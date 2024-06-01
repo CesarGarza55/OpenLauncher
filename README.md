@@ -83,4 +83,6 @@ OpenLauncher uses the following libraries and tools:
 - customtkinter
 - requests
 
+The project is based on the following project [Click me](https://github.com/Irr22/Minecraft-launcher)
+
 Thank you for using OpenLauncher!
