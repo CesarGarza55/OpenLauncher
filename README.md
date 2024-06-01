@@ -48,11 +48,11 @@ To start the launcher, run:
 
 The main interface shows different sections:
 
-    ![Captura de pantalla 2024-05-31 185110](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/464b7a33-20e3-4ddd-83e4-404786675cb1)
+![Main interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/464b7a33-20e3-4ddd-83e4-404786675cb1)
 
 To install a version, the following interface is used where the version is written:
 
-    ![Captura de pantalla 2024-05-31 185133](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/0160d883-c8c0-4464-82e3-fc9281eaf0de)
+![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/0160d883-c8c0-4464-82e3-fc9281eaf0de)
 
 You need to specify a username and the amount of RAM that the game will allocate, by default the following JVM arguments are used:
 
