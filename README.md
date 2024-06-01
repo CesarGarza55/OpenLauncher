@@ -72,7 +72,7 @@ Contributions are welcome! Follow these steps to contribute:
 - Open a Pull Request on GitHub.
 
 ## License
-This project is licensed under the GPL-2.0 License. For more details, see the LICENSE file.
+This project is licensed under the GPL-2.0 License. For more details, see the ![LICENSE](https://github.com/CesarGarza55/OpenLauncher/blob/main/LICENSE) file.
 
 ## Credits
 OpenLauncher uses the following libraries and tools:
