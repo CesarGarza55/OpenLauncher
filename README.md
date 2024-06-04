@@ -2,10 +2,12 @@
 
 OpenLauncher is an open-source Minecraft launcher developed in Python using CustomTkinter and the minecraft_launcher_lib library.
 
+(For the moment only designed for Windows)
+
 ## Features
 
 - **Custom Interface**: Utilizes CustomTkinter for a modern and customizable look.
-- **Minecraft Compatibility**: Manages Minecraft installations using the minecraft_launcher_lib library.
+- **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
 - **Open Source**: Easily extendable and modifiable by the community.
 
 ## Requirements
@@ -37,7 +39,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
    (Nuikta)
    ```bash
    pip install -r data/requirements_nuikta.txt
-   python -m nuitka --enable-plugin=tk-inter --disable-console --onefile --windows-icon-from-ico=data/icon.ico data/OpenLauncher.py
+   python -m nuitka --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico data/OpenLauncher.py
    ```
 
 ## Usage
@@ -48,11 +50,11 @@ To start the launcher, run:
 
 The main interface shows different sections:
 
-![Main interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/464b7a33-20e3-4ddd-83e4-404786675cb1)
+![Main Interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/3238a206-9881-455e-a3ee-277959aa6040)
 
-To install a version, the following interface is used where the version is written:
+To install a version, use the following interface where you select the version and click install:
 
-![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/0160d883-c8c0-4464-82e3-fc9281eaf0de)
+![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/027fa0bb-7526-4212-88e3-b1beb8612546)
 
 You need to specify a username and the amount of RAM that the game will allocate, by default the following JVM arguments are used:
 
@@ -60,7 +62,22 @@ You need to specify a username and the amount of RAM that the game will allocate
    -Xms{ram}G -Xmx{ram}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem
    ```
 
-If you want to change something you need to do it from the file 'data/OpenLauncher.py (line 287)'
+If you want to change something you need to do it from the file 'data/OpenLauncher.py (line 328)'
+
+## Testing
+My PC Specs:
+- CPU: AMD Ryzen 5 3450U 4-Core 2.1GHz
+- GPU: Radeon Vega 8 Graphics
+- RAM: 16GB DDR4 SODIMM 2400MHz
+- Operating System: Windows 11 Home v22621.3593
+
+Tested Minecraft Version:
+- RAM Allocated: 8GB
+- Fabric Loader: 0.15.11
+- Minecraft Version: 1.20.4
+- MODS: Custom modpack
+
+![Test](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/72b6c1f7-8da3-4f7d-8cdf-668621b3cb65)
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
