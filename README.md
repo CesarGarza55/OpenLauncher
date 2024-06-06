@@ -12,7 +12,8 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ## Requirements
 
-- Python 3.8 or higher
+- Python 3.10 or higher
+- Java
 - pip (Python package manager)
 
 ## Installation
@@ -31,16 +32,24 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 3. Compile:
    
-    (PyInstaller)
+    PyInstaller (Recommended for single executable file compilation [Detected as virus false positive, you probably need to disable your antivirus to compile it.])
     ```bash
     pip install -r data/requirements_pyinstaller.txt
-    pyinstaller data/OpenLauncher.py --workpath ./temp --specpath ./temp  --onefile --windowed --icon data/icon.ico --distpath ./ --noconfirm
+    pyinstaller --clean --workpath ./temp --onefile --windowed --icon data/icon.ico --distpath ./ --noconfirm data/OpenLauncher.py
     ```
+    Nuikta (Compiled in the "dist/OpenLauncher.dist" folder, it is required to share the entire folder)
+    ```bash
+    pip install -r data/requirements_nuikta.txt
+    python -m nuitka --standalone --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico --output-dir=dist data/OpenLauncher.py
+    ```
+<<<<<<< Updated upstream
    (Nuikta)
    ```bash
    pip install -r data/requirements_nuikta.txt
    python -m nuitka --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico data/OpenLauncher.py
    ```
+=======
+>>>>>>> Stashed changes
 
 ## Usage
 
@@ -100,6 +109,6 @@ OpenLauncher uses the following libraries and tools:
 - customtkinter
 - requests
 
-The project is based on the following project [Click me](https://github.com/Irr22/Minecraft-launcher)
+The project is based on the following project: [this](https://github.com/Irr22/Minecraft-launcher)
 
 Thank you for using OpenLauncher!
