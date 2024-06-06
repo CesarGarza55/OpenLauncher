@@ -32,7 +32,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 3. Compile:
    
-    PyInstaller (Recommended for single executable file compilation [Detected as virus false positive, you probably need to disable your antivirus to compile it.])
+    PyInstaller (Recommended for single executable file compilation [Detected as virus false positive, you probably need to disable your antivirus to compile it])
     ```bash
     pip install -r data/requirements_pyinstaller.txt
     pyinstaller --clean --workpath ./temp --onefile --windowed --icon data/icon.ico --distpath ./ --noconfirm data/OpenLauncher.py
@@ -42,14 +42,6 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     pip install -r data/requirements_nuikta.txt
     python -m nuitka --standalone --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico --output-dir=dist data/OpenLauncher.py
     ```
-<<<<<<< Updated upstream
-   (Nuikta)
-   ```bash
-   pip install -r data/requirements_nuikta.txt
-   python -m nuitka --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico data/OpenLauncher.py
-   ```
-=======
->>>>>>> Stashed changes
 
 ## Usage
 
@@ -59,11 +51,11 @@ To start the launcher, run:
 
 The main interface shows different sections:
 
-![Main Interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/3238a206-9881-455e-a3ee-277959aa6040)
+![Main Interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/6a70c956-6211-450d-91d2-d8ce6d542edc)
 
 To install a version, use the following interface where you select the version and click install:
 
-![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/027fa0bb-7526-4212-88e3-b1beb8612546)
+![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/da681a5d-8874-4567-b24d-b56915e28ae0)
 
 You need to specify a username and the amount of RAM that the game will allocate, by default the following JVM arguments are used:
 
@@ -88,6 +80,12 @@ Tested Minecraft Version:
 
 ![Test](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/72b6c1f7-8da3-4f7d-8cdf-668621b3cb65)
 
+## Bugs
+
+There is currently a bug when installing older versions of Forge, it is recommended to use the official installer instead of using the built-in feature (Works fine with the latest versions)
+
+![Forge Bug](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/a4f69ac2-c223-4864-ab6b-a80b9efdbffb)
+
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
 
@@ -109,6 +107,6 @@ OpenLauncher uses the following libraries and tools:
 - customtkinter
 - requests
 
-The project is based on the following project: [this](https://github.com/Irr22/Minecraft-launcher)
+The project is based on the following project: [This](https://github.com/Irr22/Minecraft-launcher)
 
 Thank you for using OpenLauncher!
