@@ -18,6 +18,8 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ## Installation
 
+### Windows:
+
 1. Clone the repository:
     ```bash
     git clone https://github.com/CesarGarza55/OpenLauncher.git
@@ -27,11 +29,11 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 2. Create a virtual environment (optional but recommended):
     ```bash
     python -m venv venv
-    source venv/bin/activate   # On Windows use `venv\Scripts\activate`
+    source `venv\Scripts\activate`
     ```
 
 3. Compile:
-   
+
     PyInstaller (Recommended for single executable file compilation [Detected as virus false positive, you probably need to disable your antivirus to compile it])
     ```bash
     pip install -r data/requirements_pyinstaller.txt
@@ -43,11 +45,35 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     python -m nuitka --standalone --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico --output-dir=dist data/OpenLauncher.py
     ```
 
-## Usage
+### Linux:
 
-To start the launcher, run: 
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/CesarGarza55/OpenLauncher.git
+    cd OpenLauncher
+    ```
     
-    OpenLauncher.exe
+2. Install python3, pip3 and Tkinter
+    ```bash
+    sudo apt install python3
+    sudo apt install pip3
+    sudo apt install python3-tk
+    ```
+    
+4. Create a virtual environment (optional but recommended):
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+    
+5. Compile:
+    PyInstaller
+    ```bash
+    pip3 install -r data/requirements_linux.txt
+    ~/.local/bin/pyinstaller --clean --workpath ./temp --onefile --windowed --distpath ./ --noconfirm data/OpenLauncher.py
+    ```
+
+## Usage
 
 The main interface shows different sections:
 
