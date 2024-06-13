@@ -74,11 +74,18 @@ try:
                     download_location = filedialog.askdirectory()
                     if download_location:  # If the user selects a location
                         messagebox.showinfo("Download", "The download is in progress, please wait...")
-                        r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe", allow_redirects=True)
-                        # Save the file to the location selected by the user
-                        with open(f'{download_location}/OpenLauncher-{latest_name}.exe', 'wb') as f:
-                            f.write(r.content)
-                        messagebox.showinfo("Download", "The download has been completed successfully.")
+                        if sys.platform == "win32":
+                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe", allow_redirects=True)
+                            # Save the file to the location selected by the user
+                            with open(f'{download_location}/OpenLauncher-{latest_name}.exe', 'wb') as f:
+                                f.write(r.content)
+                            messagebox.showinfo("Download", "The download has been completed successfully.")
+                        elif sys.platform == "linux":
+                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher", allow_redirects=True)
+                            # Save the file to the location selected by the user
+                            with open(f'{download_location}/OpenLauncher-{latest_name}', 'wb') as f:
+                                f.write(r.content)
+                            messagebox.showinfo("Download", "The download has been completed successfully.")
                         # Create the launcher_options directory if it does not exist
                         os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
                         # Save to file
