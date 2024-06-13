@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import sys
 from tkinter import filedialog, messagebox, ttk
 import uuid
@@ -12,14 +13,22 @@ import tkinter as tk
 import threading
 import requests
 
+# Set the default JVM arguments
+# Separate the arguments with a comma ("arg1", "arg2", "arg3")
+defaultJVM = ["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"]
+jvm_arguments = None
+
 # Debug Mode
 debug_mode = False
 
 # Show snapshot versions
 show_snapshots = False
 
+# Ask for updates
+ask_update = "yes"
+
 # Launcher version
-launcher_version = "alpha-0.0.5"
+launcher_version = "alpha-0.0.6"
 
 # Set Minecraft directory
 if debug_mode:
@@ -64,6 +73,10 @@ try:
             if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
                 with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
                     user_data = json.load(f)
+                    user_name = user_data.get('name')
+                    last_version = user_data.get('last_version')
+                    show_snapshots = user_data.get('toggle_snapshots')
+                    jvm_arguments = user_data.get('jvm_arguments')
                     ask_update = user_data.get('ask_update')
             if(ask_update != "no"):
                 root = tk.Tk()
@@ -88,20 +101,33 @@ try:
                             messagebox.showinfo("Download", "The download has been completed successfully.")
                         # Create the launcher_options directory if it does not exist
                         os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-                        # Save to file
+                        # Save the data to a file
                         data = {
-                            'ask_update': 'yes'
+                            'name': user_name, # Save the user name
+                            'toggle_snapshots': show_snapshots,  # save the state of the checkbox
+                            'jvm_arguments': jvm_arguments,  # Save the JVM arguments
+                            'last_version': last_version,  # Save the last version used
+                            'ask_update': ask_update # Save the state of the checkbox
                         }
-                        # Save data to a file
+
+                        # Create the launcher_options directory if it does not exist
+                        os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+
+                        # Save the data to a file
                         with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
                             json.dump(data, f)
                         exit()
                 else:
+                    ask_update = "no"
                     # Create the launcher_options directory if it does not exist
                     os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
                     # Save to file
                     data = {
-                        'ask_update': 'no'
+                        'name': user_name, # Save the user name
+                        'toggle_snapshots': show_snapshots,  # save the state of the checkbox
+                        'jvm_arguments': jvm_arguments,  # Save the JVM arguments
+                        'last_version': last_version,  # Save the last version used
+                        'ask_update': ask_update # Save the state of the checkbox
                     }
                     # Save data to a file
                     with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
@@ -142,19 +168,16 @@ window.after_idle(center_window)
 
 # Create the widgets
 bt_run_minecraft = ctk.CTkButton(window, text='Start game', text_color="white", fg_color="#3b82f6")
-bt_main_path = ctk.CTkButton(window, text='Open game folder', text_color="white", fg_color="#3b82f6")
 bt_install_versions = ctk.CTkButton(window, text='Install versions', text_color="white", fg_color="#32a862")
 bt_install_forge = ctk.CTkButton(window, text='Install Forge', text_color="white", fg_color="#ef4444")
-bt_install_fabric = ctk.CTkButton(window, text='Install Fabric', text_color="white", fg_color="#10b981")
+bt_install_fabric = ctk.CTkButton(window, text='Install Fabric', text_color="white", fg_color="#32a862")
+bt_settings = ctk.CTkButton(window, text='Settings', text_color="white", fg_color="#3b82f6")
 
 label_name = ctk.CTkLabel(window, text='User name:', text_color="white", font=("Arial", 12))
-label_ram = ctk.CTkLabel(window, text='RAM (GB):', text_color="white", font=("Arial", 12))
-
 entry_name = ctk.CTkEntry(window, placeholder_text="User name (Steve)", width=300)
-entry_ram = ctk.CTkEntry(window, placeholder_text="6", width=300)
 
 label_snapshots = ctk.CTkLabel(window, text="Show Snapshots", text_color="white", font=("Arial", 12))
-label_snapshots.place(x=550, y=17) 
+ 
 
 # Function to toggle snapshots
 def toggle_snapshots():
@@ -168,7 +191,6 @@ def toggle_snapshots():
 # Define the checkbox
 check = ctk.CTkCheckBox(window, width=30, height=30, fg_color="#3b82f6", text="", command=toggle_snapshots)
 check.deselect()
-check.place(x=650, y=17)
 
 # Load the versions
 try:
@@ -253,44 +275,49 @@ else:
 versions_dropdown_menu = ctk.CTkOptionMenu(window, variable=vers, values=installed_versions_list)
 versions_dropdown_menu.configure()
 
-
 # Function to configure the dropdown menu
 def configure_dropdown(vers, installed_versions_list):
     versions_dropdown_menu.configure(variable=vers, values=installed_versions_list)
     vers = ctk.StringVar(value=installed_versions_list[0])
-
 
 # Load the data from the user_data.json file
 if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
     with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
         user_data = json.load(f)
         user_name = user_data.get('name')
-        user_ram = user_data.get('ram')
         last_version = user_data.get('last_version')
         show_snapshots = user_data.get('toggle_snapshots')
+        jvm_arguments = user_data.get('jvm_arguments')
         # Aplicar los data cargados a los campos de entrada
-        if(user_name != "" and user_ram != "" and last_version != ""):
+        if(user_name != "" and last_version != ""):
             if user_name is not None:
                 entry_name.insert(0, user_name)
-            if user_ram is not None:
-                entry_ram.insert(0, user_ram)
             if last_version is not None:
                 vers.set(last_version)
         if show_snapshots == False:
             check.deselect()
         elif show_snapshots == True:
             check.select()
+            
 else:
     user_name = entry_name.get()
-    user_ram = entry_ram.get()
     last_version = vers.get()
     show_snapshots = False
+    jvm_arguments = defaultJVM
     # Create the launcher_options directory if it does not exist
     os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
 
     # Save the data to a file
+    data = {
+        'name': user_name, # Save the user name
+        'toggle_snapshots': show_snapshots,  # save the state of the checkbox
+        'jvm_arguments': jvm_arguments,  # Save the JVM arguments
+        'last_version': last_version,  # Save the last version used
+        'ask_update': ask_update # Save the state of the checkbox
+    }
+    # Save data to a file
     with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
-        json.dump({'name': user_name, 'ram': user_ram, 'last_version': last_version}, f)
+        json.dump(data, f)
 
 # Load the UUID from the user_uuid.json file
 if os.path.exists(f'{minecraft_directory}/launcher_options/user_uuid.json') and os.path.getsize(f'{minecraft_directory}/launcher_options/user_uuid.json') > 0:
@@ -310,8 +337,10 @@ def save_data():
     # Save the data to a file
     data = {
         'name': entry_name.get(), # Save the user name
-        'ram': entry_ram.get(), # Save the RAM value
-        'toggle_snapshots': check.get()  # save the state of the checkbox
+        'toggle_snapshots': check.get(),  # save the state of the checkbox
+        'jvm_arguments': jvm_arguments,  # Save the JVM arguments
+        'last_version': vers.get(),  # Save the last version used
+        'ask_update': ask_update # Save the state of the checkbox
     }
 
     if vers.get() != 'No version installed':
@@ -510,8 +539,7 @@ def run_minecraft():
         return
     
     mine_user = entry_name.get()
-    ram = entry_ram.get()
-    if(user_uuid == "" and mine_user != ""):
+    if(user_uuid == "" and jvm_arguments != ""):
         # Generate a UUID if it does not exist
         generate_uuid(mine_user)
     save_data()
@@ -519,8 +547,8 @@ def run_minecraft():
     if not mine_user:
         messagebox.showerror("Error", "Please enter your user name")
         return
-    if not ram:
-        messagebox.showerror("Error", "Please enter the amount of RAM to use")
+    if not jvm_arguments:
+        messagebox.showerror("Error", "Please set the JVM arguments")
         return
     
 
@@ -537,7 +565,7 @@ def run_minecraft():
             'username': mine_user,
             'uuid': user_uuid,
             'token': '',
-            'jvmArguments': [f"-Xms{ram}G", f"-Xmx{ram}G", "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200", "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch", "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M", "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4", "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90", "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem"],
+            'jvmArguments': jvm_arguments,
             'launcherName': "OpenLauncher for Minecraft",
             'launcherVersion': launcher_version
         }
@@ -694,7 +722,7 @@ def install_forge_versions():
     window_width = window_versions.winfo_reqwidth()
     window_height = window_versions.winfo_reqheight()
     position_right = int(window_versions.winfo_screenwidth()/2 - window_width/2 - 48)
-    position_down = int(window_versions.winfo_screenheight()/2 - window_height/2)
+    position_down = int(window_versions.winfo_screenheight()/2 - window_height/2 - 32)
 
     # Position the window in the center of the screen
     window_versions.geometry("+{}+{}".format(position_right, position_down))
@@ -755,6 +783,53 @@ def open_directory():
     else:
         print(f"Directory {minecraft_directory} does not exist")
 
+def settings_window():
+    window_settings = ctk.CTkToplevel(window)
+    window_settings.geometry('300x270')
+    window_settings.title('Settings')
+    window_settings.update()  # Update the window
+    window_settings.grab_set()  # Set the window to be on top
+    window_settings.resizable(False, False)  # Disable resizing
+    
+    # Set the position to center the window
+    window_width = window_settings.winfo_reqwidth()
+    window_height = window_settings.winfo_reqheight()
+    position_right = int(window_settings.winfo_screenwidth()/2 - window_width/2 - 48)
+    position_down = int(window_settings.winfo_screenheight()/2 - window_height/2 - 48)
+
+    # Position the window in the center of the screen
+    window_settings.geometry("+{}+{}".format(position_right, position_down))
+    
+    # Create the jvm arguments label and entry
+    label_jvm_arguments = ctk.CTkLabel(window_settings, text="JVM arguments (Expert settings)\n\nIf nothing is specified in this field, the default\nvalues ​​will be used. Don't use this option if\nyou don't know what you're doing.", text_color="white", font=("Arial", 12))
+    label_jvm_arguments.pack(pady=10)
+    label_tip = ctk.CTkLabel(window_settings, text="Leave blank and save to reset.", text_color="yellow", font=("Arial", 12))
+    label_tip.pack()
+    entry_jvm_arguments = ctk.CTkEntry(window_settings, width=260, placeholder_text="JVM arguments (-Xms512M -Xmx8G -XX:+UseG1GC -XX:+ParallelRe...)", text_color="white")
+    entry_jvm_arguments.pack()
+    if jvm_arguments != defaultJVM:
+        entry_jvm_arguments.insert(0, " ".join(jvm_arguments))
+    
+    def set_jvm():
+        global jvm_arguments
+        entry_value = entry_jvm_arguments.get().strip()
+        if entry_value != "" and not re.match("^-*$", entry_value):
+            jvm_arguments = entry_value.split()
+            # Filter the arguments
+            jvm_arguments = [arg.replace("\n", "") for arg in jvm_arguments if arg.strip() not in ["", "-"] and not re.match("^-*$", arg)]
+            # If jvm_arguments is empty after filtering, assign defaultJVM
+            if not jvm_arguments:
+                jvm_arguments = defaultJVM
+        else:
+            jvm_arguments = defaultJVM
+
+    # Create the save button
+    bt_save = ctk.CTkButton(window_settings, text='Save settings', width=260, fg_color="#32a862", command=lambda: [set_jvm(), save_data(), window_settings.destroy()])
+    bt_save.pack(pady=20)
+    # Create the directory button
+    bt_main_path = ctk.CTkButton(window_settings, text='Open game directory', width=260, command=lambda: open_directory())
+    bt_main_path.pack()
+
 # Function to run the menu of the application
 def menu():
     # Set the functions of the widgets and place them on the window
@@ -767,17 +842,17 @@ def menu():
     bt_install_forge.configure(command=install_forge_versions)
     bt_install_forge.place(x=690, y=120)
 
-    label_name.place(x=20, y=10)
-    entry_name.place(x=20, y=40)
+    bt_settings.configure(command=settings_window)
+    bt_settings.place(x=350, y=450)
 
-    label_ram.place(x=20, y=90)
-    entry_ram.place(x=20, y=120)
+    label_name.place(x=20, y=20)
+    entry_name.place(x=20, y=50)
+
+    label_snapshots.place(x=20, y=110)
+    check.place(x=120, y=110)
 
     bt_run_minecraft.configure(command=run_minecraft)
     bt_run_minecraft.place(x=690, y=450)
-
-    bt_main_path.configure(command=open_directory)
-    bt_main_path.place(x=350, y=450)
 
     versions_dropdown_menu.place(x=20, y=450)
 

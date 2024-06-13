@@ -5,3 +5,4 @@ OpenLauncher.exe
 OpenLauncher.cmd
 OpenLauncher.spec
 /temp
+logs/latest.log
