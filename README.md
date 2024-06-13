@@ -39,11 +39,14 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     pip install -r data/requirements_pyinstaller.txt
     pyinstaller --clean --workpath ./temp --onefile --windowed --icon data/icon.ico --distpath ./ --noconfirm data/OpenLauncher.py
     ```
+    Or run compile-pyinstaller.bat
+   
     Nuikta (Compiled in the "dist/OpenLauncher.dist" folder, it is required to share the entire folder)
     ```bash
     pip install -r data/requirements_nuikta.txt
     python -m nuitka --standalone --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico --output-dir=dist data/OpenLauncher.py
     ```
+    Or run compile-nuikta.bat
 
 ### Linux:
 
@@ -60,17 +63,17 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     sudo apt install python3-tk
     ```
     
-4. Create a virtual environment (optional but recommended):
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-    
-5. Compile:
-    PyInstaller
+3. Compile:
+
+   PyInstaller
     ```bash
     pip3 install -r data/requirements_linux.txt
     ~/.local/bin/pyinstaller --clean --workpath ./temp --onefile --windowed --distpath ./ --noconfirm data/OpenLauncher.py
+    ```
+    Or run compile-linux.sh:
+    ```bash
+    chmod +x compile-linux.sh
+    ./compile-linux.sh
     ```
 
 ## Usage
