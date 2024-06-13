@@ -808,7 +808,8 @@ def settings_window():
     entry_jvm_arguments = ctk.CTkEntry(window_settings, width=260, placeholder_text="JVM arguments (-Xms512M -Xmx8G -XX:+UseG1GC -XX:+ParallelRe...)", text_color="white")
     entry_jvm_arguments.pack()
     if jvm_arguments != defaultJVM:
-        entry_jvm_arguments.insert(0, " ".join(jvm_arguments))
+        if jvm_arguments is not None and isinstance(jvm_arguments, (list, tuple)):
+            entry_jvm_arguments.insert(0, " ".join(jvm_arguments))
     
     def set_jvm():
         global jvm_arguments
