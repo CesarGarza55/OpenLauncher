@@ -81,9 +81,9 @@ try:
                                 f.write(r.content)
                             messagebox.showinfo("Download", "The download has been completed successfully.")
                         elif sys.platform == "linux":
-                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher", allow_redirects=True)
+                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.bin", allow_redirects=True)
                             # Save the file to the location selected by the user
-                            with open(f'{download_location}/OpenLauncher-{latest_name}', 'wb') as f:
+                            with open(f'{download_location}/OpenLauncher-{latest_name}.bin', 'wb') as f:
                                 f.write(r.content)
                             messagebox.showinfo("Download", "The download has been completed successfully.")
                         # Create the launcher_options directory if it does not exist
