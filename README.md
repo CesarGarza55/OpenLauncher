@@ -60,13 +60,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     sudo apt install python3-tk
     ```
     
-4. Create a virtual environment (optional but recommended):
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-    
-5. Compile:
+3. Compile:
     PyInstaller
     ```bash
     pip3 install -r data/requirements_linux.txt
