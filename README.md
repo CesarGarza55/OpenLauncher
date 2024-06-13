@@ -84,19 +84,21 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 The main interface shows different sections:
 
-![Main Interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/6a70c956-6211-450d-91d2-d8ce6d542edc)
+![Main interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/42d5c13d-fcf0-403e-a281-e1591e3713c2)
 
 To install a version, use the following interface where you select the version and click install:
 
-![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/da681a5d-8874-4567-b24d-b56915e28ae0)
+![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/5e88b59f-f597-4b29-831a-09b18ffe4104)
 
-You need to specify a username and the amount of RAM that the game will allocate, by default the following JVM arguments are used:
+By default the following JVM arguments are used:
 
    ```bash
-   -Xms{ram}G -Xmx{ram}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem
+   -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M
    ```
 
-If you want to change something you need to do it from the file 'data/OpenLauncher.py (line 328)'
+If you want to change something you need to do it from the settings window.
+
+![Settings window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/e059b56f-5402-4d0d-8829-32ebdec0780c)
 
 ## Testing
 My PC Specs:
@@ -141,5 +143,9 @@ OpenLauncher uses the following libraries and tools:
 - requests
 
 The project is based on the following project: [This](https://github.com/Irr22/Minecraft-launcher)
+
+## Disclaimer
+
+This project is in no way related to or associated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. All trademarks and intellectual property rights mentioned in this project are the exclusive property of their respective owners. No files belonging to Mojang AB or Microsoft are hosted on servers owned by us.
 
 Thank you for using OpenLauncher!
