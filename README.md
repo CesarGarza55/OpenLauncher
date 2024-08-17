@@ -6,7 +6,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ## Features
 
-- **Custom Interface**: Utilizes CustomTkinter for a modern and customizable look.
+- **Custom Interface**: Utilizes PyQt5 for a modern and customizable look.
 - **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
 - **Open Source**: Easily extendable and modifiable by the community.
 
@@ -34,19 +34,14 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 3. Compile:
 
-    PyInstaller (Recommended for single executable file compilation [Detected as virus false positive, you probably need to disable your antivirus to compile it])
+    PyInstaller
     ```bash
-    pip install -r data/requirements_pyinstaller.txt
-    pyinstaller --clean --workpath ./temp --onefile --windowed --icon data/icon.ico --distpath ./ --noconfirm data/OpenLauncher.py
+    pip install -r data/requirements_windows.txt
+    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data\img\icon.ico" --add-data "data\img;img/" "data\OpenLauncher.py"
+    del OpenLauncher.spec
+    rmdir /s /q temp
     ```
-    Or run compile-pyinstaller.bat
-   
-    Nuikta (Compiled in the "dist/OpenLauncher.dist" folder, it is required to share the entire folder)
-    ```bash
-    pip install -r data/requirements_nuikta.txt
-    python -m nuitka --standalone --enable-plugin=tk-inter --follow-imports --disable-console --windows-icon-from-ico=data/icon.ico --output-dir=dist data/OpenLauncher.py
-    ```
-    Or run compile-nuikta.bat
+    Or run compile-windows.bat
 
 ### Linux:
 
@@ -56,10 +51,12 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     cd OpenLauncher
     ```
     
-2. Install python3, pip3 and Tkinter
+2. Install python3, pip and Tkinter
     ```bash
+    sudo apt update
+    sudo apt upgrade
     sudo apt install python3
-    sudo apt install pip3
+    sudo apt install python3-pip
     sudo apt install python3-tk
     ```
     
@@ -68,15 +65,24 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
    PyInstaller
     ```bash
     pip3 install -r data/requirements_linux.txt
-    ~/.local/bin/pyinstaller --clean --workpath ./temp --onefile --windowed --distpath ./ --noconfirm data/OpenLauncher.py
+    sudo apt install libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1
+    export QT_QPA_PLATFORM=xcb
+    sudo apt-get install --reinstall libqt5widgets5 libqt5gui5 libqt5core5a
+    ~/.local/bin/pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data/img/icon.ico" --add-data "data/img:img/" "data/OpenLauncher.py"
+    rm OpenLauncher.spec
+    rm -rf temp
     ```
     Or run compile-linux.sh:
     ```bash
     chmod +x compile-linux.sh
     ./compile-linux.sh
     ```
+    You need to install Java to be able to play, by default it should be possible with:
+    ```bash
+    sudo apt install default-jre
+    ```
 
-4. Mark the file as an program:
+5. Mark the file as an program:
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
@@ -84,11 +90,11 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 The main interface shows different sections:
 
-![Main interface](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/42d5c13d-fcf0-403e-a281-e1591e3713c2)
+![Main Interface](https://github.com/user-attachments/assets/3b516633-089f-4a19-9687-aeba389d2d7d)
 
 To install a version, use the following interface where you select the version and click install:
 
-![Install window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/5e88b59f-f597-4b29-831a-09b18ffe4104)
+![Install minecraft](https://github.com/user-attachments/assets/c709ce85-6b7d-46bd-b2e4-06b6bcf43588)
 
 By default the following JVM arguments are used:
 
@@ -98,7 +104,7 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![Settings window](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/e059b56f-5402-4d0d-8829-32ebdec0780c)
+![Settings](https://github.com/user-attachments/assets/2fc94605-2fdc-4085-926b-dde09533bf89)
 
 ## Testing
 My PC Specs:
@@ -108,18 +114,16 @@ My PC Specs:
 - Operating System: Windows 11 Home v22621.3593
 
 Tested Minecraft Version:
-- RAM Allocated: 8GB
-- Fabric Loader: 0.15.11
-- Minecraft Version: 1.20.4
-- MODS: Custom modpack
+- RAM Allocated: 2GB (Default JVM Arguments)
+- Minecraft Version: 1.21.1
 
-![Test](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/72b6c1f7-8da3-4f7d-8cdf-668621b3cb65)
+![Test](https://github.com/user-attachments/assets/b6b94107-de9c-4c53-a85e-5374d76b806a)
 
 ## Bugs
 
-There is currently a bug when installing older versions of Forge, it is recommended to use the official installer instead of using the built-in feature (Works fine with the latest versions)
+In this latest version I have patched the bug by installing Forge versions, it should work perfectly, however, I have left the warning mainly because it is likely that with specific versions there may be some error (I have not checked each one because there are too many)
 
-![Forge Bug](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/a4f69ac2-c223-4864-ab6b-a80b9efdbffb)
+![Bug](https://github.com/user-attachments/assets/b005d827-d565-4003-bc29-3a88f9da5e51)
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
@@ -137,9 +141,8 @@ This project is licensed under the GPL-2.0 License. For more details, see the [L
 OpenLauncher uses the following libraries and tools:
 
 - pyinstaller
-- nuitka
 - minecraft_launcher_lib
-- customtkinter
+- PyQt5
 - requests
 
 The project is based on the following project: [This](https://github.com/Irr22/Minecraft-launcher)
