@@ -1,4 +1,4 @@
 pyinstaller
 minecraft_launcher_lib
-customtkinter
+PyQt5
 requests
