@@ -42,6 +42,11 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     rmdir /s /q temp
     ```
     Or run compile-windows.bat
+   
+5. You need to install Java to be able to play:
+
+    [https://www.java.com/es/download/](https://www.java.com/es/download/)
+
 
 ### Linux:
 
@@ -77,7 +82,9 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     chmod +x compile-linux.sh
     ./compile-linux.sh
     ```
-    You need to install Java to be able to play, by default it should be possible with:
+    
+4. You need to install Java to be able to play, by default it should be possible with:
+
     ```bash
     sudo apt install default-jre
     ```
