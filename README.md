@@ -145,6 +145,7 @@ OpenLauncher uses the following libraries and tools:
 - pyinstaller
 - minecraft_launcher_lib
 - PyQt5
+- pypresence
 - requests
 
 The project is based on the following project: [This](https://github.com/Irr22/Minecraft-launcher)
