@@ -37,7 +37,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     PyInstaller
     ```bash
     pip install -r data/requirements_windows.txt
-    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data\img\icon.ico" --add-data "data\img;img/" "data\OpenLauncher.py"
+    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data\img\creeper.ico" --add-data "data\img;img/" "data\OpenLauncher.py"
     del OpenLauncher.spec
     rmdir /s /q temp
     ```
@@ -68,7 +68,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     sudo apt install libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1
     export QT_QPA_PLATFORM=xcb
     sudo apt-get install --reinstall libqt5widgets5 libqt5gui5 libqt5core5a
-    ~/.local/bin/pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data/img/icon.ico" --add-data "data/img:img/" "data/OpenLauncher.py"
+    ~/.local/bin/pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --add-data data/img:img/ data/OpenLauncher.py
     rm OpenLauncher.spec
     rm -rf temp
     ```
@@ -90,7 +90,8 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 The main interface shows different sections:
 
-![Main Interface](https://github.com/user-attachments/assets/3b516633-089f-4a19-9687-aeba389d2d7d)
+![Main interface](https://github.com/user-attachments/assets/bee88371-29b9-4fd3-8037-9895a3a6dc49)
+
 
 To install a version, use the following interface where you select the version and click install:
 
@@ -104,7 +105,7 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![Settings](https://github.com/user-attachments/assets/2fc94605-2fdc-4085-926b-dde09533bf89)
+![Settings](https://github.com/user-attachments/assets/ea74104f-cdb0-4e1c-8f65-66441d1153ee)
 
 ## Testing
 My PC Specs:
@@ -118,12 +119,6 @@ Tested Minecraft Version:
 - Minecraft Version: 1.21.1
 
 ![Test](https://github.com/user-attachments/assets/b6b94107-de9c-4c53-a85e-5374d76b806a)
-
-## Bugs
-
-In this latest version I have patched the bug by installing Forge versions, it should work perfectly, however, I have left the warning mainly because it is likely that with specific versions there may be some error (I have not checked each one because there are too many)
-
-![Bug](https://github.com/user-attachments/assets/b005d827-d565-4003-bc29-3a88f9da5e51)
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
