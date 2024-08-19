@@ -1,6 +1,5 @@
-import re
-import subprocess
-import json, os, sys, uuid, webbrowser, requests, pathlib, threading, minecraft_launcher_lib
+import re, time, subprocess, random, atexit, minecraft_launcher_lib
+import json, os, sys, uuid, webbrowser, requests, pathlib, threading
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, 
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
@@ -11,12 +10,68 @@ from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject
 from PyQt5.QtGui import QTextCursor, QIcon
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from pypresence import Presence
+
+# Define the client ID for the Discord Rich Presence
+CLIENT_ID = '1274620174347010069'
+
+# Select random state for the Discord Rich Presence
+state_list = ["Block party time!","Crafting away!","Pixel perfectionist!",
+            "Mining fun!","Survival mode: On!","Craft, build, repeat!",
+            "Creeper avoider!","Epic loot hunting!","Digging deep!",
+            "Also available on toaster!","With great power comes great blockiness!",
+            "print('Hello, world!')","Redstone engineer!","Building a better world!",
+            "I am a blockhead!","We love python!","Powered by coffee!",
+            "Also try Terraria!","TODO: Delete this later","Don't mine at night!",
+            "Why so blocky?","/gamerule keepInventory true","Powered by Redstone!",
+            "/op @s","respawning...","rage quitting...","I need a hero!", 
+            "zZzz...", "uninstalling..."]
+
+# Create the Discord Rich Presence object
+rpc = Presence(CLIENT_ID)
+
+# Set the default value for the Discord Rich Presence
+discord_rpc = False
+
+def connect_discord():
+    try:
+        # Connect to the Discord Rich Presence
+        rpc.connect()
+
+        # Update the Discord Rich Presence
+        rpc.update(
+            details="Playing Minecraft",
+            state=random.choice(state_list),
+            large_image="preview",
+            large_text="Minecraft Java Edition",
+            start=time.time()
+        )
+    except Exception as e:
+        pass
+
+# Function to clean up the Discord Rich Presence
+def cleanup():
+    try:
+        rpc.clear()
+        rpc.close()
+    except Exception as e:
+        pass
+
+def discord_controller():
+    global discord_rpc
+    if not discord_rpc:
+        connect_discord()
+        discord_rpc = True
+    else:
+        cleanup()
+        discord_rpc = False
+
+atexit.register(cleanup)
 
 # Set the default JVM arguments
 # Separate the arguments with a comma ("arg1", "arg2", "arg3")
 defaultJVM = ["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"]
 jvm_arguments = ""
-
 # Debug Mode
 debug_mode = False
 
@@ -27,13 +82,21 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "alpha-0.0.7"
+launcher_version = "alpha-0.0.8"
 
 # User UUID
 user_uuid = ""
 
 # Script directory
 script_dir = os.path.dirname(__file__)
+
+# Set the paths for the images
+bg_path = os.path.join(script_dir, 'img/bg.jpg').replace("\\", "/")
+uncheck_path = os.path.join(script_dir, 'img/uncheck.png').replace("\\", "/")
+uncheck_hover_path = os.path.join(script_dir, 'img/uncheck_hover.png').replace("\\", "/")
+check_path = os.path.join(script_dir, 'img/check.png').replace("\\", "/")
+check_hover_path = os.path.join(script_dir, 'img/check_hover.png').replace("\\", "/")
+
 # Set Minecraft directory
 if debug_mode:
     # Define a custom Minecraft directory for testing
@@ -45,123 +108,81 @@ if debug_mode:
 else:
     # Gets the default Minecraft directory (.minecraft)
     minecraft_directory = minecraft_launcher_lib.utils.get_minecraft_directory()
-script_dir = script_dir  # Gets the script directory
+
+def version_to_tuple(version):
+    if 'alpha' in version:
+        version_type = 0
+        version = version.replace('alpha-', '')
+    elif 'beta' in version:
+        version_type = 1
+        version = version.replace('beta-', '')
+    else:
+        version_type = 2
+    parts = version.split('.')
+    return (version_type,) + tuple(map(int, parts))
+
 
 # Launcher Update
+def load_user_data(filepath):
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    else:
+        return {
+            'name': "",
+            'last_version': "",
+            'toggle_snapshots': False,
+            'jvm_arguments': defaultJVM,
+            'ask_update': "yes",
+            'discord_rpc': False
+        }
+
+def save_user_data(filepath, data):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w') as f:
+        json.dump(data, f)
+
 try:
     update = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest")
-    def version_to_tuple(version):
-        # Determines whether the version is alpha or beta
-        if 'alpha' in version:
-            version_type = 0
-            version = version.replace('alpha-', '')
-        elif 'beta' in version:
-            version_type = 1
-            version = version.replace('beta-', '')
-        else:
-            version_type = 2
-
-        # Divide the string into parts
-        parts = version.split('.')
-        # Converts parts to integers and puts them in a tuple
-        return (version_type,) + tuple(map(int, parts))
-
-    # Get the current version and the latest version
     actual_version = version_to_tuple(launcher_version)
     latest_version = version_to_tuple(update.url.split('/').pop())
     latest_name = update.url.split('/').pop()
-    # Compare versions
+
     if latest_version > actual_version:
-        if latest_version > actual_version:
-            # Check if ask_update is no
-            if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
-                with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
-                    user_data = json.load(f)
-                    user_name = user_data.get('name')
-                    last_version = user_data.get('last_version')
-                    show_snapshots = user_data.get('toggle_snapshots')
-                    jvm_arguments = user_data.get('jvm_arguments')
-                    ask_update = user_data.get('ask_update')
+        user_data_path = f'{minecraft_directory}/launcher_options/user_data.json'
+        user_data = load_user_data(user_data_path)
+        user_name = user_data.get('name')
+        last_version = user_data.get('last_version')
+        show_snapshots = user_data.get('toggle_snapshots')
+        jvm_arguments = user_data.get('jvm_arguments')
+        ask_update = user_data.get('ask_update')
+        discord_rpc = user_data.get('discord_rpc')
+        
+        if ask_update != "no":
+            root = tk.Tk()
+            root.withdraw()
+            if messagebox.askyesno("Update", "A new version is available. Would you like to download it?"):
+                messagebox.showinfo("Download", "Please select the download location.")
+                download_location = filedialog.askdirectory()
+                if download_location:
+                    messagebox.showinfo("Download", "The download is in progress, please wait...")
+                    if sys.platform == "win32":
+                        r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe", allow_redirects=True)
+                        with open(f'{download_location}/OpenLauncher-{latest_name}.exe', 'wb') as f:
+                            f.write(r.content)
+                        messagebox.showinfo("Download", "The download has been completed successfully.")
+                    elif sys.platform == "linux":
+                        r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.bin", allow_redirects=True)
+                        with open(f'{download_location}/OpenLauncher-{latest_name}.bin', 'wb') as f:
+                            f.write(r.content)
+                        messagebox.showinfo("Download", "The download has been completed successfully.")
+                        os.system(f'chmod +x {download_location}/OpenLauncher-{latest_name}.bin')
+                    save_user_data(user_data_path, user_data)
+                    sys.exit()
             else:
-                user_name = ""
-                last_version = ""
-                show_snapshots = False
-                jvm_arguments = defaultJVM
-                ask_update = "yes"
-                # Create the launcher_options directory if it does not exist
-                os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-                # Save the data to a file
-                data = {
-                    'name': user_name, # Save the user name
-                    'toggle_snapshots': show_snapshots,  # save the state of the checkbox
-                    'jvm_arguments': jvm_arguments,  # Save the JVM arguments
-                    'last_version': last_version,  # Save the last version used
-                    'ask_update': ask_update # Save the state of the checkbox
-                }
-
-                # Create the launcher_options directory if it does not exist
-                os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-
-                # Save the data to a file
-                with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
-                    json.dump(data, f)
-            if(ask_update != "no"):
-                root = tk.Tk()
-                root.withdraw()  # Hide the Tkinter window
-                if messagebox.askyesno("Update", "A new version is available. Would you like to download it?"):
-                    messagebox.showinfo("Download", "Please select the download location.")
-                    # Prompt user to select download location
-                    download_location = filedialog.askdirectory()
-                    if download_location:  # If the user selects a location
-                        messagebox.showinfo("Download", "The download is in progress, please wait...")
-                        if sys.platform == "win32":
-                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe", allow_redirects=True)
-                            # Save the file to the location selected by the user
-                            with open(f'{download_location}/OpenLauncher-{latest_name}.exe', 'wb') as f:
-                                f.write(r.content)
-                            messagebox.showinfo("Download", "The download has been completed successfully.")
-                            os.startfile(f'{download_location}/OpenLauncher-{latest_name}.exe')
-                        elif sys.platform == "linux":
-                            r = requests.get("https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.bin", allow_redirects=True)
-                            # Save the file to the location selected by the user
-                            with open(f'{download_location}/OpenLauncher-{latest_name}.bin', 'wb') as f:
-                                f.write(r.content)
-                            messagebox.showinfo("Download", "The download has been completed successfully.")
-                            os.system(f'chmod +x {download_location}/OpenLauncher-{latest_name}.bin')
-                        # Create the launcher_options directory if it does not exist
-                        os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-                        # Save the data to a file
-                        data = {
-                            'name': user_name, # Save the user name
-                            'toggle_snapshots': show_snapshots,  # save the state of the checkbox
-                            'jvm_arguments': jvm_arguments,  # Save the JVM arguments
-                            'last_version': last_version,  # Save the last version used
-                            'ask_update': ask_update # Save the state of the checkbox
-                        }
-
-                        # Create the launcher_options directory if it does not exist
-                        os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-
-                        # Save the data to a file
-                        with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
-                            json.dump(data, f)
-                        sys.exit()
-                else:
-                    ask_update = "no"
-                    # Create the launcher_options directory if it does not exist
-                    os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-                    # Save to file
-                    data = {
-                        'name': user_name, # Save the user name
-                        'toggle_snapshots': show_snapshots,  # save the state of the checkbox
-                        'jvm_arguments': jvm_arguments,  # Save the JVM arguments
-                        'last_version': last_version,  # Save the last version used
-                        'ask_update': ask_update # Save the state of the checkbox
-                    }
-                    # Save data to a file
-                    with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
-                        json.dump(data, f)
-                root.destroy()
+                user_data['ask_update'] = "no"
+                save_user_data(user_data_path, user_data)
+            root.destroy()
 except Exception as e:
     print("Error:", e)
 
@@ -220,7 +241,7 @@ class Ui_MainWindow(object):
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(850, 500)
         MainWindow.setMinimumSize(QSize(850, 500))
-        icon = os.path.join(script_dir, 'img/icon.ico').replace("\\", "/")
+        icon = os.path.join(script_dir, 'img/creeper_black.png').replace("\\", "/")
         MainWindow.setWindowIcon(QIcon(icon))
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -260,8 +281,6 @@ class Ui_MainWindow(object):
 
         self.checkBox = QCheckBox(self.centralwidget)
         self.checkBox.setObjectName(u"checkBox")
-        self.checkBox.setMinimumWidth(115)  # Establece el ancho mínimo
-        self.checkBox.setMaximumWidth(115)  # Establece el ancho máximo
         self.verticalLayout_2.addWidget(self.checkBox)
 
         self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Ignored)
@@ -382,15 +401,8 @@ class Ui_MainWindow(object):
 
         QMetaObject.connectSlotsByName(MainWindow)
 
-        # Establecer el tema oscuro directamente en el método setupUi
+        # Establish the style of the widgets
         MainWindow.setStyleSheet("background-color: rgb(30, 50, 100);")
-        # Establecer la imagen de fondo usando una ruta absoluta y redimensionarla
-        bg_path = os.path.join(script_dir, 'img/bg.jpg').replace("\\", "/")
-        uncheck_path = os.path.join(script_dir, 'img/uncheck.png').replace("\\", "/")
-        uncheck_hover_path = os.path.join(script_dir, 'img/uncheck_hover.png').replace("\\", "/")
-        check_path = os.path.join(script_dir, 'img/check.png').replace("\\", "/")
-        check_hover_path = os.path.join(script_dir, 'img/check_hover.png').replace("\\", "/")
-        
         self.centralwidget.setStyleSheet(f"""
             QWidget#centralwidget {{
                 border-image: url({bg_path});
@@ -481,6 +493,10 @@ class Ui_MainWindow(object):
             QLineEdit:hover {
                 background-color: rgba(70, 130, 240, 0.6);
             }
+            QLineEdit:disabled {
+                background-color: rgba(128, 128, 128, 0.6);
+                color: #cccccc;
+            }
         """)
         self.checkBox.setStyleSheet(f"""
             QCheckBox {{
@@ -506,6 +522,9 @@ class Ui_MainWindow(object):
             QCheckBox::indicator:checked:hover {{
                 image: url({check_hover_path});
             }}
+            QCheckBox:disabled {{
+                color: #cccccc;
+            }}
         """)
         self.comboBox.setStyleSheet("""
             QComboBox {
@@ -515,6 +534,10 @@ class Ui_MainWindow(object):
             }
             QComboBox:hover {
                 background-color: rgba(30, 50, 100, 1);
+            }
+            QComboBox:disabled {
+                background-color: rgba(128, 128, 128, 0.6);
+                color: #cccccc;
             }
         """)
         self.progressBar.setStyleSheet("""
@@ -539,67 +562,76 @@ class Ui_MainWindow(object):
         self.pushButton_4.clicked.connect(self.settings_window)
         self.pushButton_5.clicked.connect(self.run_minecraft)
         self.checkBox.clicked.connect(self.toggle_snapshots)
-    
-        
 
         self.update_list_versions()
-        
-        try:
-            # Load the data from the user_data.json file
-            if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
-                with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
-                    user_data = json.load(f)
-                    user_name = user_data.get('name')
-                    last_version = user_data.get('last_version')
-                    show_snapshots = user_data.get('toggle_snapshots')
-                    jvm_arguments = user_data.get('jvm_arguments')
-                    # Aplicar los data cargados a los campos de entrada
-                    if(user_name != "" and last_version != ""):
-                        if user_name is not None:
-                            self.lineEdit.setText(user_name)
-                        if last_version is not None:
-                            index = self.comboBox.findText(last_version, QtCore.Qt.MatchFixedString)
-                            if index >= 0:
-                                self.comboBox.setCurrentIndex(index)
-                    if show_snapshots == False:
-                        self.checkBox.setChecked(False)
-                    elif show_snapshots == True:
-                        self.checkBox.setChecked(True)
-                        
-            else:
-                user_name = self.lineEdit.text()
-                last_version = self.comboBox.currentText()
-                show_snapshots = False
-                jvm_arguments = defaultJVM
-                # Create the launcher_options directory if it does not exist
-                os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+        global jvm_arguments
+        global maximize
+        global discord_rpc
+        # Load the data from the user_data.json file
+        if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
+            with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
+                user_data = json.load(f)
+                user_name = user_data.get('name')
+                last_version = user_data.get('last_version')
+                show_snapshots = user_data.get('toggle_snapshots')
+                jvm_arguments = user_data.get('jvm_arguments')
+                ask_update = user_data.get('ask_update')
+                discord_rpc = user_data.get('discord_rpc')
+                maximize = user_data.get('maximized')
+                # Apply the data to the widgets and variables
+                if(user_name != "" and last_version != ""):
+                    if user_name is not None:
+                        self.lineEdit.setText(user_name)
+                    if last_version is not None:
+                        index = self.comboBox.findText(last_version, QtCore.Qt.MatchFixedString)
+                        if index >= 0:
+                            self.comboBox.setCurrentIndex(index)
+                if show_snapshots == False:
+                    self.checkBox.setChecked(False)
+                elif show_snapshots == True:
+                    self.checkBox.setChecked(True)
+                first_load = True
+                if discord_rpc == True and first_load == True:
+                    connect_discord()  
+                    first_load = False
+                if maximize == True:
+                    MainWindow.showMaximized()                      
+        else:
+            user_name = self.lineEdit.text()
+            last_version = self.comboBox.currentText()
+            show_snapshots = False
+            jvm_arguments = defaultJVM
+            discord_rpc = False
+            ask_update = "yes"
+            # Create the launcher_options directory if it does not exist
+            os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
 
-                # Save the data to a file
-                data = {
-                    'name': user_name, # Save the user name
-                    'toggle_snapshots': show_snapshots,  # save the state of the checkbox
-                    'jvm_arguments': jvm_arguments,  # Save the JVM arguments
-                    'last_version': last_version,  # Save the last version used
-                    'ask_update': ask_update # Save the state of the checkbox
-                }
-                # Save data to a file
-                with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
-                    json.dump(data, f)
-
-            # Load the UUID from the user_uuid.json file
-            if os.path.exists(f'{minecraft_directory}/launcher_options/user_uuid.json') and os.path.getsize(f'{minecraft_directory}/launcher_options/user_uuid.json') > 0:
-                with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'r') as f:
-                    user_uuid = json.load(f)
-            else:
-                user_uuid = ""
-                
-                # Create the launcher_options directory if it does not exist
-                os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
-                
-                with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'w') as f:
-                    json.dump(user_uuid, f)
-        except Exception as e:
-            print("Error:", e)
+            # Save the data to a file
+            data = {
+                'name': user_name, # Save the user name
+                'toggle_snapshots': show_snapshots,  # save the state of the checkbox
+                'jvm_arguments': jvm_arguments,  # Save the JVM arguments
+                'last_version': last_version,  # Save the last version used
+                'ask_update': ask_update, # Save the state of the checkbox
+                'discord_rpc': discord_rpc, # Save the state of the discord rpc
+                'maximized': MainWindow.isMaximized(self)
+            }
+            # Save data to a file
+            with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
+                json.dump(data, f)
+        global user_uuid
+        # Load the UUID from the user_uuid.json file
+        if os.path.exists(f'{minecraft_directory}/launcher_options/user_uuid.json') and os.path.getsize(f'{minecraft_directory}/launcher_options/user_uuid.json') > 0:
+            with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'r') as f:
+                user_uuid = json.load(f)
+        else:
+            user_uuid = ""
+            
+            # Create the launcher_options directory if it does not exist
+            os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+            
+            with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'w') as f:
+                json.dump(user_uuid, f)
         
     # setupUi
 
@@ -836,6 +868,7 @@ class Ui_MainWindow(object):
     
     # Function to save the data
     def save_data(self):
+        global jvm_arguments
         if jvm_arguments != "":
             arg = jvm_arguments
         else:
@@ -847,7 +880,9 @@ class Ui_MainWindow(object):
             'toggle_snapshots': self.checkBox.isChecked(),  # save the state of the checkbox
             'jvm_arguments': arg,  # Save the JVM arguments
             'last_version': self.comboBox.currentText(),  # Save the last version used
-            'ask_update': ask_update # Save the state of the checkbox
+            'ask_update': ask_update, # Save the state of the checkbox
+            'discord_rpc': discord_rpc, # Save the state of the discord rpc
+            'maximized': MainWindow.isMaximized(self)
         }
 
         # Create the launcher_options directory if it does not exist
@@ -871,6 +906,8 @@ class Ui_MainWindow(object):
         except KeyError:
             # If the user is not found, generate a random UUID
             user_uuid = str(uuid.uuid4())
+        print(f"UUID: {user_uuid}")
+
     # Function to check if Java is installed
     def is_java_installed(self):
         try:
@@ -899,7 +936,9 @@ class Ui_MainWindow(object):
         if not mine_user:
             messagebox.showerror("Error", "Please enter your user name")
             return
+        global jvm_arguments
         if not jvm_arguments:
+            print("No JVM arguments")
             arg = defaultJVM
         else:
             arg = jvm_arguments
@@ -1020,6 +1059,8 @@ class Ui_MainWindow(object):
         # Label with the information
         info_label = QLabel("Install the version of Minecraft you want")
         info_label.setStyleSheet("background-color: transparent; color: white;")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
         # Create the dropdown
@@ -1073,9 +1114,10 @@ class Ui_MainWindow(object):
         layout = QVBoxLayout()
 
         # Label with the information
-        info_label = QLabel("Install the latest available version of Fabric for the\ndesired Minecraft version")
+        info_label = QLabel("Install the latest available version of Fabric for the desired Minecraft version")
         info_label.setStyleSheet("background-color: transparent; color: white;")
         info_label.setAlignment(Qt.AlignCenter)
+        info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
         # Create the dropdown
@@ -1115,20 +1157,17 @@ class Ui_MainWindow(object):
         position_right = int(screen_geometry.width()/2 - window_width/2)
         position_down = int(screen_geometry.height()/2 - window_height/2)
         window_versions.move(position_right, position_down)
-
-        # Warning label and link
-        warning_label = QLabel("Warning: Installing Forge via this feature is not\nrecommended for older versions, please consider\nusing the official installer:")
-        warning_label.setStyleSheet("background-color: transparent; color: yellow;")
-        warning_label.setAlignment(Qt.AlignCenter)
-        warning_label.setWordWrap(True)
-
-        link_label = QLabel('<a href="https://files.minecraftforge.net/">https://files.minecraftforge.net/</a>')
-        link_label.setTextInteractionFlags(Qt.TextBrowserInteraction)  # Make the text clickable
-        link_label.setOpenExternalLinks(True)
-        link_label.setAlignment(Qt.AlignCenter)
-        link_label.setStyleSheet("color: #6e9be6; background-color: #303030;")
-
         
+        # Create the layout
+        layout = QVBoxLayout()
+
+        # Forge label
+        info_label = QLabel("Install the latest available version of Forge for the desired Minecraft version")
+        info_label.setStyleSheet("background-color: transparent; color: white;")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
         # Obtain the latest version of Forge
         response = requests.get("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json")
         forge_latest = response.json()
@@ -1144,11 +1183,6 @@ class Ui_MainWindow(object):
         else:
             vers = forge_all[0]
             versions_list = forge_all
-
-        # Create the layout
-        layout = QVBoxLayout()
-        layout.addWidget(warning_label)
-        layout.addWidget(link_label)
 
         # Create the dropdown
         versions_drop = QComboBox()
@@ -1198,9 +1232,10 @@ class Ui_MainWindow(object):
         layout = QVBoxLayout()
 
         # Create the JVM arguments label and entry
-        label_jvm_arguments = QLabel("JVM arguments (Expert settings)\n\nIf nothing is specified in this field, the default values ​​will\nbe used. Don't use this option if you don't know what\nyou're doing.")
+        label_jvm_arguments = QLabel("JVM arguments (Expert settings)\n\nIf nothing is specified in this field, the default values ​​will be used. Don't use this option if you don't know what you're doing.")
         label_jvm_arguments.setStyleSheet("color: white;")
         label_jvm_arguments.setAlignment(Qt.AlignCenter)
+        label_jvm_arguments.setWordWrap(True)
         layout.addWidget(label_jvm_arguments)
 
         label_tip = QLabel("Leave blank and save to reset.")
@@ -1213,6 +1248,41 @@ class Ui_MainWindow(object):
         entry_jvm_arguments.setPlaceholderText("JVM arguments (-Xms512M -Xmx8G -XX:+UseG1GC -XX:+ParallelRe...)")
         entry_jvm_arguments.setStyleSheet("color: white; background-color: rgba(30, 50, 100, 0.6);")
         layout.addWidget(entry_jvm_arguments)
+
+        discord_checkbox = QCheckBox("Enable Discord Rich Presence")
+        discord_checkbox.setStyleSheet(f"""
+            QCheckBox {{
+                color: #ffffff;
+                background-color: transparent;
+            }}
+            QCheckBox::indicator {{
+                width: 25px;
+                height: 25px;
+            }}
+            QCheckBox::hover {{
+                color: #03c2fc;
+            }}
+            QCheckBox::indicator:unchecked {{
+                image: url({uncheck_path});
+            }}
+            QCheckBox::indicator:checked {{
+                image: url({check_path});
+            }}
+            QCheckBox::indicator:unchecked:hover {{
+                image: url({uncheck_hover_path});
+            }}
+            QCheckBox::indicator:checked:hover {{
+                image: url({check_hover_path});
+            }}
+        """)
+        discord_checkbox.clicked.connect(lambda: [discord_controller()])
+        layout.addWidget(discord_checkbox)
+
+        global discord_rpc
+        if discord_rpc == True:
+            discord_checkbox.setChecked(True)
+        else:
+            discord_checkbox.setChecked(False)
 
         # Initialize entry with current JVM arguments
         if jvm_arguments != defaultJVM:
@@ -1276,7 +1346,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         # Redirect the standard output to the QTextEdit widget
         sys.stdout = StdoutRedirector(self.console_output)
-    
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
