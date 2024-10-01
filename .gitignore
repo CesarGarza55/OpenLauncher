@@ -1,4 +1,3 @@
-
 /releases
 /OpenLauncher.dist
 OpenLauncher.exe
@@ -7,3 +6,5 @@ OpenLauncher.spec
 /temp
 /logs
 /.vscode
+venv
+__pycache__
