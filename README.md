@@ -93,6 +93,13 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
+## Download options
+
+- Windows: .exe
+- Linux (compiled): .bin
+- Linux (Debian/Ubuntu) .deb
+
+
 ## Usage
 
 The main interface shows different sections:
