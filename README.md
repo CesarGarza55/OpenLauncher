@@ -115,8 +115,12 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
     # Deactivate the virtual environment
     deactivate
+    ```
+    
+    ```bash
     ./compile-linux.sh
     ```
+    
     
 4. You need to install Java to be able to play, by default it should be possible with:
 
