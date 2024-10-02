@@ -116,12 +116,33 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     # Deactivate the virtual environment
     deactivate
     ```
-    
+
     ```bash
     ./compile-linux.sh
     ```
     
-    
+    Debian / Ubuntu:
+    ```bash
+    #!/bin/bash
+    set -e
+
+    # Create the directory structure
+    DEST_DIR="compile-deb/usr/share/openlauncher"
+    mkdir -p "$DEST_DIR"
+
+    # Copy the necessary files
+    cp data/variables.py "$DEST_DIR"
+    cp data/updater.py "$DEST_DIR"
+    cp data/OpenLauncher.py "$DEST_DIR"
+    cp -r data/img "$DEST_DIR"
+
+    # Compile the deb package
+    dpkg-deb --build compile-deb "OpenLauncher.deb"
+    ```
+
+    ```bash
+    ./compile-debian.sh
+    ```
 4. You need to install Java to be able to play, by default it should be possible with:
 
     ```bash
