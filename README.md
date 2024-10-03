@@ -9,6 +9,10 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 - **Custom Interface**: Utilizes PyQt5 for a modern and customizable look.
 - **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
 - **Open Source**: Easily extendable and modifiable by the community.
+- **Multiplatform**: Available for Windows and Linux operating systems.
+- **Oficial Themes**: Download and install themes to personalize your launcher.
+- **Community Themes**: Create and share custom themes with other users in the [website](https://openlauncher.totalh.net/)
+- **Theme Creator**: Design your own themes using the OpenLauncher [theme creator tool](https://openlauncher.totalh.net/create)
 
 ## Requirements
 
@@ -180,6 +184,26 @@ By default the following JVM arguments are used:
 If you want to change something you need to do it from the settings window.
 
 ![Settings](https://github.com/user-attachments/assets/ea74104f-cdb0-4e1c-8f65-66441d1153ee)
+
+## Themes
+
+OpenLauncher allows you to customize the appearance of the launcher with themes. You can choose from official and community themes, as well as create your own.
+
+### Official themes
+Official themes are provided by me, and you can find them at [https://openlauncher.totalh.net/plugins](https://openlauncher.totalh.net/plugins).
+
+### Community Themes
+
+Users can create and share their own themes on the official OpenLauncher website. Visit [https://openlauncher.totalh.net/community](https://openlauncher.totalh.net/community) to explore and download community themes.
+
+### Theme Creator
+
+If you want to create a custom theme, use the theme creator tool available on [https://openlauncher.totalh.net/create](https://openlauncher.totalh.net/create).
+
+### Guide
+
+For a detailed guide on how to install themes, visit [https://openlauncher.totalh.net/guide](https://openlauncher.totalh.net/guide).
+
 
 ## Testing
 My PC Specs:

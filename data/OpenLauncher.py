@@ -13,31 +13,19 @@ from pypresence import Presence
 import variables
 from updater import update
 
-# Update the launcher
+# Check for updates and update the launcher if necessary
 update()
 
-# Define the client ID for the Discord Rich Presence
-CLIENT_ID = '1274620174347010069'
-
-# Select random state for the Discord Rich Presence
-state_list = ["Block party time!","Crafting away!","Pixel perfectionist!",
-            "Mining fun!","Survival mode: On!","Craft, build, repeat!",
-            "Creeper avoider!","Epic loot hunting!","Digging deep!",
-            "Also available on toaster!","With great power comes great blockiness!",
-            "print('Hello, world!')","Redstone engineer!","Building a better world!",
-            "I am a blockhead!","We love python!","Powered by coffee!",
-            "Also try Terraria!","TODO: Delete this later","Don't mine at night!",
-            "Why so blocky?","/gamerule keepInventory true","Powered by Redstone!",
-            "/op @s","respawning...","rage quitting...","I need a hero!", 
-            "zZzz...", "uninstalling..."]
-
 # Create the Discord Rich Presence object
-rpc = Presence(CLIENT_ID)
+rpc = Presence(variables.CLIENT_ID)
+
+discord_error = ""
 
 # Set the default value for the Discord Rich Presence
 discord_rpc = False
 
 def connect_discord():
+    global discord_error
     try:
         # Connect to the Discord Rich Presence
         rpc.connect()
@@ -45,34 +33,139 @@ def connect_discord():
         # Update the Discord Rich Presence
         rpc.update(
             details="Playing Minecraft",
-            state=random.choice(state_list),
+            state=random.choice(variables.state_list),
             large_image="preview",
             large_text="Minecraft Java Edition",
             start=time.time()
         )
+        discord_error = ""
     except Exception as e:
-        pass
+        discord_error = f"Could not connect to Discord Rich Presence, ensure that Discord is running"
 
 # Function to clean up the Discord Rich Presence
 def cleanup():
+    global discord_error
     try:
         rpc.clear()
         rpc.close()
+        discord_error = ""
     except Exception as e:
         pass
 
+# Function to enable or disable the Discord Rich Presence
 def discord_controller():
-    global discord_rpc
+    global discord_rpc, discord_error
     if not discord_rpc:
         connect_discord()
         discord_rpc = True
     else:
         cleanup()
         discord_rpc = False
+        discord_error = ""
 
-atexit.register(cleanup)
+# if the Discord Rich Presence is enabled, clean up the connection when the application is closed
+if discord_rpc:
+    atexit.register(cleanup)
 
 minecraft_directory = variables.minecraft_directory
+app_dir = variables.app_directory
+plugin_dir = variables.plugins_directory
+
+def open_plugins_website():
+    webbrowser.open(os.path.join(variables.website_url, "plugins"))
+
+def open_launcher_dir():
+    # Check if the directory exists
+    if os.path.exists(app_dir):
+        # Open the directory
+        if sys.platform == "win32":
+            subprocess.Popen(['explorer', app_dir])
+        elif sys.platform == "linux":
+            open_directory(app_dir)
+    else:
+        messagebox.showerror("Error", f"Directory {app_dir} does not exist")
+
+def open_minecraft_dir():
+    # Check if the directory exists
+    if os.path.exists(minecraft_directory):
+        # Open the directory
+        if sys.platform == "win32":
+            subprocess.Popen(['explorer', minecraft_directory])
+        elif sys.platform == "linux":
+            open_directory(minecraft_directory)
+    else:
+        messagebox.showerror("Error", f"Directory {minecraft_directory} does not exist")
+
+def open_directory(directory):
+    if os.path.exists(directory):
+        try:
+            with open(os.devnull, 'wb') as devnull:
+                subprocess.Popen(['xdg-open', directory], stdout=devnull, stderr=devnull)
+        except FileNotFoundError:
+            messagebox.showerror("Error", "xdg-open is not installed. Please install it using your package manager.")
+    else:
+        messagebox.showerror("Error", f"Directory {directory} does not exist")
+
+def load_theme_plugins(plugin_dir):
+    themes = []
+    if os.path.exists(plugin_dir):
+        for folder in os.listdir(plugin_dir):
+            folder_path = os.path.join(plugin_dir, folder)
+            if os.path.isdir(folder_path):
+                config_path = os.path.join(folder_path, 'theme.json')
+                if os.path.isfile(config_path):
+                    with open(config_path, 'r') as f:
+                        try:
+                            theme = json.load(f)
+                            theme['folder'] = folder  # Add the folder name to the theme
+                            themes.append(theme)
+                        except Exception as e:
+                            print(f"Could not load theme from {config_path}: {e}")
+    return themes
+
+# Load the themes
+themes = load_theme_plugins(plugin_dir)
+
+bg_color = variables.bg_color
+
+# Function to apply the theme
+def apply_theme(theme):
+    global bg_path, bg_color, icon
+    
+    # Dictionary with the default paths
+    default_paths = {
+        'bg_path': variables.bg_path,
+        'icon': variables.icon,
+        'bg_color': variables.bg_color
+    }
+    
+    # Update the paths
+    for key in default_paths:
+        if key in theme:
+            if key == 'bg_color':
+                globals()[key] = theme[key]
+            else:
+                globals()[key] = os.path.join(plugin_dir, theme['folder'], theme[key]).replace("\\", "/")
+        else:
+            globals()[key] = default_paths[key]
+        # print(f"{key}: {globals()[key]}")
+        
+# Check if there is more than one theme
+if len(themes) == 0: 
+    # Load the default theme
+    bg_path = variables.bg_path
+    icon = variables.icon
+    bg_color = variables.bg_color
+elif len(themes) > 1:
+    if messagebox.askyesno("Multiple themes found", "Multiple themes found. Do you want to open the app directory to remove the extra themes?"):
+        open_launcher_dir()
+        sys.exit()
+    else:
+        messagebox.showinfo("Info", "The first theme found will be loaded.")
+    # Load the first theme
+    apply_theme(themes[0])
+elif len(themes) == 1:
+    apply_theme(themes[0])
 
 # Load the versions
 try:
@@ -125,17 +218,25 @@ class StdoutRedirector:
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        global discord_error
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(850, 500)
         MainWindow.setMinimumSize(QSize(850, 500))
-        MainWindow.setWindowIcon(QIcon(variables.icon))
+        MainWindow.setWindowIcon(QIcon(icon))
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName(u"gridLayout")
         self.verticalLayout_3 = QVBoxLayout()
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.discord_e = QLabel(self.centralwidget)
+        self.discord_e.setObjectName(u"discord_e")
+        self.discord_e.setText(discord_error)
+        self.discord_e.setStyleSheet("color: #ff0000; background-color: transparent; font-weight: bold; font-size: 12px;")
+        self.discord_e.setAlignment(Qt.AlignCenter)
+        self.verticalLayout_3.addWidget(self.discord_e)
+
         self.horizontalLayout_3 = QHBoxLayout()
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.verticalLayout_2 = QVBoxLayout()
@@ -289,20 +390,20 @@ class Ui_MainWindow(object):
         QMetaObject.connectSlotsByName(MainWindow)
 
         # Establish the style of the widgets
-        MainWindow.setStyleSheet("background-color: rgb(30, 50, 100);")
+        MainWindow.setStyleSheet("background-color: rgba("f'{bg_color}'", 1);")
         self.centralwidget.setStyleSheet(f"""
             QWidget#centralwidget {{
-                border-image: url({variables.bg_path});
+                border-image: url("{bg_path}");
             }}
         """)
         self.pushButton.setStyleSheet("""
             QPushButton {
-                background-color: rgba(66, 176, 50, 0.6); 
+                background-color: rgba("""f'{bg_color}'""", 0.6); 
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(66, 176, 50, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -312,12 +413,12 @@ class Ui_MainWindow(object):
         
         self.pushButton_2.setStyleSheet("""
             QPushButton {
-                background-color: rgba(66, 176, 50, 0.6); 
+                background-color: rgba("""f'{bg_color}'""", 0.6); 
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(66, 176, 50, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -327,12 +428,12 @@ class Ui_MainWindow(object):
         
         self.pushButton_3.setStyleSheet("""
             QPushButton {
-                background-color: rgba(176, 50, 50, 0.6);; 
+                background-color: rgba("""f'{bg_color}'""", 0.6);; 
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(176, 50, 50, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -342,12 +443,12 @@ class Ui_MainWindow(object):
         
         self.pushButton_4.setStyleSheet("""
             QPushButton {
-                background-color: rgba(30, 50, 100, 0.5);
+                background-color: rgba("""f'{bg_color}'""", 0.5);
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(30, 50, 100, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -357,12 +458,12 @@ class Ui_MainWindow(object):
         
         self.pushButton_5.setStyleSheet("""
             QPushButton {
-                background-color: rgba(30, 50, 100, 0.5);
+                background-color: rgba("""f'{bg_color}'""", 0.5);
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(30, 50, 100, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -370,15 +471,15 @@ class Ui_MainWindow(object):
             }
         """)
         
-        self.console_output.setStyleSheet("background-color: rgba(30, 50, 100, 0.5); color: #ffffff;")
+        self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
         self.label.setStyleSheet("background-color: transparent; color: #ffffff;")
         self.lineEdit.setStyleSheet("""
             QLineEdit {
-                background-color: rgba(30, 50, 100, 0.5); 
+                background-color: rgba("""f'{bg_color}'""", 0.5); 
                 color: #ffffff;
             }
             QLineEdit:hover {
-                background-color: rgba(70, 130, 240, 0.6);
+                background-color: rgba("""f'{bg_color}'""", 0.8);
             }
             QLineEdit:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -387,27 +488,31 @@ class Ui_MainWindow(object):
         """)
         self.checkBox.setStyleSheet(f"""
             QCheckBox {{
-                color: #ffffff;
                 background-color: transparent;
+                color: #ffffff;
             }}
             QCheckBox::indicator {{
-                width: 25px;
-                height: 25px;
-            }}
-            QCheckBox::hover {{
-                color: #03c2fc;
+                width: 20px;
+                height: 20px;
             }}
             QCheckBox::indicator:unchecked {{
-                image: url({variables.uncheck_path});
+                border-radius: 5px;
+                border: 2px solid rgb(255, 255, 255);
+                background-color: transparent;
             }}
             QCheckBox::indicator:checked {{
-                image: url({variables.check_path});
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.5);
+                background-color: rgba({bg_color}, 0.5);
             }}
             QCheckBox::indicator:unchecked:hover {{
-                image: url({variables.uncheck_hover_path});
+                border-radius: 5px;
+                border: 2px solid rgb({bg_color});
             }}
             QCheckBox::indicator:checked:hover {{
-                image: url({variables.check_hover_path});
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.8);
+                background-color: rgba({bg_color}, 0.8);
             }}
             QCheckBox:disabled {{
                 color: #cccccc;
@@ -415,12 +520,12 @@ class Ui_MainWindow(object):
         """)
         self.comboBox.setStyleSheet("""
             QComboBox {
-                background-color: rgba(30, 50, 100, 0.5); 
+                background-color: rgba("""f'{bg_color}'""", 0.5); 
                 color: #ffffff; 
-                border: none;
+                border-radius: 5px;
             }
             QComboBox:hover {
-                background-color: rgba(30, 50, 100, 1);
+                background-color: rgba("""f'{bg_color}'""", 1);
             }
             QComboBox:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
@@ -429,13 +534,13 @@ class Ui_MainWindow(object):
         """)
         self.progressBar.setStyleSheet("""
             QProgressBar {
-                background-color: rgba(30, 50, 100, 0.5);
+                background-color: rgba("""f'{bg_color}'""", 0.5);
                 color: #ffffff;
-                border: none;
+                border-radius: 5px;
                 text-align: right;
             }
             QProgressBar::chunk {
-                background-color: rgb(30, 50, 100);
+                background-color: rgb("""f'{bg_color}'""");
                 width: 20px;
             }
         """)
@@ -455,8 +560,8 @@ class Ui_MainWindow(object):
         global maximize
         global discord_rpc
         # Load the data from the user_data.json file
-        if os.path.exists(f'{minecraft_directory}/launcher_options/user_data.json'):
-            with open(f'{minecraft_directory}/launcher_options/user_data.json', 'r') as f:
+        if os.path.exists(f'{app_dir}/config/user_data.json'):
+            with open(f'{app_dir}/config/user_data.json', 'r') as f:
                 user_data = json.load(f)
                 user_name = user_data.get('name')
                 last_version = user_data.get('last_version')
@@ -490,8 +595,8 @@ class Ui_MainWindow(object):
             jvm_arguments = variables.defaultJVM
             discord_rpc = False
             ask_update = "yes"
-            # Create the launcher_options directory if it does not exist
-            os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+            # Create the config directory if it does not exist
+            os.makedirs(f'{app_dir}/config', exist_ok=True)
 
             # Save the data to a file
             data = {
@@ -504,20 +609,20 @@ class Ui_MainWindow(object):
                 'maximized': self.isMaximized()
             }
             # Save data to a file
-            with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
+            with open(f'{app_dir}/config/user_data.json', 'w') as f:
                 json.dump(data, f)
         global user_uuid
         # Load the UUID from the user_uuid.json file
-        if os.path.exists(f'{minecraft_directory}/launcher_options/user_uuid.json') and os.path.getsize(f'{minecraft_directory}/launcher_options/user_uuid.json') > 0:
-            with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'r') as f:
+        if os.path.exists(f'{app_dir}/config/user_uuid.json') and os.path.getsize(f'{app_dir}/config/user_uuid.json') > 0:
+            with open(f'{app_dir}/config/user_uuid.json', 'r') as f:
                 user_uuid = json.load(f)
         else:
             user_uuid = ""
             
-            # Create the launcher_options directory if it does not exist
-            os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+            # Create the config directory if it does not exist
+            os.makedirs(f'{app_dir}/config', exist_ok=True)
             
-            with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'w') as f:
+            with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
                 json.dump(user_uuid, f)
         
     # setupUi
@@ -532,6 +637,16 @@ class Ui_MainWindow(object):
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", u"Settings", None))
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", u"Play", None))
     # retranslateUi
+
+    # Function to update the discord error label
+    def update_error_discord(self):
+        global discord_error
+        if discord_error != "":
+            self.discord_e.setText(discord_error)
+            self.discord_e.show()
+        else:
+            self.discord_e.setText("")
+            self.discord_e.hide()
 
     # Function to clear the console output from the main thread
     def clear_console(self):
@@ -772,15 +887,15 @@ class Ui_MainWindow(object):
             'maximized': MainWindow.isMaximized(self)
         }
 
-        # Create the launcher_options directory if it does not exist
-        os.makedirs(f'{minecraft_directory}/launcher_options', exist_ok=True)
+        # Create the config directory if it does not exist
+        os.makedirs(f'{app_dir}/config', exist_ok=True)
 
         # Save the data to a file
-        with open(f'{minecraft_directory}/launcher_options/user_uuid.json', 'w') as f:
+        with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
             json.dump(user_uuid, f)
 
         # Save the data to a file
-        with open(f'{minecraft_directory}/launcher_options/user_data.json', 'w') as f:
+        with open(f'{app_dir}/config/user_data.json', 'w') as f:
             json.dump(data, f)
 
     # Function to generate a UUID
@@ -924,7 +1039,7 @@ class Ui_MainWindow(object):
         window_versions.setWindowTitle('Install versions')
         window_versions.setFixedSize(300, 150)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint) 
-        window_versions.setStyleSheet("background-color: rgb(48, 48, 48);")
+        window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
         # Place the window in the center of the screen
         window_width = window_versions.width()
         window_height = window_versions.height()
@@ -954,12 +1069,22 @@ class Ui_MainWindow(object):
         versions_drop = QComboBox()
         versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba(30, 50, 100, 0.6); color: white; border: none;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
         layout.addWidget(versions_drop)
 
         # Create the install button
         bt_install_versions = QPushButton('Install')
-        bt_install_versions.setStyleSheet("background-color: rgba(66, 176, 50, 0.6); color: white; border: none; min-height: 30px;")
+        bt_install_versions.setStyleSheet("""
+            QPushButton {
+                background-color: rgba("""f'{bg_color}'""", 0.6);
+                color: #ffffff; 
+                border-radius: 5px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: rgba("""f'{bg_color}'""", 1);
+            }
+        """)
         bt_install_versions.clicked.connect(lambda: [window_versions.accept(), self.start_installation(self.install_minecraft, versions_drop.currentText())])
         layout.addWidget(bt_install_versions)
 
@@ -979,7 +1104,7 @@ class Ui_MainWindow(object):
         window_versions.setWindowTitle('Install Fabric')
         window_versions.setFixedSize(300, 150)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        window_versions.setStyleSheet("background-color: rgb(48, 48, 48);")
+        window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
 
         # Center the window on the screen
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -1011,12 +1136,22 @@ class Ui_MainWindow(object):
         versions_drop = QComboBox()
         versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba(30, 50, 100, 0.6); color: white; border: none;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
         layout.addWidget(versions_drop)
 
         # Create the install button
         bt_install_fabric = QPushButton('Install')
-        bt_install_fabric.setStyleSheet("background-color: rgba(66, 176, 50, 0.6); color: white; border: none; min-height: 30px;")
+        bt_install_fabric.setStyleSheet("""
+            QPushButton {
+                background-color: rgba("""f'{bg_color}'""", 0.6);
+                color: #ffffff; 
+                border-radius: 5px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: rgba("""f'{bg_color}'""", 1);
+            }
+        """)
         bt_install_fabric.clicked.connect(lambda: [window_versions.accept(), self.start_installation(self.install_fabric, versions_drop.currentText())])
         layout.addWidget(bt_install_fabric)
 
@@ -1035,7 +1170,7 @@ class Ui_MainWindow(object):
         window_versions.setWindowTitle('Install Forge')
         window_versions.setFixedSize(300, 200)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        window_versions.setStyleSheet("background-color: rgb(48, 48, 48);")
+        window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
 
         # Center the window on the screen
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -1075,12 +1210,22 @@ class Ui_MainWindow(object):
         versions_drop = QComboBox()
         versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba(30, 50, 100, 0.6); color: white; border: none;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
         layout.addWidget(versions_drop)
 
         # Create the install button
         bt_install_forge = QPushButton('Install')
-        bt_install_forge.setStyleSheet("background-color: rgba(66, 176, 50, 0.6); color: white; border: none; min-height: 30px;")
+        bt_install_forge.setStyleSheet("""
+            QPushButton {
+                background-color: rgba("""f'{bg_color}'""", 0.6);
+                color: #ffffff; 
+                border-radius: 5px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: rgba("""f'{bg_color}'""", 1);
+            }
+        """)
         bt_install_forge.clicked.connect(lambda: [window_versions.accept(), self.start_installation(self.install_forge, versions_drop.currentText())])
         layout.addWidget(bt_install_forge)
 
@@ -1088,26 +1233,15 @@ class Ui_MainWindow(object):
         window_versions.setLayout(layout)
         window_versions.exec_()
 
-    def open_directory(self):
-        # Check if the directory exists
-        if os.path.exists(minecraft_directory):
-            # Open the directory
-            if sys.platform == "win32":
-                subprocess.Popen(['explorer', minecraft_directory])
-            elif sys.platform == "linux":
-                subprocess.Popen(['xdg-open', minecraft_directory])
-        else:
-            print(f"Directory {minecraft_directory} does not exist")
-
     def settings_window(self):
-        # Create the window
+        # Crear la ventana
         window_settings = QDialog()
         window_settings.setWindowTitle('Settings')
-        window_settings.setFixedSize(300, 270)
+        window_settings.setFixedSize(350, 350)
         window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        window_settings.setStyleSheet("background-color: rgb(36, 36, 36);")
+        window_settings.setStyleSheet("background-color: rgb(45, 55, 65); border-radius: 10px;")
 
-        # Center the window on the screen
+        # Centrar la ventana en la pantalla
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         window_width = window_settings.width()
         window_height = window_settings.height()
@@ -1115,66 +1249,84 @@ class Ui_MainWindow(object):
         position_down = int(screen_geometry.height()/2 - window_height/2)
         window_settings.move(position_right, position_down)
 
-        # Create the layout
+        # Crear el layout
         layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignHCenter)  # Centrar los widgets
+        layout.setSpacing(15)  # Añadir más espacio entre los elementos
 
-        # Create the JVM arguments label and entry
-        label_jvm_arguments = QLabel("JVM arguments (Expert settings)\n\nIf nothing is specified in this field, the default values ​​will be used. Don't use this option if you don't know what you're doing.")
-        label_jvm_arguments.setStyleSheet("color: white;")
+        # Crear el label de JVM arguments
+        label_jvm_arguments = QLabel("JVM arguments (Expert settings)\nIf nothing is specified, default values will be used.\nDon't use this option if you're unsure.")
+        label_jvm_arguments.setStyleSheet("color: white; font-size: 12px;")
         label_jvm_arguments.setAlignment(Qt.AlignCenter)
         label_jvm_arguments.setWordWrap(True)
         layout.addWidget(label_jvm_arguments)
 
+        # Crear label tip
         label_tip = QLabel("Leave blank and save to reset.")
-        label_tip.setStyleSheet("color: yellow; text-align: center;")
+        label_tip.setStyleSheet("color: yellow; font-size: 11px;")
         label_tip.setAlignment(Qt.AlignCenter)
         layout.addWidget(label_tip)
 
+        bt_style = """
+            QPushButton {
+                background-color: rgba("""f'{bg_color}'""", 0.6);
+                color: #ffffff; 
+                border-radius: 5px;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba("""f'{bg_color}'""", 1);
+            }
+        """
+
+        # Crear el campo de entrada para JVM arguments
         entry_jvm_arguments = QLineEdit()
-        entry_jvm_arguments.setFixedWidth(260)
-        entry_jvm_arguments.setPlaceholderText("JVM arguments (-Xms512M -Xmx8G -XX:+UseG1GC -XX:+ParallelRe...)")
-        entry_jvm_arguments.setStyleSheet("color: white; background-color: rgba(30, 50, 100, 0.6);")
+        entry_jvm_arguments.setFixedWidth(300)
+        entry_jvm_arguments.setPlaceholderText("JVM arguments (-Xms512M -Xmx8G ...)")
+        entry_jvm_arguments.setStyleSheet("""
+            color: white; 
+            background-color: rgba("""f'{bg_color}'""", 0.6);
+            border-radius: 5px; 
+            padding: 5px;
+        """)
         layout.addWidget(entry_jvm_arguments)
 
+        # Checkbox para Discord
         discord_checkbox = QCheckBox("Enable Discord Rich Presence")
         discord_checkbox.setStyleSheet(f"""
             QCheckBox {{
-                color: #ffffff;
                 background-color: transparent;
+                color: #ffffff;
             }}
             QCheckBox::indicator {{
-                width: 25px;
-                height: 25px;
-            }}
-            QCheckBox::hover {{
-                color: #03c2fc;
+                width: 20px;
+                height: 20px;
             }}
             QCheckBox::indicator:unchecked {{
-                image: url({variables.uncheck_path});
+                border-radius: 5px;
+                border: 2px solid rgb(255, 255, 255);
+                background-color: transparent;
             }}
             QCheckBox::indicator:checked {{
-                image: url({variables.check_path});
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.5);
+                background-color: rgba({bg_color}, 0.5);
             }}
             QCheckBox::indicator:unchecked:hover {{
-                image: url({variables.uncheck_hover_path});
+                border-radius: 5px;
+                border: 2px solid rgb({bg_color});
             }}
             QCheckBox::indicator:checked:hover {{
-                image: url({variables.check_hover_path});
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.8);
+                background-color: rgba({bg_color}, 0.8);
+            }}
+            QCheckBox:disabled {{
+                color: #cccccc;
             }}
         """)
-        discord_checkbox.clicked.connect(lambda: [discord_controller()])
+        discord_checkbox.clicked.connect(lambda: [discord_controller(), self.update_error_discord(), self.save_data()])
         layout.addWidget(discord_checkbox)
-
-        global discord_rpc
-        if discord_rpc == True:
-            discord_checkbox.setChecked(True)
-        else:
-            discord_checkbox.setChecked(False)
-
-        # Initialize entry with current JVM arguments
-        if jvm_arguments != variables.defaultJVM:
-            if jvm_arguments is not None and isinstance(jvm_arguments, (list, tuple)):
-                entry_jvm_arguments.setText(" ".join(jvm_arguments))
 
         def set_jvm():
             global jvm_arguments
@@ -1189,43 +1341,36 @@ class Ui_MainWindow(object):
             else:
                 jvm_arguments = variables.defaultJVM
 
-        # Create the save button
+        # Botón para guardar la configuración
         bt_save = QPushButton('Save settings')
-        bt_save.setFixedWidth(260)
-        bt_save.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(66, 176, 50, 0.6); 
-                color: #ffffff; 
-                border: none;
-                min-height: 30px;
-            }
-            QPushButton:hover {
-                background-color: rgba(66, 176, 50, 1);
-            }
-        """)
+        bt_save.setFixedWidth(300)
+        bt_save.setStyleSheet(bt_style)
         bt_save.clicked.connect(lambda: [set_jvm(), self.save_data(), window_settings.accept()])
         layout.addWidget(bt_save)
 
-        # Create the directory button
-        bt_main_path = QPushButton('Open game directory')
-        bt_main_path.setFixedWidth(260)
-        bt_main_path.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(30, 50, 100, 0.6);
-                color: #ffffff; 
-                border: none;
-                min-height: 30px;
-            }
-            QPushButton:hover {
-                background-color: rgba(30, 50, 100, 1);
-            }
-        """)
-        bt_main_path.clicked.connect(self.open_directory)
-        layout.addWidget(bt_main_path)
+        # Botones para abrir directorios
+        bt_mine_path = QPushButton('Open game directory')
+        bt_mine_path.setFixedWidth(300)
+        bt_mine_path.setStyleSheet(bt_style)
+        bt_mine_path.clicked.connect(open_minecraft_dir)
+        layout.addWidget(bt_mine_path)
 
-        # Set the layout and execute the window
+        bt_app_path = QPushButton('Open launcher directory')
+        bt_app_path.setFixedWidth(300)
+        bt_app_path.setStyleSheet(bt_style)
+        bt_app_path.clicked.connect(open_launcher_dir)
+        layout.addWidget(bt_app_path)
+
+        bt_plugins_path = QPushButton('Open plugins website')
+        bt_plugins_path.setFixedWidth(300)
+        bt_plugins_path.setStyleSheet(bt_style)
+        bt_plugins_path.clicked.connect(open_plugins_website)
+        layout.addWidget(bt_plugins_path)
+
+        # Configurar el layout y ejecutar la ventana
         window_settings.setLayout(layout)
         window_settings.exec_()
+
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -1240,4 +1385,5 @@ if __name__ == "__main__":
     app.setStyle('Fusion')
     window = MainWindow()
     window.show()
+    window.update_error_discord()
     sys.exit(app.exec_())
