@@ -1,5 +1,8 @@
 # OpenLauncher
 
+THE .DEB INSTALLER (FOR DEBIAN / UBUNTU) SEEMS TO BE BROKEN SINCE IT DOES NOT ALLOW INSTALLING VERSIONS OF THE GAME, IT IS RECOMMENDED TO USE THE .BIN EXECUTABLE UNTIL THE FAILURE IS CHECKED IN MORE DETAIL.
+
+
 OpenLauncher is an open-source Minecraft launcher developed in Python using CustomTkinter and the minecraft_launcher_lib library.
 
 (For the moment only designed for Windows and Linux)
