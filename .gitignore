@@ -8,3 +8,6 @@ OpenLauncher.spec
 /.vscode
 venv
 __pycache__
+compile-deb/usr/share/openlauncher/*
+OpenLauncher.bin
+OpenLauncher.deb
