@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 /usr/share/openlauncher/OpenLauncher.py
+/usr/share/openlauncher/OpenLauncher.bin

@@ -6,12 +6,34 @@ from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPu
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
                              QProgressBar, QApplication, QMessageBox,
                              QDialog)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, QThreadPool
 from PyQt5.QtGui import QTextCursor, QIcon
 from tkinter import messagebox
 from pypresence import Presence
 import variables
 from updater import update
+
+# I have been working on this for idk how long, i stopped counting the hours long ago
+# When i fix a bug, another one appears, and when i fix that one, another four appear
+# Functions that worked perfectly before, suddenly stop working and i have to rewrite them
+# I considerate to rewrite the whole code from scratch, but i don't tink it will be worth it
+# If someone wants to rewrite this, feel free to do it, i will not try to refactor this again
+# I will keep making updates, but i'm not sure if i will be able to fix all the bugs someday
+# The code is a mess, but hey, it works, and that's what matters XD
+
+# Class to run a function in a separate thread 
+# (idk why but it doesn't work with threading.Thread and i had to use QRunnable,
+# I really don't know what's exactly happening here, but it works, so i will keep it like that)
+class Worker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    @pyqtSlot()
+    def run(self):
+        self.fn(*self.args, **self.kwargs)
 
 # Check for updates and update the launcher if necessary
 update()
@@ -32,7 +54,7 @@ def connect_discord():
 
         # Update the Discord Rich Presence
         rpc.update(
-            details="Playing Minecraft",
+            details="OpenSource Minecraft Launcher",
             state=random.choice(variables.state_list),
             large_image="preview",
             large_text="Minecraft Java Edition",
@@ -71,20 +93,28 @@ minecraft_directory = variables.minecraft_directory
 app_dir = variables.app_directory
 plugin_dir = variables.plugins_directory
 
+# Function to open the plugins website
 def open_plugins_website():
     webbrowser.open(os.path.join(variables.website_url, "plugins"))
 
+# Function to open the launcher directory
+# For some reason, the function to open the directory on Linux suddenly stopped working
+# so i had to change it to use gio instead of xdg-open (i don't know why it stopped working)
+# when i use xdg-open, the kde-open5 start to use all the RAM and the system freezes
+# so i had to use gio, i don't know if it will work on all the linux distros, but it works on mine (Ubuntu with KDE)
 def open_launcher_dir():
     # Check if the directory exists
     if os.path.exists(app_dir):
         # Open the directory
         if sys.platform == "win32":
+            print("Opening directory on Windows")
             subprocess.Popen(['explorer', app_dir])
         elif sys.platform == "linux":
-            open_directory(app_dir)
+            subprocess.Popen(['gio', 'open',  app_dir])
     else:
         messagebox.showerror("Error", f"Directory {app_dir} does not exist")
 
+# Function to open the Minecraft directory (the same case as the open_launcher_dir function)
 def open_minecraft_dir():
     # Check if the directory exists
     if os.path.exists(minecraft_directory):
@@ -92,19 +122,9 @@ def open_minecraft_dir():
         if sys.platform == "win32":
             subprocess.Popen(['explorer', minecraft_directory])
         elif sys.platform == "linux":
-            open_directory(minecraft_directory)
+            subprocess.Popen(['gio', 'open',  minecraft_directory])
     else:
-        messagebox.showerror("Error", f"Directory {minecraft_directory} does not exist")
-
-def open_directory(directory):
-    if os.path.exists(directory):
-        try:
-            with open(os.devnull, 'wb') as devnull:
-                subprocess.Popen(['xdg-open', directory], stdout=devnull, stderr=devnull)
-        except FileNotFoundError:
-            messagebox.showerror("Error", "xdg-open is not installed. Please install it using your package manager.")
-    else:
-        messagebox.showerror("Error", f"Directory {directory} does not exist")
+        print(f"Directory {minecraft_directory} does not exist")
 
 def load_theme_plugins(plugin_dir):
     themes = []
@@ -673,7 +693,6 @@ class Ui_MainWindow(object):
     # Function to install Minecraft version in a separate thread
     def install_minecraft(self, version):
         if version:
-            
             # Print the version to be installed
             print(f'Version {version} will be installed, this may take a few minutes depending on your internet connection, please wait...')
             # Disable the buttons
@@ -698,6 +717,8 @@ class Ui_MainWindow(object):
                 messagebox.showinfo("Success", f'Version {version} has been installed')
             except Exception as e:
                 messagebox.showerror("Error", f"Could not install version: {e}")
+                print("Error durante la instalación:", e)
+                raise
             finally:
                 # Enable the buttons
                 self.pushButton.setEnabled(True)
@@ -1021,11 +1042,12 @@ class Ui_MainWindow(object):
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
                 self.checkBox.setEnabled(True)
-    
-    # Function to start the installation in a separate thread
+
+    # Function to start the installation of the versions in a separate thread
+    # It's weird but it works and it's the only way I found to make it work with the QThreadPool
     def start_installation(self, install_function, version):
-        installation_thread = threading.Thread(target=install_function, args=(version,))
-        installation_thread.start()
+        worker = Worker(install_function, version)
+        QThreadPool.globalInstance().start(worker)
 
     # Function to run the installation of the versions of Minecraft
     def install_normal_versions(self):
@@ -1387,3 +1409,10 @@ if __name__ == "__main__":
     window.show()
     window.update_error_discord()
     sys.exit(app.exec_())
+
+# Hello, idk what to put here but I'm going to put it anyway :D
+
+# I'm not sure what i'm doing anymore, but I'm going to keep going (maybe XD)
+# I'm going to put a lot of comments here, I don't know why, but I'm going to do it anyway
+# I hate you Qt, I hate you so much, but I love you at the same time <3
+# and you too threadings

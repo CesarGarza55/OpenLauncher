@@ -11,3 +11,4 @@ __pycache__
 compile-deb/usr/share/openlauncher/*
 OpenLauncher.bin
 OpenLauncher.deb
+OpenLauncher.bin.spec

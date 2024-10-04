@@ -99,12 +99,6 @@ if sys.platform == "win32":
     os.makedirs(plugins_directory, exist_ok=True)
 elif sys.platform == "linux":
     plugins_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher", "plugins")
-    os.makedirs(plugins_directory, exist_ok=True)
-    info = os.path.join(plugins_directory, "info.txt")
-    with open(info, "w") as f:
-        f.write("In this directory you can place themes for the launcher.\n")
-        f.write("You can found themes in the website: " + website_url + "/plugins")
-        f.write("Or you can create your own theme using the theme creator in: " + website_url + "/create")
 
 # Set Minecraft directory
 if debug_mode:

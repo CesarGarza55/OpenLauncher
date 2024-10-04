@@ -32,10 +32,11 @@ pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpat
     --add-data data/img:img/ \
     --add-data data/updater.py:. \
     --add-data data/variables.py:. \
+    --name OpenLauncher.bin \
     data/OpenLauncher.py
 
 # Remove the temporary files
-rm OpenLauncher.spec
+rm OpenLauncher.bin.spec
 rm -rf temp
 
 # Deactivate the virtual environment
