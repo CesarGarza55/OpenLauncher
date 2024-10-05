@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPu
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
                              QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, QThreadPool
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
 from pypresence import Presence
@@ -24,16 +24,26 @@ from mod_manager import show_mod_manager
 # Class to run a function in a separate thread 
 # (idk why but it doesn't work with threading.Thread and i had to use QRunnable,
 # I really don't know what's exactly happening here, but it works, so i will keep it like that)
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super(Worker, self).__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
+        self.signals = WorkerSignals()
 
     @pyqtSlot()
     def run(self):
-        self.fn(*self.args, **self.kwargs)
+        try:
+            self.fn(*self.args, **self.kwargs)
+        except Exception as e:
+            self.signals.error.emit(str(e))
+        finally:
+            self.signals.finished.emit()
 
 # Check for updates and update the launcher if necessary
 update()
@@ -932,34 +942,39 @@ class Ui_MainWindow(object):
         except Exception:
             return False
 
-    # Function to run Minecraft
+    # Function to run Minecraft 
+    # Idk why this crashes the app on Linux but at least opens Minecraft
+    # The only thing is that the console output is not shown because the app crashes
+    # But the game runs fine (idk if in another distro it works fine but in Ubuntu with KDE it crashes)
     def run_minecraft(self):
         # Clear the console output
         self.console_output.clear()
+        
         # Check if Java is installed
         if not self.is_java_installed():
             if sys.platform == 'win32':
                 if messagebox.askyesno("Error", "Java is not installed. Do you want to open the download page?"):
                     webbrowser.open('https://www.java.com/es/download/')
                 else:
-                    messagebox.showerror("Java is not installed","It's necessary to install Java to run Minecraft, please install it and restart the launcher")
-                    sys.exit() # Close the application
+                    messagebox.showerror("Java is not installed", "It's necessary to install Java to run Minecraft, please install it and restart the launcher")
+                    sys.exit()  # Close the application
             elif sys.platform == 'linux':
-                messagebox.showinfo("Java is not installed", "Please install Java to run Minecraft.\n\nFor example, in Ubuntu you can install it with the command 'sudo apt install default-jre'") 
+                messagebox.showinfo("Java is not installed", "Please install Java to run Minecraft.\n\nFor example, in Ubuntu you can install it with the command 'sudo apt install default-jre'")
             return
-        
-        mine_user = self.lineEdit.text()  
+
+        mine_user = self.lineEdit.text()
         if not mine_user:
             messagebox.showerror("Error", "Please enter your user name")
             return
+
         global jvm_arguments
         if not jvm_arguments:
             print("No JVM arguments")
             arg = variables.defaultJVM
         else:
             arg = jvm_arguments
-        
-        if(user_uuid == ""):
+
+        if user_uuid == "":
             # Generate a UUID if it does not exist
             self.generate_uuid(mine_user)
         self.save_data()
@@ -970,13 +985,14 @@ class Ui_MainWindow(object):
         self.pushButton_3.setEnabled(False)
         self.pushButton_4.setEnabled(False)
         self.pushButton_5.setEnabled(False)
+        self.pushButton_6.setEnabled(False)
         self.lineEdit.setEnabled(False)
         self.comboBox.setEnabled(False)
         self.checkBox.setEnabled(False)
 
         # Set version to the selected version
         version = self.comboBox.currentText()
-        
+
         # If version is not null then set the options
         if version:
             options = {
@@ -991,8 +1007,9 @@ class Ui_MainWindow(object):
             # Start Minecraft with the selected version and options in a separate thread
             try:
                 minecraft_command = minecraft_launcher_lib.command.get_minecraft_command(version, minecraft_directory, options)
-                
+
                 def run_command(command):
+                    process = None
                     try:
                         if sys.platform == 'win32':
                             # Don't show the console window
@@ -1007,34 +1024,41 @@ class Ui_MainWindow(object):
                         process.stdout.close()
                         process.wait()
                     except Exception as e:
-                        messagebox.showerror("Error", f"Could not start Minecraft: {e}")
+                        self.signals.error.emit(f"Could not start Minecraft: {e}")
                     finally:
-                        self.progressBar.setValue(0)
-                    # Enable the buttons
-                    self.pushButton.setEnabled(True)
-                    self.pushButton_2.setEnabled(True)
-                    self.pushButton_3.setEnabled(True)
-                    self.pushButton_4.setEnabled(True)
-                    self.pushButton_5.setEnabled(True)
-                    self.lineEdit.setEnabled(True)
-                    self.comboBox.setEnabled(True)
-                    self.checkBox.setEnabled(True)
-                # Start the thread to run the command 
+                        if process:
+                            process.stdout.close()
+                            process.stderr.close()
+                            process.wait()
+                        self.signals.finished.emit()
 
-                thread = threading.Thread(target=run_command, args=(minecraft_command,))
-                thread.start()
+                worker = Worker(run_command, minecraft_command)
+                worker.signals.finished.connect(self.on_minecraft_finished)
+                worker.signals.error.connect(self.on_minecraft_error)
+                QThreadPool.globalInstance().start(worker)
 
             except Exception as e:
                 messagebox.showerror("Error", f"Could not start Minecraft: {e}")
-                # Enable the buttons
-                self.pushButton.setEnabled(True)
-                self.pushButton_2.setEnabled(True)
-                self.pushButton_3.setEnabled(True)
-                self.pushButton_4.setEnabled(True)
-                self.pushButton_5.setEnabled(True)
-                self.lineEdit.setEnabled(True)
-                self.comboBox.setEnabled(True)
-                self.checkBox.setEnabled(True)
+                self.enable_buttons()
+
+    def on_minecraft_finished(self):
+        self.progressBar.setValue(0)
+        self.enable_buttons()
+
+    def on_minecraft_error(self, error_message):
+        messagebox.showerror("Error", error_message)
+        self.enable_buttons()
+
+    def enable_buttons(self):
+        self.pushButton.setEnabled(True)
+        self.pushButton_2.setEnabled(True)
+        self.pushButton_3.setEnabled(True)
+        self.pushButton_4.setEnabled(True)
+        self.pushButton_5.setEnabled(True)
+        self.pushButton_6.setEnabled(True)
+        self.lineEdit.setEnabled(True)
+        self.comboBox.setEnabled(True)
+        self.checkBox.setEnabled(True)
 
     # Function to start the installation of the versions in a separate thread
     # It's weird but it works and it's the only way I found to make it work with the QThreadPool
@@ -1297,7 +1321,7 @@ class Ui_MainWindow(object):
         # Create the window
         window_settings = QDialog()
         window_settings.setWindowTitle('Settings')
-        window_settings.setFixedSize(350, 350)
+        window_settings.setFixedSize(350, 380)
         window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         window_settings.setWindowIcon(QIcon(icon))
         window_settings.setStyleSheet("background-color: rgb(45, 55, 65); border-radius: 10px;")
