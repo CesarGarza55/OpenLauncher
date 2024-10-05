@@ -166,14 +166,18 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ## Usage
 
+When you open the application, a welcome window greets you. You can disable this feature using a checkbox.
+
+![imagen](https://github.com/user-attachments/assets/5b31cabc-4f53-4264-aa78-478509e68299)
+
 The main interface shows different sections:
 
-![Main interface](https://github.com/user-attachments/assets/bee88371-29b9-4fd3-8037-9895a3a6dc49)
+![imagen](https://github.com/user-attachments/assets/539d8587-a1dd-46e0-b41b-aaf665f35c06)
 
 
 To install a version, use the following interface where you select the version and click install:
 
-![Install minecraft](https://github.com/user-attachments/assets/c709ce85-6b7d-46bd-b2e4-06b6bcf43588)
+![imagen](https://github.com/user-attachments/assets/a4917355-f5d1-4cfe-b972-6ae7b3f6eae0)
 
 By default the following JVM arguments are used:
 
@@ -183,7 +187,12 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![Settings](https://github.com/user-attachments/assets/ea74104f-cdb0-4e1c-8f65-66441d1153ee)
+![imagen](https://github.com/user-attachments/assets/e95fa134-191e-4054-bf57-078216bdcb5b)
+
+The new mod manager allows you to manage mods sorted by game version so you can install all the mods you want and then disable the ones you don't want to use:
+
+![imagen](https://github.com/user-attachments/assets/92f17c0a-90c2-4e25-90a3-3ce244b44679)
+
 
 ## Themes
 
@@ -210,13 +219,19 @@ My PC Specs:
 - CPU: AMD Ryzen 5 3450U 4-Core 2.1GHz
 - GPU: Radeon Vega 8 Graphics
 - RAM: 16GB DDR4 SODIMM 2400MHz
-- Operating System: Windows 11 Home v22621.3593
+- Operating System: Ubuntu 24.04.1 LTS x86_64 
 
 Tested Minecraft Version:
 - RAM Allocated: 2GB (Default JVM Arguments)
 - Minecraft Version: 1.21.1
+- Fabric: 0.16.5
 
-![Test](https://github.com/user-attachments/assets/b6b94107-de9c-4c53-a85e-5374d76b806a)
+![imagen](https://github.com/user-attachments/assets/7fdc4cc9-066a-4f07-ae02-32bf9ddaefb6)
+
+
+## Bugs
+
+For some reason (I don't know if it's a problem with my Linux distribution) there are times when the launcher crashes when running the game, but there are also times when it doesn't happen, so I assume it may be my own distribution.
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
