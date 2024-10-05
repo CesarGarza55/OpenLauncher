@@ -1046,7 +1046,19 @@ class Ui_MainWindow(object):
         self.enable_buttons()
 
     def on_minecraft_error(self, error_message):
-        messagebox.showerror("Error", error_message)
+        # Create log directory if it doesn't exist
+        log_dir = os.path.join(app_dir, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Write the error message to the log file
+        log_file_path = os.path.join(log_dir, 'error_log.txt')
+        try:
+            with open(log_file_path, 'w') as f:
+                f.write(error_message)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to write error log: {e}")
+        
+        # Enable the buttons
         self.enable_buttons()
 
     def enable_buttons(self):
