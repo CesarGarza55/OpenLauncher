@@ -4,14 +4,14 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, 
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
-                             QProgressBar, QApplication, QMessageBox,
-                             QDialog)
+                             QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, QThreadPool
-from PyQt5.QtGui import QTextCursor, QIcon
+from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
 from pypresence import Presence
 import variables
 from updater import update
+from mod_manager import show_mod_manager
 
 # I have been working on this for idk how long, i stopped counting the hours long ago
 # When i fix a bug, another one appears, and when i fix that one, another four appear
@@ -107,7 +107,6 @@ def open_launcher_dir():
     if os.path.exists(app_dir):
         # Open the directory
         if sys.platform == "win32":
-            print("Opening directory on Windows")
             subprocess.Popen(['explorer', app_dir])
         elif sys.platform == "linux":
             subprocess.Popen(['gio', 'open',  app_dir])
@@ -150,22 +149,43 @@ bg_color = variables.bg_color
 
 # Function to apply the theme
 def apply_theme(theme):
-    global bg_path, bg_color, icon
+    global bg_path, bg_color, icon, bg_blur
     
     # Dictionary with the default paths
     default_paths = {
         'bg_path': variables.bg_path,
         'icon': variables.icon,
-        'bg_color': variables.bg_color
+        'bg_color': variables.bg_color,
+        'bg_blur': variables.bg_blur
     }
     
     # Update the paths
     for key in default_paths:
         if key in theme:
             if key == 'bg_color':
-                globals()[key] = theme[key]
+                # Validate bg_color format
+                if isinstance(theme[key], str) and all(0 <= int(c) <= 255 for c in theme[key].split(',')):
+                    globals()[key] = theme[key]
+                else:
+                    messagebox.showerror("Error", f"The theme {theme['folder']} has an invalid bg_color value (must be in the format 'R, G, B') for example '25, 45, 75' the values must be between 0 and 255.\nThe default color will be used")
+                    globals()[key] = default_paths[key]
+            elif key == 'bg_blur':
+                # Validate bg_blur range
+                if isinstance(theme[key], int) and 0 <= theme[key] <= 64:
+                    globals()[key] = theme[key]
+                else:
+                    messagebox.showerror("Error", f"The theme {theme['folder']} has an invalid bg_blur value (must be an number between 0 and 64).\nThe default value will be used")
+                    globals()[key] = default_paths[key]
+            elif key == 'folder':
+                pass
             else:
-                globals()[key] = os.path.join(plugin_dir, theme['folder'], theme[key]).replace("\\", "/")
+                # Validate image path
+                image_path = os.path.join(plugin_dir, theme['folder'], theme[key]).replace("\\", "/")
+                if os.path.isfile(image_path):
+                    globals()[key] = image_path
+                else:
+                    messagebox.showerror("Error", f"The theme {theme['folder']} has an invalid {key} path.\nThe default path will be used")
+                    globals()[key] = default_paths[key]
         else:
             globals()[key] = default_paths[key]
         # print(f"{key}: {globals()[key]}")
@@ -176,12 +196,13 @@ if len(themes) == 0:
     bg_path = variables.bg_path
     icon = variables.icon
     bg_color = variables.bg_color
+    bg_blur = variables.bg_blur
 elif len(themes) > 1:
-    if messagebox.askyesno("Multiple themes found", "Multiple themes found. Do you want to open the app directory to remove the extra themes?"):
+    if messagebox.askyesno("Conflicting Themes Detected", "Multiple themes were found, which may cause issues. Would you like to open the plugins directory to remove the additional themes?"):
         open_launcher_dir()
         sys.exit()
     else:
-        messagebox.showinfo("Info", "The first theme found will be loaded.")
+        messagebox.showinfo("Information", "The first detected theme will be attempted for loading, please remove additional themes to prevent issues.")
     # Load the first theme
     apply_theme(themes[0])
 elif len(themes) == 1:
@@ -246,6 +267,18 @@ class Ui_MainWindow(object):
         MainWindow.setWindowIcon(QIcon(icon))
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+
+        # Create the background image for the central widget with blur effect
+        self.background = QLabel(self.centralwidget)
+        self.background.setObjectName(u"background")
+        self.background.setGeometry(0, 0, 850, 500)
+        self.background.setPixmap(QPixmap(bg_path).scaled(850, 500, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+
+        self.blur_effect = QGraphicsBlurEffect()
+        self.blur_effect.setBlurRadius(bg_blur)
+        self.background.setGraphicsEffect(self.blur_effect)
+
+
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName(u"gridLayout")
         self.verticalLayout_3 = QVBoxLayout()
@@ -333,6 +366,14 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.pushButton_3)
 
+        self.pushButton_6 = QPushButton(self.centralwidget)
+        self.pushButton_6.setObjectName(u"pushButton_6")
+        sizePolicy1.setHeightForWidth(self.pushButton_6.sizePolicy().hasHeightForWidth())
+        self.pushButton_6.setSizePolicy(sizePolicy1)
+        self.pushButton_6.setMinimumSize(QSize(140, 30))
+
+        self.verticalLayout.addWidget(self.pushButton_6)
+
         self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Ignored)
 
         self.verticalLayout.addItem(self.verticalSpacer_2)
@@ -411,57 +452,7 @@ class Ui_MainWindow(object):
 
         # Establish the style of the widgets
         MainWindow.setStyleSheet("background-color: rgba("f'{bg_color}'", 1);")
-        self.centralwidget.setStyleSheet(f"""
-            QWidget#centralwidget {{
-                border-image: url("{bg_path}");
-            }}
-        """)
-        self.pushButton.setStyleSheet("""
-            QPushButton {
-                background-color: rgba("""f'{bg_color}'""", 0.6); 
-                color: #ffffff; 
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-            QPushButton:disabled {
-                background-color: rgba(128, 128, 128, 0.6);
-                color: #cccccc;
-            }
-        """)
-        
-        self.pushButton_2.setStyleSheet("""
-            QPushButton {
-                background-color: rgba("""f'{bg_color}'""", 0.6); 
-                color: #ffffff; 
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-            QPushButton:disabled {
-                background-color: rgba(128, 128, 128, 0.6);
-                color: #cccccc;
-            }
-        """)
-        
-        self.pushButton_3.setStyleSheet("""
-            QPushButton {
-                background-color: rgba("""f'{bg_color}'""", 0.6);; 
-                color: #ffffff; 
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-            QPushButton:disabled {
-                background-color: rgba(128, 128, 128, 0.6);
-                color: #cccccc;
-            }
-        """)
-        
-        self.pushButton_4.setStyleSheet("""
+        self.bt_style = """
             QPushButton {
                 background-color: rgba("""f'{bg_color}'""", 0.5);
                 color: #ffffff; 
@@ -474,22 +465,13 @@ class Ui_MainWindow(object):
                 background-color: rgba(128, 128, 128, 0.6);
                 color: #cccccc;
             }
-        """)
-        
-        self.pushButton_5.setStyleSheet("""
-            QPushButton {
-                background-color: rgba("""f'{bg_color}'""", 0.5);
-                color: #ffffff; 
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-            QPushButton:disabled {
-                background-color: rgba(128, 128, 128, 0.6);
-                color: #cccccc;
-            }
-        """)
+        """
+        self.pushButton.setStyleSheet(self.bt_style)
+        self.pushButton_2.setStyleSheet(self.bt_style)
+        self.pushButton_3.setStyleSheet(self.bt_style)
+        self.pushButton_4.setStyleSheet(self.bt_style)
+        self.pushButton_5.setStyleSheet(self.bt_style)
+        self.pushButton_6.setStyleSheet(self.bt_style)
         
         self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
         self.label.setStyleSheet("background-color: transparent; color: #ffffff;")
@@ -573,6 +555,7 @@ class Ui_MainWindow(object):
         self.pushButton_3.clicked.connect(self.install_forge_versions)
         self.pushButton_4.clicked.connect(self.settings_window)
         self.pushButton_5.clicked.connect(self.run_minecraft)
+        self.pushButton_6.clicked.connect(self.open_mod_manager)
         self.checkBox.clicked.connect(self.toggle_snapshots)
 
         self.update_list_versions()
@@ -645,18 +628,28 @@ class Ui_MainWindow(object):
             with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
                 json.dump(user_uuid, f)
         
+        MainWindow.resizeEvent = self.on_resize
+
     # setupUi
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", f'OpenLauncher for Minecraft — {variables.launcher_version}', None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"Username: ", None))
         self.checkBox.setText(QCoreApplication.translate("MainWindow", u"Show Snapshots", None))
-        self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Install versions", None))
+        self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Install Minecraft", None))
         self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"Install Fabric", None))
         self.pushButton_3.setText(QCoreApplication.translate("MainWindow", u"Install Forge", None))
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", u"Settings", None))
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", u"Play", None))
+        self.pushButton_6.setText(QCoreApplication.translate("MainWindow", u"Mod Manager", None))
     # retranslateUi
+
+
+    def on_resize(self, event):
+        size = event.size()
+        self.background.setGeometry(0, 0, size.width(), size.height())
+        self.background.setPixmap(QPixmap(bg_path).scaled(size.width(), size.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        event.accept()
 
     # Function to update the discord error label
     def update_error_discord(self):
@@ -1058,9 +1051,10 @@ class Ui_MainWindow(object):
             return
         # Create the window
         window_versions = QDialog()
-        window_versions.setWindowTitle('Install versions')
+        window_versions.setWindowTitle('Install Minecraft Versions')
         window_versions.setFixedSize(300, 150)
-        window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint) 
+        window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_versions.setWindowIcon(QIcon(icon))
         window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
         # Place the window in the center of the screen
         window_width = window_versions.width()
@@ -1079,6 +1073,20 @@ class Ui_MainWindow(object):
 
         # Create the layout
         layout = QVBoxLayout()
+
+        # Create the background label
+        bg_label = QLabel(window_versions)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_versions.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
+
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        bg_label_2 = QLabel(window_versions)
+        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        bg_label_2.setGeometry(0, 0, window_width, window_height)
 
         # Label with the information
         info_label = QLabel("Install the version of Minecraft you want")
@@ -1126,6 +1134,7 @@ class Ui_MainWindow(object):
         window_versions.setWindowTitle('Install Fabric')
         window_versions.setFixedSize(300, 150)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_versions.setWindowIcon(QIcon(icon))
         window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
 
         # Center the window on the screen
@@ -1146,6 +1155,20 @@ class Ui_MainWindow(object):
 
         # Create the layout
         layout = QVBoxLayout()
+
+        # Create the background label
+        bg_label = QLabel(window_versions)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_versions.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
+
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        bg_label_2 = QLabel(window_versions)
+        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        bg_label_2.setGeometry(0, 0, window_width, window_height)
 
         # Label with the information
         info_label = QLabel("Install the latest available version of Fabric for the desired Minecraft version")
@@ -1192,6 +1215,7 @@ class Ui_MainWindow(object):
         window_versions.setWindowTitle('Install Forge')
         window_versions.setFixedSize(300, 200)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_versions.setWindowIcon(QIcon(icon))
         window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
 
         # Center the window on the screen
@@ -1204,6 +1228,20 @@ class Ui_MainWindow(object):
         
         # Create the layout
         layout = QVBoxLayout()
+
+        # Create the background label
+        bg_label = QLabel(window_versions)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_versions.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
+
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        bg_label_2 = QLabel(window_versions)
+        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        bg_label_2.setGeometry(0, 0, window_width, window_height)
 
         # Forge label
         info_label = QLabel("Install the latest available version of Forge for the desired Minecraft version")
@@ -1256,14 +1294,15 @@ class Ui_MainWindow(object):
         window_versions.exec_()
 
     def settings_window(self):
-        # Crear la ventana
+        # Create the window
         window_settings = QDialog()
         window_settings.setWindowTitle('Settings')
         window_settings.setFixedSize(350, 350)
         window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_settings.setWindowIcon(QIcon(icon))
         window_settings.setStyleSheet("background-color: rgb(45, 55, 65); border-radius: 10px;")
 
-        # Centrar la ventana en la pantalla
+        # Center the window on the screen
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         window_width = window_settings.width()
         window_height = window_settings.height()
@@ -1271,37 +1310,35 @@ class Ui_MainWindow(object):
         position_down = int(screen_geometry.height()/2 - window_height/2)
         window_settings.move(position_right, position_down)
 
-        # Crear el layout
+        # Create the layout
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignHCenter)  # Centrar los widgets
-        layout.setSpacing(15)  # Añadir más espacio entre los elementos
+        layout.setAlignment(Qt.AlignHCenter)  # Center the elements
+        layout.setSpacing(15)  # Add spacing between the elements
+        
+        # Create the background label
+        bg_label = QLabel(window_settings)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_settings.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
 
-        # Crear el label de JVM arguments
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        # Create the label for the JVM arguments
         label_jvm_arguments = QLabel("JVM arguments (Expert settings)\nIf nothing is specified, default values will be used.\nDon't use this option if you're unsure.")
-        label_jvm_arguments.setStyleSheet("color: white; font-size: 12px;")
+        label_jvm_arguments.setStyleSheet("color: white; font-size: 12px; background-color: transparent;")
         label_jvm_arguments.setAlignment(Qt.AlignCenter)
         label_jvm_arguments.setWordWrap(True)
         layout.addWidget(label_jvm_arguments)
 
-        # Crear label tip
+        # Create the label for the tip
         label_tip = QLabel("Leave blank and save to reset.")
-        label_tip.setStyleSheet("color: yellow; font-size: 11px;")
+        label_tip.setStyleSheet("color: yellow; font-size: 11px; background-color: transparent;")
         label_tip.setAlignment(Qt.AlignCenter)
         layout.addWidget(label_tip)
 
-        bt_style = """
-            QPushButton {
-                background-color: rgba("""f'{bg_color}'""", 0.6);
-                color: #ffffff; 
-                border-radius: 5px;
-                padding: 8px;
-            }
-            QPushButton:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-        """
-
-        # Crear el campo de entrada para JVM arguments
+        # Create the entry for the JVM arguments
         entry_jvm_arguments = QLineEdit()
         entry_jvm_arguments.setFixedWidth(300)
         entry_jvm_arguments.setPlaceholderText("JVM arguments (-Xms512M -Xmx8G ...)")
@@ -1313,7 +1350,7 @@ class Ui_MainWindow(object):
         """)
         layout.addWidget(entry_jvm_arguments)
 
-        # Checkbox para Discord
+        # Checkbox to enable Discord Rich Presence
         discord_checkbox = QCheckBox("Enable Discord Rich Presence")
         discord_checkbox.setStyleSheet(f"""
             QCheckBox {{
@@ -1363,35 +1400,174 @@ class Ui_MainWindow(object):
             else:
                 jvm_arguments = variables.defaultJVM
 
-        # Botón para guardar la configuración
+        # Button to save the settings
         bt_save = QPushButton('Save settings')
-        bt_save.setFixedWidth(300)
-        bt_save.setStyleSheet(bt_style)
+        bt_save.setFixedSize(300, 30)
+        bt_save.setStyleSheet(self.bt_style)
         bt_save.clicked.connect(lambda: [set_jvm(), self.save_data(), window_settings.accept()])
         layout.addWidget(bt_save)
 
-        # Botones para abrir directorios
+        # Button to open all the directories
         bt_mine_path = QPushButton('Open game directory')
-        bt_mine_path.setFixedWidth(300)
-        bt_mine_path.setStyleSheet(bt_style)
+        bt_mine_path.setFixedSize(300, 30)
+        bt_mine_path.setStyleSheet(self.bt_style)
         bt_mine_path.clicked.connect(open_minecraft_dir)
         layout.addWidget(bt_mine_path)
 
         bt_app_path = QPushButton('Open launcher directory')
-        bt_app_path.setFixedWidth(300)
-        bt_app_path.setStyleSheet(bt_style)
+        bt_app_path.setFixedSize(300, 30)
+        bt_app_path.setStyleSheet(self.bt_style)
         bt_app_path.clicked.connect(open_launcher_dir)
         layout.addWidget(bt_app_path)
-
-        bt_plugins_path = QPushButton('Open plugins website')
-        bt_plugins_path.setFixedWidth(300)
-        bt_plugins_path.setStyleSheet(bt_style)
+        
+        # Button to open the plugins website
+        bt_plugins_path = QPushButton('Open themes website')
+        bt_plugins_path.setFixedSize(300, 30)
+        bt_plugins_path.setStyleSheet(self.bt_style)
         bt_plugins_path.clicked.connect(open_plugins_website)
         layout.addWidget(bt_plugins_path)
 
-        # Configurar el layout y ejecutar la ventana
+        # Configure the layout
         window_settings.setLayout(layout)
         window_settings.exec_()
+    
+    # Function to open the mod manager (works better than i thought :D)
+    def open_mod_manager(self):
+        show_mod_manager(bg_color, icon, self.comboBox.currentText(), bg_path, bg_blur)
+
+    def get_started(self):
+        # Create the window
+        window_get_started = QDialog()
+        window_get_started.setWindowTitle('Get started')
+        window_get_started.setFixedSize(800, 500)
+        window_get_started.setWindowFlags(window_get_started.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_get_started.setWindowIcon(QIcon(icon))
+        window_get_started.setStyleSheet("background-color: rgb(45, 55, 65);")
+
+        # Center the window on the screen
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        window_width = window_get_started.width()
+        window_height = window_get_started.height()
+        position_right = int(screen_geometry.width()/2 - window_width/2)
+        position_down = int(screen_geometry.height()/2 - window_height/2)
+        window_get_started.move(position_right, position_down)
+
+        # Create the layout
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)  # Añadir márgenes para separar el texto del borde de la ventana
+        layout.setSpacing(15)
+
+        # Create the background label
+        bg_label = QLabel(window_get_started)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_get_started.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
+
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        bg_label_2 = QLabel(window_get_started)
+        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        bg_label_2.setGeometry(0, 0, window_width, window_height)
+
+        # Create the labels
+        welcome_label = QLabel("Welcome to OpenLauncher!")
+        welcome_label.setStyleSheet("color: white; font-size: 16px; background-color: transparent;")
+        welcome_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(welcome_label)
+
+        # Add welcome message and launcher information
+        welcome_message = (
+            "OpenLauncher is a free and open-source launcher for Minecraft that allows you to install and play the version you want, "
+            "created with Python and Qt for the GUI.<br><br>"
+            "To get started, you can install the Minecraft version you want, install Fabric or Forge, and play the game. "
+            "You can also manage your mods with the Mod Manager and enable Discord Rich Presence.<br><br>"
+            f"You can install themes to customize the launcher, you can find them in the <a style='color: #00aaff;' href='{variables.website_url}/plugins'>themes section</a> of the OpenLauncher website.<br><br>"
+            f"Visit the <a style='color: #00aaff;' href='{variables.website_url}'>OpenLauncher website</a> for more information.<br><br>"
+            "OpenLauncher offers some features like:"
+            "<ul>"
+            "<li>Install Minecraft versions</li>"
+            "<li>Install Fabric and Forge</li>"
+            "<li>Play the Minecraft version you want</li>"
+            "<li>Manage your mods with the Mod Manage</li>"
+            "<li>Enable Discord Rich Presence</li>"
+            "<li>Customize the launcher with themes</li>"
+            "</ul>"
+        )
+        welcome_label = QLabel(welcome_message)
+        welcome_label.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
+        welcome_label.setAlignment(Qt.AlignLeft)
+        welcome_label.setWordWrap(True)
+        welcome_label.setOpenExternalLinks(False)  # Disable the links
+        welcome_label.setTextInteractionFlags(Qt.TextBrowserInteraction)  # Enable the cursor to change when hovering over the link
+        layout.addWidget(welcome_label)
+
+        # Connect the links to the website
+        welcome_label.linkActivated.connect(lambda link: webbrowser.open(link))
+        # Create the bottom layout
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setAlignment(Qt.AlignCenter)
+
+        # Create the checkbox to not show the window again
+        gs_checkbox = QCheckBox("Don't show this window again")
+        gs_checkbox.setStyleSheet(f"""
+            QCheckBox {{
+                background-color: transparent;
+                color: #ffffff;
+            }}
+            QCheckBox::indicator {{
+                width: 20px;
+                height: 20px;
+            }}
+            QCheckBox::indicator:unchecked {{
+                border-radius: 5px;
+                border: 2px solid rgb(255, 255, 255);
+                background-color: transparent;
+            }}
+            QCheckBox::indicator:checked {{
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.5);
+                background-color: rgba({bg_color}, 0.5);
+            }}
+            QCheckBox::indicator:unchecked:hover {{
+                border-radius: 5px;
+                border: 2px solid rgb({bg_color});
+            }}
+            QCheckBox::indicator:checked:hover {{
+                border-radius: 5px;
+                border: 2px solid rgba({bg_color}, 0.8);
+                background-color: rgba({bg_color}, 0.8);
+            }}
+            QCheckBox:disabled {{
+                color: #cccccc;
+            }}
+        """)
+        # Function to close the window
+        def close_window():
+            # Save the data to a file
+            with open(f'{app_dir}/config/config.json', 'r') as f:
+                data = json.load(f)
+                data["first_time"] = not gs_checkbox.isChecked()
+            with open(f'{app_dir}/config/config.json', 'w') as f:
+                json.dump(data, f)
+            window_get_started.accept()
+        # Create the close button
+        bt_close = QPushButton('Close')
+        bt_close.setFixedSize(100, 30)
+        bt_close.setStyleSheet(self.bt_style)
+        bt_close.clicked.connect(close_window)
+        bottom_layout.addWidget(gs_checkbox)
+        bottom_layout.addWidget(bt_close)
+
+        # Add the bottom layout to the main layout
+        layout.addLayout(bottom_layout)
+
+
+        window_get_started.setLayout(layout)
+
+        # Mostrar la ventana
+        window_get_started.exec_()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -1401,14 +1577,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Redirect the standard output to the QTextEdit widget
         sys.stdout = StdoutRedirector(self.console_output)
 
-
+# Start the application
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    window = MainWindow()
-    window.show()
-    window.update_error_discord()
-    sys.exit(app.exec_())
+    app = QApplication(sys.argv) # Create the application
+    app.setStyle('Fusion') # Set the style to Fusion
+    window = MainWindow() # Create the window
+    # Create the get started window if the user is using the launcher for the first time
+    if not os.path.exists(f'{app_dir}/config/config.json'):
+        with open(f'{app_dir}/config/config.json', 'w') as f:
+            json.dump({"first_time": True}, f)
+            window.get_started()
+    else:
+        with open(f'{app_dir}/config/config.json', 'r') as f:
+            data = json.load(f)
+            if data["first_time"] == True:
+                window.get_started()
+    
+    window.show() # Show the window
+    window.update_error_discord() # Update the discord error label
+    sys.exit(app.exec_()) # When the application is closed, exit the application
 
 # Hello, idk what to put here but I'm going to put it anyway :D
 
