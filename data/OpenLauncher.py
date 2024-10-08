@@ -1490,7 +1490,7 @@ class Ui_MainWindow(object):
 
         # Create the layout
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)  # Añadir márgenes para separar el texto del borde de la ventana
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
 
         # Create the background label
@@ -1535,12 +1535,13 @@ class Ui_MainWindow(object):
         welcome_label.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
         welcome_label.setAlignment(Qt.AlignLeft)
         welcome_label.setWordWrap(True)
-        welcome_label.setOpenExternalLinks(False)  # Disable the links
-        welcome_label.setTextInteractionFlags(Qt.TextBrowserInteraction)  # Enable the cursor to change when hovering over the link
+        welcome_label.setOpenExternalLinks(False)
+        welcome_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
         layout.addWidget(welcome_label)
 
         # Connect the links to the website
         welcome_label.linkActivated.connect(lambda link: webbrowser.open(link))
+
         # Create the bottom layout
         bottom_layout = QHBoxLayout()
         bottom_layout.setAlignment(Qt.AlignCenter)
@@ -1579,15 +1580,23 @@ class Ui_MainWindow(object):
                 color: #cccccc;
             }}
         """)
+
         # Function to close the window
         def close_window():
-            # Save the data to a file
-            with open(f'{app_dir}/config/config.json', 'r') as f:
-                data = json.load(f)
-                data["first_time"] = not gs_checkbox.isChecked()
-            with open(f'{app_dir}/config/config.json', 'w') as f:
+            config_path = f'{app_dir}/config/config.json'
+            if not os.path.exists(config_path):
+                data = {}
+            else:
+                with open(config_path, 'r') as f:
+                    try:
+                        data = json.load(f)
+                    except json.JSONDecodeError:
+                        data = {}
+            data["first_time"] = not gs_checkbox.isChecked()
+            with open(config_path, 'w') as f:
                 json.dump(data, f)
             window_get_started.accept()
+
         # Create the close button
         bt_close = QPushButton('Close')
         bt_close.setFixedSize(100, 30)
@@ -1598,7 +1607,6 @@ class Ui_MainWindow(object):
 
         # Add the bottom layout to the main layout
         layout.addLayout(bottom_layout)
-
 
         window_get_started.setLayout(layout)
 
@@ -1618,17 +1626,23 @@ if __name__ == "__main__":
     app = QApplication(sys.argv) # Create the application
     app.setStyle('Fusion') # Set the style to Fusion
     window = MainWindow() # Create the window
-    # Create the get started window if the user is using the launcher for the first time
-    if not os.path.exists(f'{app_dir}/config/config.json'):
-        with open(f'{app_dir}/config/config.json', 'w') as f:
+    config_path = os.path.join(app_dir, 'config/config.json').replace('\\', '/')
+    if not os.path.exists(config_path):
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, 'w') as f:
             json.dump({"first_time": True}, f)
-            window.get_started()
+        window.get_started()
     else:
-        with open(f'{app_dir}/config/config.json', 'r') as f:
-            data = json.load(f)
-            if data["first_time"] == True:
+        with open(config_path, 'r') as f:
+            try:
+                data = json.load(f)
+                if data.get("first_time", True):
+                    window.get_started()
+            except json.JSONDecodeError:
+                with open(config_path, 'w') as f:
+                    json.dump({"first_time": True}, f)
                 window.get_started()
-    
+        
     window.show() # Show the window
     window.update_error_discord() # Update the discord error label
     sys.exit(app.exec_()) # When the application is closed, exit the application
