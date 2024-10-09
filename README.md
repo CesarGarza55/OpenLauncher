@@ -6,6 +6,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 
 ## Features
 
+- **Microsoft Account Login**: Now supports logging in with an official Microsoft account.
 - **Custom Interface**: Utilizes PyQt5 for a modern and customizable look.
 - **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
 - **Open Source**: Easily extendable and modifiable by the community.
@@ -46,6 +47,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
         --add-data "data\updater.py;." ^
         --add-data "data\variables.py;." ^
         --add-data "data\mod_manager.py;." ^
+        --add-data "data\microsoft_auth.py;." ^
         "data\OpenLauncher.py"
     del OpenLauncher.spec
     rmdir /s /q temp
@@ -80,7 +82,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     ```bash
     #!/bin/bash
     set -e
-
+    
     # Create a virtual environment if it doesn't exist
     VENV_DIR="venv"
     if [ -d "$VENV_DIR" ]; then
@@ -90,36 +92,37 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
         # Activate the virtual environment
         source "$VENV_DIR/bin/activate"
     fi
-
+    
     # Check if pip is installed in the virtual environment
     if ! command -v pip &> /dev/null; then
         echo "pip is not installed in the virtual environment"
         exit 1
     fi
-
+    
     # Install dependencies
     pip install -r data/requirements_linux.txt
-
+    
     # Install the necessary libraries
     sudo apt install -y libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1
     sudo apt-get install -y --reinstall libqt5widgets5 libqt5gui5 libqt5core5a
-
+    
     # Export the QT_QPA_PLATFORM variable
     export QT_QPA_PLATFORM=xcb
-
+    
     # Compile the application
     pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
         --add-data data/img:img/ \
         --add-data data/updater.py:. \
         --add-data data/variables.py:. \
         --add-data data/mod_manager.py:. \
+        --add-data data/microsoft_auth.py:. \
         --name OpenLauncher.bin \
         data/OpenLauncher.py
-
+    
     # Remove the temporary files
     rm OpenLauncher.bin.spec
     rm -rf temp
-
+    
     # Deactivate the virtual environment
     deactivate
 
@@ -131,11 +134,11 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     ```bash
     #!/bin/bash
     set -e
-
+    
     # Create the directory structure
     DEST_DIR="compile-deb/usr/share/openlauncher"
     mkdir -p "$DEST_DIR"
-
+    
     # Compile the source code if the binary does not exist
     if [ ! -f "OpenLauncher.bin" ]; then
         echo "OpenLauncher.bin is not compiled yet and will be compiled now"
@@ -143,12 +146,16 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
         ./compile-linux.sh
         echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
     else
-        echo "OpenLauncher.bin is already compiled and ready to be packaged"
+        rm OpenLauncher.bin
+        echo "OpenLauncher.bin will be recompiled to ensure the latest version is packaged"
+        chmod +x compile-linux.sh
+        ./compile-linux.sh
+        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
     fi
-
+    
     # Copy the necessary files
     cp OpenLauncher.bin "$DEST_DIR"
-
+    
     # Compile the deb package
     dpkg-deb --build compile-deb "OpenLauncher.deb"
     ```
@@ -181,12 +188,13 @@ When you open the application, a welcome window greets you. You can disable this
 
 The main interface shows different sections:
 
-![imagen](https://github.com/user-attachments/assets/539d8587-a1dd-46e0-b41b-aaf665f35c06)
+![image](https://github.com/user-attachments/assets/bd337d4b-e24c-44dd-8bb6-d2ec0dcb3e3c)
 
 
 To install a version, use the following interface where you select the version and click install:
 
-![imagen](https://github.com/user-attachments/assets/a4917355-f5d1-4cfe-b972-6ae7b3f6eae0)
+![image](https://github.com/user-attachments/assets/8174c08a-827f-47f9-897d-9dbd9076cb4b)
+
 
 By default the following JVM arguments are used:
 
@@ -196,12 +204,19 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![imagen](https://github.com/user-attachments/assets/e95fa134-191e-4054-bf57-078216bdcb5b)
+![image](https://github.com/user-attachments/assets/377374ba-d60c-4957-bb6e-7c78239ec804)
 
 The new mod manager allows you to manage mods sorted by game version so you can install all the mods you want and then disable the ones you don't want to use:
 
 ![imagen](https://github.com/user-attachments/assets/92f17c0a-90c2-4e25-90a3-3ce244b44679)
 
+## Logging in with Microsoft Account
+To log in with your official Microsoft account, follow these steps:
+
+1. Open the launcher.
+2. Click on "Login with Microsoft"
+3. Enter your Microsoft account with Minecraft purchased
+4. Once the authentication process is complete, you will see your account appear in the launcher
 
 ## Themes
 
@@ -241,6 +256,8 @@ Tested Minecraft Version:
 ## Bugs
 
 For some reason (I don't know if it's a problem with my Linux distribution) there are times when the launcher crashes when running the game, but there are also times when it doesn't happen, so I assume it may be my own distribution.
+
+Occasionally, the Microsoft login may cause the launcher to crash, but you can try again, and this issue shouldn't occur frequently.
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
