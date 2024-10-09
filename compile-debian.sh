@@ -12,7 +12,11 @@ if [ ! -f "OpenLauncher.bin" ]; then
     ./compile-linux.sh
     echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
 else
-    echo "OpenLauncher.bin is already compiled and ready to be packaged"
+    rm OpenLauncher.bin
+    echo "OpenLauncher.bin will be recompiled to ensure the latest version is packaged"
+    chmod +x compile-linux.sh
+    ./compile-linux.sh
+    echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
 fi
 
 # Copy the necessary files

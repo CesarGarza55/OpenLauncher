@@ -1,17 +1,18 @@
 import re, time, subprocess, random, atexit, minecraft_launcher_lib
-import json, os, sys, uuid, webbrowser, requests, threading
+import json, os, sys, uuid, webbrowser, requests
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, 
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
                              QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject, QThread
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
 from pypresence import Presence
 import variables
 from updater import update
 from mod_manager import show_mod_manager
+from microsoft_auth import authenticate_and_fetch_profile, logout, fetch_minecraft_profile
 
 # I have been working on this for idk how long, i stopped counting the hours long ago
 # When i fix a bug, another one appears, and when i fix that one, another four appear
@@ -45,8 +46,30 @@ class Worker(QRunnable):
         finally:
             self.signals.finished.emit()
 
+# Authenticate the user and fetch the profile
+def authenticate():
+    try:
+        profile, access_token = authenticate_and_fetch_profile()
+        return profile, access_token
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not authenticate: {e}")
+        return None, None    
+    
+def reauthenticate():
+    try:
+        if messagebox.askyesno("Error", "Your session has expired, you need to login again, do you want to login now?"):
+            profile, access_token = authenticate()
+            return profile, access_token
+        else:
+            return "offline", "offline"
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not authenticate: {e}")
+        return None, None
+    
 # Check for updates and update the launcher if necessary
 update()
+
+access_token = ""
 
 # Create the Discord Rich Presence object
 rpc = Presence(variables.CLIENT_ID)
@@ -277,6 +300,7 @@ class Ui_MainWindow(object):
         MainWindow.setWindowIcon(QIcon(icon))
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+        self.resizeEvent = self.on_resize
 
         # Create the background image for the central widget with blur effect
         self.background = QLabel(self.centralwidget)
@@ -330,6 +354,7 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
 
+
         self.checkBox = QCheckBox(self.centralwidget)
         self.checkBox.setObjectName(u"checkBox")
         self.verticalLayout_2.addWidget(self.checkBox)
@@ -337,6 +362,16 @@ class Ui_MainWindow(object):
         self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Ignored)
 
         self.verticalLayout_2.addItem(self.verticalSpacer)
+        self.pushButton_7 = QPushButton(self.centralwidget)
+        self.pushButton_7.setObjectName(u"pushButton_7")
+        sizePolicy1 = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
+        sizePolicy1.setHeightForWidth(self.pushButton_7.sizePolicy().hasHeightForWidth())
+        self.pushButton_7.setSizePolicy(sizePolicy1)
+        self.pushButton_7.setMinimumSize(QSize(140, 30))
+        self.pushButton_7.setMaximumSize(QSize(270, 30))
+        self.pushButton_7.setText("Login with Microsoft")
+        self.pushButton_7.clicked.connect(self.login_microsoft)
+        self.verticalLayout_2.addWidget(self.pushButton_7)
 
 
         self.horizontalLayout_3.addLayout(self.verticalLayout_2)
@@ -351,7 +386,6 @@ class Ui_MainWindow(object):
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.pushButton = QPushButton(self.centralwidget)
         self.pushButton.setObjectName(u"pushButton")
-        sizePolicy1 = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
@@ -482,6 +516,7 @@ class Ui_MainWindow(object):
         self.pushButton_4.setStyleSheet(self.bt_style)
         self.pushButton_5.setStyleSheet(self.bt_style)
         self.pushButton_6.setStyleSheet(self.bt_style)
+        self.pushButton_7.setStyleSheet(self.bt_style)
         
         self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
         self.label.setStyleSheet("background-color: transparent; color: #ffffff;")
@@ -572,6 +607,7 @@ class Ui_MainWindow(object):
         global jvm_arguments
         global maximize
         global discord_rpc
+        global access_token
         # Load the data from the user_data.json file
         if os.path.exists(f'{app_dir}/config/user_data.json'):
             with open(f'{app_dir}/config/user_data.json', 'r') as f:
@@ -583,6 +619,46 @@ class Ui_MainWindow(object):
                 ask_update = user_data.get('ask_update')
                 discord_rpc = user_data.get('discord_rpc')
                 maximize = user_data.get('maximized')
+                access_token = user_data.get('token')
+                if access_token != "" and access_token is not None:
+                    try:
+                        profile = fetch_minecraft_profile(access_token)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        profile = "No connection"
+                    if profile and 'id' in profile and 'name' in profile:
+                        self.lineEdit.setVisible(False)
+                        self.label.setText(f"Logged in as {profile['name']}")
+                        self.pushButton_7.setText("Logout from Microsoft")
+                        self.pushButton_7.clicked.disconnect()
+                        self.pushButton_7.clicked.connect(self.logout_microsoft)
+                    elif profile == "No connection":
+                        self.lineEdit.setVisible(True)
+                        self.label.setText("Username: ")
+                        self.pushButton_7.setText("There is no internet connection")
+                        self.pushButton_7.setStyleSheet(self.bt_style)
+                        self.pushButton_7.clicked.disconnect()
+                    else:
+                        self.lineEdit.setVisible(True)
+                        self.label.setText("Username: ")
+                        self.pushButton_7.setText("Reauthenticate with Microsoft")
+                        warning_style = """
+                            QPushButton {
+                                background-color: rgba(255, 0, 0, 0.5);
+                                color: #000000;
+                                border-radius: 5px;
+                            }
+                            QPushButton:hover {
+                                background-color: rgba(255, 0, 0, 0.8);
+                            }
+                            QPushButton:disabled {
+                                background-color: rgba(128, 128, 128, 0.6);
+                                color: #cccccc;
+                            }
+                        """
+                        self.pushButton_7.setStyleSheet(warning_style)
+                        self.pushButton_7.clicked.disconnect()
+                        self.pushButton_7.clicked.connect(self.reauthenticate_microsoft)
                 # Apply the data to the widgets and variables
                 if(user_name != "" and last_version != ""):
                     if user_name is not None:
@@ -591,16 +667,14 @@ class Ui_MainWindow(object):
                         index = self.comboBox.findText(last_version, QtCore.Qt.MatchFixedString)
                         if index >= 0:
                             self.comboBox.setCurrentIndex(index)
-                if show_snapshots == False:
-                    self.checkBox.setChecked(False)
-                elif show_snapshots == True:
-                    self.checkBox.setChecked(True)
+                self.checkBox.setChecked(show_snapshots)
                 first_load = True
                 if discord_rpc == True and first_load == True:
                     connect_discord()  
                     first_load = False
                 if maximize == True:
-                    MainWindow.showMaximized()                      
+                    MainWindow.showMaximized()
+                    self.on_resize(MainWindow)                  
         else:
             user_name = self.lineEdit.text()
             last_version = self.comboBox.currentText()
@@ -608,6 +682,7 @@ class Ui_MainWindow(object):
             jvm_arguments = variables.defaultJVM
             discord_rpc = False
             ask_update = "yes"
+            access_token = ""
             # Create the config directory if it does not exist
             os.makedirs(f'{app_dir}/config', exist_ok=True)
 
@@ -619,7 +694,8 @@ class Ui_MainWindow(object):
                 'last_version': last_version,  # Save the last version used
                 'ask_update': ask_update, # Save the state of the checkbox
                 'discord_rpc': discord_rpc, # Save the state of the discord rpc
-                'maximized': self.isMaximized()
+                'maximized': self.isMaximized(),
+                'token': access_token
             }
             # Save data to a file
             with open(f'{app_dir}/config/user_data.json', 'w') as f:
@@ -637,8 +713,6 @@ class Ui_MainWindow(object):
             
             with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
                 json.dump(user_uuid, f)
-        
-        MainWindow.resizeEvent = self.on_resize
 
     # setupUi
 
@@ -653,13 +727,78 @@ class Ui_MainWindow(object):
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", u"Play", None))
         self.pushButton_6.setText(QCoreApplication.translate("MainWindow", u"Mod Manager", None))
     # retranslateUi
+    
+    def reauthenticate_microsoft(self):
+        global access_token
+        try:
+            profile, token = reauthenticate()
+            if profile == "offline" and token == "offline":
+                self.pushButton_7.setText("Login with Microsoft")
+                self.pushButton_7.setStyleSheet(self.bt_style)
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.clicked.connect(self.login_microsoft)
+                with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
+                    json.dump("", f)
+                self.lineEdit.setVisible(True)
+                self.label.setText("Username: ")
+                self.lineEdit.setText("")
+                access_token = ""
+                self.save_data()
+            elif profile and 'id' in profile and 'name' in profile:
+                access_token = token
+                self.lineEdit.setText(profile['name'])
+                self.lineEdit.setVisible(False)
+                self.label.setText(f"Logged in as {profile['name']}")
+                self.pushButton_7.setText("Logout from Microsoft")
+                self.pushButton_7.setStyleSheet(self.bt_style)
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.clicked.connect(self.logout_microsoft)
+                with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
+                    json.dump(profile['id'], f)
 
+                self.save_data()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not login: {e}")
+
+    def login_microsoft(self):
+        global access_token
+        try:
+            profile, token = authenticate()
+            if profile:
+                access_token = token
+                self.lineEdit.setText(profile['name'])
+                self.lineEdit.setVisible(False)
+                self.label.setText(f"Logged in as {profile['name']}")
+                self.pushButton_7.setText("Logout from Microsoft")
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.clicked.connect(self.logout_microsoft)
+                with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
+                    json.dump(profile['id'], f)
+
+                self.save_data()    
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not login: {e}")
+
+    def logout_microsoft(self):
+        logout()
+        global access_token
+        access_token = ""
+        with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
+            json.dump("", f)
+        
+        self.lineEdit.setVisible(True)
+        self.label.setText("Username: ")
+        self.lineEdit.setText("")
+        self.pushButton_7.setText("Login with Microsoft")
+        self.pushButton_7.clicked.disconnect()
+        self.pushButton_7.clicked.connect(self.login_microsoft)
+        self.save_data()
 
     def on_resize(self, event):
         size = event.size()
         self.background.setGeometry(0, 0, size.width(), size.height())
         self.background.setPixmap(QPixmap(bg_path).scaled(size.width(), size.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-        event.accept()
+
 
     # Function to update the discord error label
     def update_error_discord(self):
@@ -702,8 +841,8 @@ class Ui_MainWindow(object):
             self.pushButton.setEnabled(False)
             self.pushButton_2.setEnabled(False)
             self.pushButton_3.setEnabled(False)
-            self.pushButton_4.setEnabled(False)
             self.pushButton_5.setEnabled(False)
+            self.pushButton_7.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
             self.checkBox.setEnabled(False)
@@ -727,8 +866,8 @@ class Ui_MainWindow(object):
                 self.pushButton.setEnabled(True)
                 self.pushButton_2.setEnabled(True)
                 self.pushButton_3.setEnabled(True)
-                self.pushButton_4.setEnabled(True)
                 self.pushButton_5.setEnabled(True)
+                self.pushButton_7.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
                 self.checkBox.setEnabled(True)
@@ -751,8 +890,8 @@ class Ui_MainWindow(object):
             self.pushButton.setEnabled(False)
             self.pushButton_2.setEnabled(False)
             self.pushButton_3.setEnabled(False)
-            self.pushButton_4.setEnabled(False)
             self.pushButton_5.setEnabled(False)
+            self.pushButton_7.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
             self.checkBox.setEnabled(False)
@@ -778,8 +917,8 @@ class Ui_MainWindow(object):
                 self.pushButton.setEnabled(True)
                 self.pushButton_2.setEnabled(True)
                 self.pushButton_3.setEnabled(True)
-                self.pushButton_4.setEnabled(True)
                 self.pushButton_5.setEnabled(True)
+                self.pushButton_7.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
                 self.checkBox.setEnabled(True)
@@ -802,8 +941,8 @@ class Ui_MainWindow(object):
             self.pushButton.setEnabled(False)
             self.pushButton_2.setEnabled(False)
             self.pushButton_3.setEnabled(False)
-            self.pushButton_4.setEnabled(False)
             self.pushButton_5.setEnabled(False)
+            self.pushButton_7.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
             self.checkBox.setEnabled(False)
@@ -833,8 +972,8 @@ class Ui_MainWindow(object):
                 self.pushButton.setEnabled(True)
                 self.pushButton_2.setEnabled(True)
                 self.pushButton_3.setEnabled(True)
-                self.pushButton_4.setEnabled(True)
                 self.pushButton_5.setEnabled(True)
+                self.pushButton_7.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
                 self.checkBox.setEnabled(True)
@@ -894,12 +1033,12 @@ class Ui_MainWindow(object):
     
     # Function to save the data
     def save_data(self):
-        global jvm_arguments
+        global jvm_arguments, discord_rpc, access_token
         if jvm_arguments != "":
             arg = jvm_arguments
         else:
             arg = variables.defaultJVM
-
+        
         # Save the data to a file
         data = {
             'name': self.lineEdit.text(), # Save the user name
@@ -908,7 +1047,8 @@ class Ui_MainWindow(object):
             'last_version': self.comboBox.currentText(),  # Save the last version used
             'ask_update': variables.ask_update, # Save the state of the checkbox
             'discord_rpc': discord_rpc, # Save the state of the discord rpc
-            'maximized': MainWindow.isMaximized(self)
+            'maximized': MainWindow.isMaximized(self),
+            'token': access_token
         }
 
         # Create the config directory if it does not exist
@@ -932,7 +1072,6 @@ class Ui_MainWindow(object):
         except KeyError:
             # If the user is not found, generate a random UUID
             user_uuid = str(uuid.uuid4())
-        print(f"UUID: {user_uuid}")
 
     # Function to check if Java is installed
     def is_java_installed(self):
@@ -967,7 +1106,7 @@ class Ui_MainWindow(object):
             messagebox.showerror("Error", "Please enter your user name")
             return
 
-        global jvm_arguments
+        global jvm_arguments, access_token
         if not jvm_arguments:
             print("No JVM arguments")
             arg = variables.defaultJVM
@@ -983,8 +1122,8 @@ class Ui_MainWindow(object):
         self.pushButton.setEnabled(False)
         self.pushButton_2.setEnabled(False)
         self.pushButton_3.setEnabled(False)
-        self.pushButton_4.setEnabled(False)
         self.pushButton_5.setEnabled(False)
+        self.pushButton_7.setEnabled(False)
         self.pushButton_6.setEnabled(False)
         self.lineEdit.setEnabled(False)
         self.comboBox.setEnabled(False)
@@ -998,7 +1137,7 @@ class Ui_MainWindow(object):
             options = {
                 'username': mine_user,
                 'uuid': user_uuid,
-                'token': '',
+                'token': access_token,
                 'jvmArguments': arg,
                 'launcherName': "OpenLauncher for Minecraft",
                 'launcherVersion': variables.launcher_version
@@ -1065,8 +1204,8 @@ class Ui_MainWindow(object):
         self.pushButton.setEnabled(True)
         self.pushButton_2.setEnabled(True)
         self.pushButton_3.setEnabled(True)
-        self.pushButton_4.setEnabled(True)
         self.pushButton_5.setEnabled(True)
+        self.pushButton_7.setEnabled(True)
         self.pushButton_6.setEnabled(True)
         self.lineEdit.setEnabled(True)
         self.comboBox.setEnabled(True)
@@ -1423,6 +1562,9 @@ class Ui_MainWindow(object):
         discord_checkbox.clicked.connect(lambda: [discord_controller(), self.update_error_discord(), self.save_data()])
         layout.addWidget(discord_checkbox)
 
+        # update the discord checkbox
+        discord_checkbox.setChecked(discord_rpc)
+
         def set_jvm():
             global jvm_arguments
             entry_value = entry_jvm_arguments.text().strip()
@@ -1447,20 +1589,20 @@ class Ui_MainWindow(object):
         bt_mine_path = QPushButton('Open game directory')
         bt_mine_path.setFixedSize(300, 30)
         bt_mine_path.setStyleSheet(self.bt_style)
-        bt_mine_path.clicked.connect(open_minecraft_dir)
+        bt_mine_path.clicked.connect(lambda: [open_minecraft_dir(), window_settings.accept()])
         layout.addWidget(bt_mine_path)
 
         bt_app_path = QPushButton('Open launcher directory')
         bt_app_path.setFixedSize(300, 30)
         bt_app_path.setStyleSheet(self.bt_style)
-        bt_app_path.clicked.connect(open_launcher_dir)
+        bt_app_path.clicked.connect(lambda: [open_launcher_dir(), window_settings.accept()])
         layout.addWidget(bt_app_path)
         
         # Button to open the plugins website
         bt_plugins_path = QPushButton('Open themes website')
         bt_plugins_path.setFixedSize(300, 30)
         bt_plugins_path.setStyleSheet(self.bt_style)
-        bt_plugins_path.clicked.connect(open_plugins_website)
+        bt_plugins_path.clicked.connect(lambda: [window_settings.accept(), open_plugins_website()])
         layout.addWidget(bt_plugins_path)
 
         # Configure the layout

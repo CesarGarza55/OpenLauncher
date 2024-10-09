@@ -4,6 +4,7 @@ pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpat
     --add-data "data\updater.py;." ^
     --add-data "data\variables.py;." ^
     --add-data "data\mod_manager.py;." ^
+    --add-data "data\microsoft_auth.py;." ^
     "data\OpenLauncher.py"
 del OpenLauncher.spec
 rmdir /s /q temp
