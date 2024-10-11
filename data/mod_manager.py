@@ -5,17 +5,19 @@ from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLab
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QBrush, QColor, QPixmap
 import variables
+from lang import lang
 
 # Class to manage mods in the launcher (install, activate, deactivate)
 class ModManager(QDialog):
     # Constructor
-    def __init__(self, bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", version="", bg_path=variables.bg_path, bg_blur=variables.bg_blur):
+    def __init__(self, bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", version="", bg_path=variables.bg_path, bg_blur=variables.bg_blur, current_lang="en"):
         super().__init__()
         self.bg_color = bg_color
         self.icon = icon
         self.version = version
         self.bg_path = bg_path
         self.bg_blur = bg_blur
+        self.current_lang = current_lang
         self.init_ui()
 
     # Function to initialize the UI
@@ -59,7 +61,7 @@ class ModManager(QDialog):
         for version in self.inactive_mods:
             self.inactive_mods[version].sort()
 
-        self.setWindowTitle("Mod Manager")
+        self.setWindowTitle(lang(self.current_lang, "btn_mod_manager"))
         self.setWindowIcon(QIcon(self.icon))
         self.setFixedSize(800, 480)
         self.setWindowFlags(Qt.WindowCloseButtonHint)
@@ -86,17 +88,17 @@ class ModManager(QDialog):
         lists_layout = QHBoxLayout()
 
         # Create the label of information
-        info_label = QLabel(f"The Mod Manager renames mods by adding the current game version to the start of the file name. For example, 'mod.jar' becomes '{self.version_text}_mod.jar'. This lets you manage multiple mod versions for different game versions.\n\nTo install, drag and drop the file or click 'Install mod' (supports .jar and .olpkg files). Avoid activating mods that are incompatible with the current version.\n\nThe 'olpkg' files are OpenLauncher Packages, which are mods that have been deactivated. You can activate them by clicking 'Activate mod'.")
+        info_label = QLabel(lang(self.current_lang, "mod_manager_info").replace("VERSION_TEXT", self.version_text))
         info_label.setStyleSheet(f"color: white; font-size: 14px; background-color: rgba({self.bg_color}, 0.6); padding: 8px; border-radius: 5px;")
         info_label.setWordWrap(True)
 
         # Create the label of disabled state
-        disabled_label = QLabel("The Mod Manager is disabled because no compatible version is detected.\nPlease select a valid (Forge, Fabric, Quilt, NeoForge) version in the launcher settings.")
+        disabled_label = QLabel(lang(self.current_lang, "mod_manager_disabled"))
         disabled_label.setStyleSheet(f"color: yellow; font-size: 16px; background-color: rgba({self.bg_color}, 0.6); border-radius: 5px;")
         disabled_label.setAlignment(Qt.AlignCenter)
         disabled_label.setWordWrap(True)
         # Create the label for the active mods list
-        active_mods_label = QLabel("Active Mods")
+        active_mods_label = QLabel(lang(self.current_lang, "active_mods"))
         active_mods_label.setStyleSheet(f"color: white; font-size: 14px; background-color: rgba({self.bg_color}, 0.6); border-radius: 5px;")
         active_mods_label.setAlignment(Qt.AlignCenter)
 
@@ -120,7 +122,7 @@ class ModManager(QDialog):
         self.active_mods_list.setStyleSheet(list_style)
 
         # Create the label for the inactive mods list
-        inactive_mods_label = QLabel("Inactive Mods")
+        inactive_mods_label = QLabel(lang(self.current_lang, "inactive_mods"))
         inactive_mods_label.setStyleSheet(f"color: white; font-size: 14px; background-color: rgba({self.bg_color}, 0.6); border-radius: 5px;")
         inactive_mods_label.setAlignment(Qt.AlignCenter)
 
@@ -181,9 +183,9 @@ class ModManager(QDialog):
                         self.inactive_mods[version].append(mod_text)
                         self.active_mods[version].remove(mod.text())
                     else:
-                        messagebox.showerror("Error", "The mod already exists in the list of inactive mods")
+                        messagebox.showerror("Error", lang(self.current_lang, "mod_already_exists"))
                 else:
-                    messagebox.showerror("Error", "The mod does not exist in the list of active mods")
+                    pass
             self.sort_mods()
             self.remove_empty_versions()
             self.populate_mod_list(self.active_mods_list, self.active_mods)
@@ -210,9 +212,9 @@ class ModManager(QDialog):
                         self.active_mods[version].append(mod_text)
                         self.inactive_mods[version].remove(mod.text())
                     else:
-                        messagebox.showerror("Error", "The mod already exists in the list of active mods")
+                        messagebox.showerror("Error", lang(self.current_lang, "mod_already_exists"))
                 else:
-                    messagebox.showerror("Error", "The mod does not exist in the list of inactive mods")
+                    pass
             self.sort_mods()
             self.remove_empty_versions()
             self.populate_mod_list(self.active_mods_list, self.active_mods)
@@ -235,7 +237,7 @@ class ModManager(QDialog):
 
                     if file.endswith(".jar"):
                         if os.path.exists(new_path):
-                            if messagebox.askyesno("Warning", "The file already exists. Do you want to overwrite it?"):
+                            if messagebox.askyesno("Warning", lang(self.current_lang, "file_exists")):
                                 # Remove the old file from the list
                                 self.remove_mod_from_list(self.active_mods_list, new_name)
                                 for version, mods in self.active_mods.items():
@@ -253,7 +255,7 @@ class ModManager(QDialog):
                             self.active_mods[version].append(mod_text)
                     elif file.endswith(".olpkg"):
                         if os.path.exists(new_path):
-                            if messagebox.askyesno("Warning", "The file already exists. Do you want to overwrite it?"):
+                            if messagebox.askyesno("Warning", lang(self.current_lang, "file_exists")):
                                 # Remove the old file from the list
                                 self.remove_mod_from_list(self.inactive_mods_list, new_name)
                                 for version, mods in self.inactive_mods.items():
@@ -270,13 +272,13 @@ class ModManager(QDialog):
                                 self.inactive_mods[version] = []
                             self.inactive_mods[version].append(mod_text)
                     else:
-                        messagebox.showerror("Error", "Invalid file format")
+                        messagebox.showerror("Error", lang(self.current_lang, "invalid_file_format"))
                 self.sort_mods()
                 self.remove_empty_versions()
                 self.populate_mod_list(self.active_mods_list, self.active_mods)
                 self.populate_mod_list(self.inactive_mods_list, self.inactive_mods)
             else:
-                messagebox.showerror("Error", "No file selected")
+                pass
 
         # Function to open the mods directory
         def open_mods_dir():
@@ -284,20 +286,21 @@ class ModManager(QDialog):
                 if sys.platform == "win32":
                     subprocess.Popen(['explorer', self.mod_directory])
                 else:
-                    subprocess.Popen(['gio', 'open',  self.mod_directory])
+                    # subprocess.Popen(['gio', 'open',  self.mod_directory]) Use this if xdg-open doesn't work on your system
+                    subprocess.Popen(['xdg-open',  self.mod_directory])
 
         # Create the buttons
-        activate_button = QPushButton("Activate mod")
+        activate_button = QPushButton(lang(self.current_lang, "btn_activate"))
         activate_button.setFixedWidth(254)
         activate_button.setStyleSheet(bt_style)
         activate_button.clicked.connect(activate_mods)
 
-        install_button = QPushButton("Install mod")
+        install_button = QPushButton(lang(self.current_lang, "btn_install"))
         install_button.setFixedWidth(254)
         install_button.setStyleSheet(bt_style)
         install_button.clicked.connect(install_mods)
 
-        deactivate_button = QPushButton("Deactivate mod")
+        deactivate_button = QPushButton(lang(self.current_lang, "btn_deactivate"))
         deactivate_button.setFixedWidth(254)
         deactivate_button.setStyleSheet(bt_style)
         deactivate_button.clicked.connect(deactivate_mods)
@@ -314,7 +317,7 @@ class ModManager(QDialog):
         main_layout.addLayout(lists_layout)
         main_layout.addLayout(buttons_layout)
 
-        mod_dir_button = QPushButton("Open Mods Directory")
+        mod_dir_button = QPushButton(lang(self.current_lang, "btn_open_mods_dir"))
         mod_dir_button.setStyleSheet(bt_style)
         mod_dir_button.clicked.connect(open_mods_dir)
         main_layout.addWidget(mod_dir_button)
@@ -348,7 +351,7 @@ class ModManager(QDialog):
     # Function to drop files
     def dropEvent(self, event):
         if self.version == "No version installed":
-            messagebox.showerror("Error", "First install a version to manage mods")
+            messagebox.showerror("Error", lang(self.current_lang, "error_no_version"))
             return
         for url in event.mimeData().urls():
             file_path = url.toLocalFile()
@@ -356,7 +359,7 @@ class ModManager(QDialog):
             new_path = os.path.join(self.mod_directory, new_name)
             if file_path.endswith(".jar"):
                 if os.path.exists(new_path):
-                    if messagebox.askyesno("Warning", "The file already exists. Do you want to overwrite it?"):
+                    if messagebox.askyesno("Warning", lang(self.current_lang, "file_exists")):
                         self.remove_mod_from_list(self.active_mods_list, new_name)
                         for version, mods in self.active_mods.items():
                             if new_name.replace(f"{self.version}_", "") in [mod.split(" (")[0] for mod in mods]:
@@ -382,7 +385,7 @@ class ModManager(QDialog):
                     self.active_mods[version].append(mod_text)
             elif file_path.endswith(".olpkg"):
                 if os.path.exists(new_path):
-                    if messagebox.askyesno("Warning", "The file already exists. Do you want to overwrite it?"):
+                    if messagebox.askyesno("Warning", lang(self.current_lang, "file_exists")):
                         self.remove_mod_from_list(self.inactive_mods_list, new_name)
                         for version, mods in self.inactive_mods.items():
                             if new_name.replace(f"{self.version}_", "") in [mod.split(" (")[0] for mod in mods]:
@@ -407,7 +410,7 @@ class ModManager(QDialog):
                         self.inactive_mods[version] = []
                     self.inactive_mods[version].append(mod_text)
             else:
-                messagebox.showerror("Error", "Invalid file format, only .jar and .olpkg files are allowed")
+                messagebox.showerror("Error", lang(self.current_lang, "invalid_file_format"))
         self.sort_mods()
         self.remove_empty_versions()
         self.populate_mod_list(self.active_mods_list, self.active_mods)
@@ -458,6 +461,6 @@ class ModManager(QDialog):
                 list_widget.addItem(mod)
 
 # Function to show the mod manager dialog
-def show_mod_manager(bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", version="", bg_path=variables.bg_path, bg_blur=variables.bg_blur):
-    mod_manager = ModManager(bg_color, icon, version, bg_path, bg_blur)
+def show_mod_manager(bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", version="", bg_path=variables.bg_path, bg_blur=variables.bg_blur, current_lang="en"):
+    mod_manager = ModManager(bg_color, icon, version, bg_path, bg_blur, current_lang)
     mod_manager.exec_()

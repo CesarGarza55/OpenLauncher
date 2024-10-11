@@ -70,7 +70,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "beta-1.3.0"
+launcher_version = "beta-1.4.0"
 
 # User UUID
 user_uuid = ""
@@ -79,12 +79,12 @@ user_uuid = ""
 script_dir = os.path.dirname(__file__)
 
 # Set the paths for the images
-bg_path = os.path.join(script_dir, 'img/bg.jpg').replace("\\", "/")
-icon = os.path.join(script_dir, 'img/creeper_black.png').replace("\\", "/")
+bg_path = os.path.join(script_dir, 'img/bg.png').replace("\\", "/")
+icon = os.path.join(script_dir, 'img/icon.png').replace("\\", "/")
 bg_blur = 6
 
 # Set the variable theme
-bg_color = "25, 45, 75"
+bg_color = "25, 50, 100"
 
 # Set app directory
 if sys.platform == "win32":

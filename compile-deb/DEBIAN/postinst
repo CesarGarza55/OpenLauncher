@@ -1,4 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "OpenLauncher has been installed successfully!"
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}OpenLauncher has been installed successfully!${NC}"
+echo -e "${GREEN}You can now run OpenLauncher by typing 'openlauncher' in your terminal or by searching for it in your application menu.${NC}"
+echo -e "${GREEN}If you have any issues, please report them at ${BLUE}https://github.com/CesarGarza55/OpenLauncher/issues${NC}"
+echo -e "${GREEN}Don't forget to check out the website at ${BLUE}https://openlauncher.totalh.net${GREEN} for more information or search for Theme Packs in ${BLUE}https://openlauncher.totalh.net/plugins${NC}"
+echo -e "${GREEN}Enjoy!${NC}"

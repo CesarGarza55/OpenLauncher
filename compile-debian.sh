@@ -22,5 +22,17 @@ fi
 # Copy the necessary files
 cp OpenLauncher.bin "$DEST_DIR"
 
+# Ensure the binary is executable
+chmod +x "$DEST_DIR/OpenLauncher.bin"
+
+# Ensure the permissions are set correctly
+chmod -R 0755 compile-deb
+
 # Compile the deb package
 dpkg-deb --build compile-deb "OpenLauncher.deb"
+
+# Ask the user if they want to install the package
+read -p "Do you want to install the package? [y/n]: " INSTALL
+if [ "$INSTALL" == "y" ]; then
+    sudo dpkg -i "OpenLauncher.deb"
+fi

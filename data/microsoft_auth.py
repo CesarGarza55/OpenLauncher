@@ -1,10 +1,11 @@
 import json, random, string, requests, sys
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from urllib.parse import parse_qs, urlparse
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import webbrowser
+from lang import lang, current_language
 
 # Constants
 CLIENT_ID = "e16699bb-2aa8-46da-b5e3-45cbcce29091"
@@ -17,16 +18,17 @@ MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile"
 LOGOUT_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/logout"
 REDIRECT_URI = "http://localhost:8000/callback"
 SCOPE = "XboxLive.signin offline_access"
+ACCOUNT_SELECTION_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 
 class AuthWindow:
     def __init__(self, auth_url=None, state=None):
         self.state = state
         self.auth_code = None
         self.root = tk.Tk()
-        self.root.title("Microsoft Authentication")
+        self.root.title(lang(current_language, "auth_window_title"))
         self.root.geometry("400x200")  # Smaller window size
 
-        self.label = tk.Label(self.root, text="Waiting for authentication...")
+        self.label = tk.Label(self.root, text=lang(current_language, "auth_window_label"), wraplength=400)
         self.label.pack(pady=20)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -55,13 +57,13 @@ class AuthWindow:
                 if "code" in query and "state" in query and query["state"][0] == self.server.auth_window.state:
                     self.server.auth_window.auth_code = query["code"][0]
                     self.send_response(200)
-                    self.send_header('Content-type', 'text/html')
+                    self.send_header('Content-type', 'text/html; charset=utf-8')
                     self.end_headers()
                     if self.wfile:
                         try:
-                            self.wfile.write(b"AUTHENTICATION SUCCESSFUL - You can close this window now.")
+                            self.wfile.write(lang(current_language, "auth_success").encode('utf-8'))
                         except:
-                            messagebox.showerror("Success", "Authentication Successful - You can close this window now.")
+                            messagebox.showerror("Success", lang(current_language, "auth_success"))
                     self.server.auth_window.root.quit()
                 else:
                     self.send_response(400)
@@ -69,9 +71,11 @@ class AuthWindow:
                     self.end_headers()
                     if self.wfile:
                         try:
-                            self.wfile.write(b"AUTHENTICATION FAILED - Please try again.")
+                            self.wfile.write(lang(current_language, "auth_failure").encode('utf-8'))
                         except:
-                            messagebox.showerror("Error", "Authentication Failed - Please try again.")
+                            messagebox.showerror("Error", lang(current_language, "auth_failure"))
+                    self.server.auth_window.auth_code = None
+                    self.root.quit()
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'text/html')
@@ -92,7 +96,8 @@ def build_authorization_url(state, code_verifier):
         "scope": SCOPE,
         "state": state,
         "code_challenge": code_verifier,
-        "code_challenge_method": "plain"
+        "code_challenge_method": "plain",
+        "prompt": "select_account"
     }
     auth_url = f"{AUTHORIZE_URL}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
     return auth_url
@@ -147,6 +152,7 @@ def fetch_minecraft_profile(mc_access_token):
 
 def authenticate_and_fetch_profile():
     state, code_verifier = generate_state_and_code_verifier()
+    
     auth_url = build_authorization_url(state, code_verifier)
 
     auth_window = AuthWindow(auth_url, state)

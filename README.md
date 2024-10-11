@@ -14,6 +14,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
 - **Oficial Themes**: Download and install themes to personalize your launcher.
 - **Community Themes**: Create and share custom themes with other users in the [website](https://openlauncher.totalh.net/)
 - **Theme Creator**: Design your own themes using the OpenLauncher [theme creator tool](https://openlauncher.totalh.net/create)
+- **Multilanguage Support**: Supports multiple languages for a better user experience.
 
 ## Requirements
 
@@ -48,6 +49,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
         --add-data "data\variables.py;." ^
         --add-data "data\mod_manager.py;." ^
         --add-data "data\microsoft_auth.py;." ^
+        --add-data "data\lang.py;." ^
         "data\OpenLauncher.py"
     del OpenLauncher.spec
     rmdir /s /q temp
@@ -82,48 +84,91 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     ```bash
     #!/bin/bash
     set -e
-    
+
+    # Colors
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    RED='\033[0;31m'
+    YELLOW='\033[0;33m'
+    NC='\033[0m' # No Color
+
     # Create a virtual environment if it doesn't exist
-    VENV_DIR="venv"
-    if [ -d "$VENV_DIR" ]; then
-        source "$VENV_DIR/bin/activate"
-    else
-        python3 -m venv "$VENV_DIR"
-        # Activate the virtual environment
-        source "$VENV_DIR/bin/activate"
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${YELLOW}python3 is not installed and will be installed now${NC}"
+        sudo apt install -y python3
     fi
-    
-    # Check if pip is installed in the virtual environment
-    if ! command -v pip &> /dev/null; then
-        echo "pip is not installed in the virtual environment"
+
+    if ! dpkg -l | grep -q python3-venv; then
+        echo -e "${YELLOW}python3-venv is not installed and will be installed now${NC}"
+        sudo apt install -y python3-venv
+    fi
+
+    VENV_DIR="venv"
+    if [ ! -d "$VENV_DIR" ]; then
+        echo -e "${GREEN}Creating virtual environment...${NC}"
+        python3 -m venv "$VENV_DIR"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to create virtual environment${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}Virtual environment already exists${NC}"
+    fi
+
+    # Check if the virtual environment was created successfully
+    if [ ! -f "$VENV_DIR/bin/activate" ]; then
+        echo -e "${RED}Virtual environment was not created... Exiting${NC}"
         exit 1
     fi
-    
+
+    # Activate the virtual environment
+    echo -e "${GREEN}Activating virtual environment...${NC}"
+    source "$VENV_DIR/bin/activate"
+
+    # Check if pip is installed in the virtual environment
+    if ! command -v pip &> /dev/null; then
+        echo -e "${RED}pip is not installed in the virtual environment... Exiting${NC}"
+        exit 1
+    fi
+
     # Install dependencies
+    echo -e "${GREEN}Installing dependencies...${NC}"
     pip install -r data/requirements_linux.txt
-    
-    # Install the necessary libraries
-    sudo apt install -y libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1
-    sudo apt-get install -y --reinstall libqt5widgets5 libqt5gui5 libqt5core5a
-    
+
+    # Install the necessary libraries if not already installed
+    LIBRARIES=("libxcb-xinerama0" "libxcb1" "libx11-xcb1" "libxrender1" "libfontconfig1" "libqt5widgets5" "libqt5gui5" "libqt5core5a")
+
+    for LIB in "${LIBRARIES[@]}"; do
+        if ! dpkg -l | grep -q "$LIB"; then
+            echo -e "${GREEN}Installing $LIB...${NC}"
+            sudo apt install -y "$LIB"
+        else
+            echo -e "${GREEN}$LIB is already installed${NC}"
+        fi
+    done
+
     # Export the QT_QPA_PLATFORM variable
     export QT_QPA_PLATFORM=xcb
-    
+
     # Compile the application
+    echo -e "${GREEN}Compiling the application...${NC}"
     pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
         --add-data data/img:img/ \
         --add-data data/updater.py:. \
         --add-data data/variables.py:. \
         --add-data data/mod_manager.py:. \
         --add-data data/microsoft_auth.py:. \
+        --add-data data/lang.py:. \
         --name OpenLauncher.bin \
         data/OpenLauncher.py
-    
+
     # Remove the temporary files
+    echo -e "${GREEN}Cleaning up...${NC}"
     rm OpenLauncher.bin.spec
     rm -rf temp
-    
+
     # Deactivate the virtual environment
+    echo -e "${GREEN}Deactivating virtual environment...${NC}"
     deactivate
 
     ```bash
@@ -134,11 +179,11 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
     ```bash
     #!/bin/bash
     set -e
-    
+
     # Create the directory structure
     DEST_DIR="compile-deb/usr/share/openlauncher"
     mkdir -p "$DEST_DIR"
-    
+
     # Compile the source code if the binary does not exist
     if [ ! -f "OpenLauncher.bin" ]; then
         echo "OpenLauncher.bin is not compiled yet and will be compiled now"
@@ -152,12 +197,24 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Cust
         ./compile-linux.sh
         echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
     fi
-    
+
     # Copy the necessary files
     cp OpenLauncher.bin "$DEST_DIR"
-    
+
+    # Ensure the binary is executable
+    chmod +x "$DEST_DIR/OpenLauncher.bin"
+
+    # Ensure the permissions are set correctly
+    chmod -R 0755 compile-deb
+
     # Compile the deb package
     dpkg-deb --build compile-deb "OpenLauncher.deb"
+
+    # Ask the user if they want to install the package
+    read -p "Do you want to install the package? [y/n]: " INSTALL
+    if [ "$INSTALL" == "y" ]; then
+        sudo dpkg -i "OpenLauncher.deb"
+    fi
     ```
 
     ```bash
@@ -258,6 +315,16 @@ Tested Minecraft Version:
 For some reason (I don't know if it's a problem with my Linux distribution) there are times when the launcher crashes when running the game, but there are also times when it doesn't happen, so I assume it may be my own distribution.
 
 Occasionally, the Microsoft login may cause the launcher to crash, but you can try again, and this issue shouldn't occur frequently.
+
+## Linux errors
+
+In some distributions, errors may occur due to the wide variety of systems available. If the executable does not open or fails to display anything when you run it, this may be due to an incompatibility or missing dependencies. To help identify the error and provide a possible solution in the future, you can run the application directly from the terminal using './OpenLauncher.bin' or 'openlauncher' if you installed the .deb package.
+
+For example, in Debian 12, when you try to open the application, no error message may appear, but the application does not launch. This issue is caused by the version of Python being used. The easiest way to resolve this is by compiling the package yourself.
+
+Example of the error:
+
+![imagen](https://github.com/user-attachments/assets/d5e56835-95a8-457a-a45c-cc6a11e56d03)
 
 ## Contributing
 Contributions are welcome! Follow these steps to contribute:
