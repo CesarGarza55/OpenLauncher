@@ -1,6 +1,6 @@
 # OpenLauncher
 
-OpenLauncher is an open-source Minecraft launcher developed in Python using Tkinter and the minecraft_launcher_lib library.
+OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, Tkinter and the minecraft_launcher_lib library.
 
 (For the moment only designed for Windows and Linux)
 
