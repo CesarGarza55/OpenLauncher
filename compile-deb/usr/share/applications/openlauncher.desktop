@@ -1,9 +1,9 @@
 [Desktop Entry]
-Version=1.0
+Version=1.5.0
 Type=Application
 Name=OpenLauncher
 Comment=OpenLauncher is an open source Minecraft launcher developed in Python
-Exec=/usr/local/bin/openlauncher
+Exec=openlauncher
 Icon=openlauncher
 Terminal=false
 Categories=Game;

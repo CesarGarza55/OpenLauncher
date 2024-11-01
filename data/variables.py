@@ -1,6 +1,7 @@
 import os
 import pathlib
 import sys
+import time
 import minecraft_launcher_lib
 
 # Website URL
@@ -70,7 +71,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "beta-1.4.0"
+launcher_version = "beta-1.5.0"
 
 # User UUID
 user_uuid = ""
@@ -101,6 +102,9 @@ if sys.platform == "win32":
 elif sys.platform == "linux":
     plugins_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher", "plugins")
 
+config_dir = os.path.join(app_directory, "config")
+refresh_token_file = os.path.join(config_dir, "refresh_token.json")
+
 # Set Minecraft directory
 if debug_mode:
     # Define a custom Minecraft directory for testing
@@ -112,3 +116,10 @@ if debug_mode:
 else:
     # Gets the default Minecraft directory (.minecraft)
     minecraft_directory = minecraft_launcher_lib.utils.get_minecraft_directory()
+
+# Function to write a log file
+def write_log(text = "", log_type = "latest"):
+    text = f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {text}\n"
+    os.makedirs(f'{app_directory}/logs', exist_ok=True)
+    with open(f'{app_directory}/logs/{log_type}.log', 'a') as f:
+        f.write(text)

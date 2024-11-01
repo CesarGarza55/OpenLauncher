@@ -49,10 +49,10 @@ fi
 
 # Install dependencies
 echo -e "${GREEN}Installing dependencies...${NC}"
-pip install -r data/requirements_linux.txt
+python3 -m pip install -r data/requirements_linux.txt
 
 # Install the necessary libraries if not already installed
-LIBRARIES=("libxcb-xinerama0" "libxcb1" "libx11-xcb1" "libxrender1" "libfontconfig1" "libqt5widgets5" "libqt5gui5" "libqt5core5a")
+LIBRARIES=("libxcb-xinerama0" "libxcb1" "libx11-xcb1" "libxrender1" "libfontconfig1" "libqt5widgets5" "libqt5gui5" "libqt5core5a" "libxcb-cursor0")
 
 for LIB in "${LIBRARIES[@]}"; do
     if ! dpkg -l | grep -q "$LIB"; then
@@ -75,6 +75,7 @@ pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpat
     --add-data data/mod_manager.py:. \
     --add-data data/microsoft_auth.py:. \
     --add-data data/lang.py:. \
+    --add-data data/run.py:. \
     --name OpenLauncher.bin \
     data/OpenLauncher.py
 

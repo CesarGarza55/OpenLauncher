@@ -1,6 +1,11 @@
 import json
-import os
+import os, sys
 import variables
+
+if sys.platform == 'win32':
+    platform = ".exe"
+elif sys.platform == 'linux':
+    platform = ".bin"
 
 lang_codes = ["en", "es"]
 
@@ -37,6 +42,7 @@ languages = {
         "btn_install_loader": "Install Fabric",
         "btn_play": "Play",
         "btn_mod_manager": "Mod Manager",
+        "btn_shorts": "Shortcuts",
         "get_started": "Get Started",
         "welcome": "Welcome to OpenLauncher!",
         "welcome_message": (
@@ -108,7 +114,26 @@ languages = {
         "auth_window_label": "Please wait while we authenticate you with Microsoft...",
         "auth_success": "Authentication Successful - You can close this window now.",
         "auth_failure": "Authentication Failed - Please try again.",
-        "restart_app": "The application needs to restart to apply the changes, do you want to close it now?, you will have to open it manually."
+        "restart_app": "The application needs to restart to apply the changes, do you want to close it now?, you will have to open it manually.",
+        "shortcuts": "Shortcuts",
+        "shortcuts_info": (
+            "You can create shortcuts to launch the game with different configurations. "
+            "For example, you can create a shortcut to launch the game with a specific Minecraft version. "
+            f"Use the following format: 'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve', where '1.0' is the Minecraft version and 'Steve' is the username. "
+            f"For more information, visit the <a style='color: #00aaff;' href='{variables.website_url}/guide'>OpenLauncher documentation</a>.<br><br>"
+            "Example of a shortcut to launch the game with version 1.0 and username Steve:<br>"
+            f"<b>'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve'</b><br><br>"
+            f"Use <b>'OpenLauncher{platform} -h'</b> to see the available parameters."
+        ),
+        "logout_success": "You have successfully logged out",
+        "copy_parameters": "Copy parameters",
+        "parameters_copied": "Success",
+        "parameters_copied_info": "The parameters have been copied to the clipboard, you can add them to the game shortcut",
+        "offline_mode": "Offline mode",
+        "offline_mode_error": "If you want to play in offline mode, you must enter a username",
+        "no_refresh_token": "You must be logged in to use the online mode, please run OpenLauncher without arguments to open the GUI and log in",
+        "no_version": "No version has been selected, please run OpenLauncher -mc_ver <version> -mc_name <username> -online <true/false> to run Minecraft",
+        "mc_fail": "An error occurred while trying to run Minecraft please run OpenLauncher without arguments to open the GUI",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -125,6 +150,7 @@ languages = {
         "btn_install_loader": "Instalar Fabric",
         "btn_play": "Jugar",
         "btn_mod_manager": "Gestor de Mods",
+        "btn_shorts": "Accesos Directos",
         "get_started": "Inicio",
         "welcome": "¡Bienvenido a OpenLauncher!",
         "welcome_message": (
@@ -196,7 +222,26 @@ languages = {
         "auth_window_label": "Por favor, espera mientras te autenticamos con Microsoft...",
         "auth_success": "Autenticación Exitosa - Puedes cerrar esta ventana ahora.",
         "auth_failure": "Autenticación Fallida - Por favor, inténtalo de nuevo.",
-        "restart_app": "La aplicación necesita reiniciarse para aplicar los cambios, ¿quieres cerrarla ahora?, tendrás que abrirla manualmente."
+        "restart_app": "La aplicación necesita reiniciarse para aplicar los cambios, ¿quieres cerrarla ahora?, tendrás que abrirla manualmente.",
+        "shortcuts": "Accesos Directos",
+        "shortcuts_info": (
+            "Puedes crear accesos directos para lanzar el juego con diferentes configuraciones. "
+            "Por ejemplo, puedes crear un acceso directo para lanzar el juego con una versión específica de Minecraft. "
+            f"Usa el siguiente formato: 'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve', donde '1.0' es la versión de Minecraft y 'Steve' es el nombre de usuario. "
+            f"Para más información, visita la <a style='color: #00aaff;' href='{variables.website_url}/guide'>documentación de OpenLauncher</a>.<br><br>"
+            "Ejemplo de acceso directo para lanzar el juego con la versión 1.0 y el nombre de usuario Steve:<br>"
+            f"<b>'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve'</b><br><br>"
+            f"Usa <b>'OpenLauncher{platform} -h'</b> para ver los parámetros disponibles."
+        ),
+        "logout_success": "Has cerrado sesión correctamente",
+        "copy_parameters": "Copiar parámetros",
+        "parameters_copied": "Éxito",
+        "parameters_copied_info": "Los parámetros se han copiado al portapapeles, puedes agregarlos en el acceso directo al juego",
+        "offline_mode": "Modo desconectado",
+        "offline_mode_error": "Si deseas jugar en modo desconectado, debes ingresar un nombre de usuario",
+        "no_refresh_token": "Debes iniciar sesión para usar el modo en línea, por favor ejecuta OpenLauncher sin argumentos para abrir la GUI e iniciar sesión",
+        "no_version": "No se ha seleccionado ninguna versión, por favor ejecuta OpenLauncher -mc_ver <version> -mc_name <username> -online <true/false> para ejecutar Minecraft",
+        "mc_fail": "Ocurrió un error al intentar ejecutar Minecraft por favor ejecuta OpenLauncher sin argumentos para abrir la GUI",
     }
 }
 

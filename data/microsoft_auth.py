@@ -1,181 +1,86 @@
-import json, random, string, requests, sys
-import tkinter as tk
-from tkinter import messagebox, simpledialog
-from urllib.parse import parse_qs, urlparse
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import webbrowser
-from lang import lang, current_language
+from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QVBoxLayout
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile  # Cambiado aquí
+from PyQt5.QtCore import QUrl, QLocale
+from variables import write_log
+import minecraft_launcher_lib
+import json
+import sys
+import os
+import variables
+
+config_dir = os.path.join(variables.app_directory, "config")
 
 # Constants
-CLIENT_ID = "e16699bb-2aa8-46da-b5e3-45cbcce29091"
-AUTHORIZE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
-TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
-XBOX_AUTH_URL = "https://user.auth.xboxlive.com/user/authenticate"
-XBOX_XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize"
-MC_AUTH_URL = "https://api.minecraftservices.com/authentication/login_with_xbox"
-MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile"
-LOGOUT_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/logout"
-REDIRECT_URI = "http://localhost:8000/callback"
-SCOPE = "XboxLive.signin offline_access"
-ACCOUNT_SELECTION_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+CLIENT_ID = "3f59fbe7-2c4b-4343-9a61-c03104ddaedf"
+REDIRECT_URL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
 
-class AuthWindow:
-    def __init__(self, auth_url=None, state=None):
-        self.state = state
-        self.auth_code = None
-        self.root = tk.Tk()
-        self.root.title(lang(current_language, "auth_window_title"))
-        self.root.geometry("400x200")  # Smaller window size
+class LoginDialog(QDialog):
+    def __init__(self):
+        super().__init__()
 
-        self.label = tk.Label(self.root, text=lang(current_language, "auth_window_label"), wraplength=400)
-        self.label.pack(pady=20)
+        self.setWindowTitle("Microsoft Account Login")
+        self.resize(800, 600)
 
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        if auth_url:
-            self.start_http_server()
-            self.root.after(100, lambda: webbrowser.open(auth_url))  # Open browser after window is created
+        layout = QVBoxLayout(self)
+        self.web_view = QWebEngineView(self)
+        layout.addWidget(self.web_view)
 
-    def start_http_server(self):
-        server_address = ('', 8000)
-        self.httpd = HTTPServer(server_address, self.RequestHandler)
-        self.httpd.auth_window = self
-        threading.Thread(target=self.httpd.serve_forever).start()
+        self.refresh_token_file = os.path.join(config_dir, "refresh_token.json")
+        self.account_information = None
 
-    def on_close(self):
-        self.auth_code = None
-        self.root.quit()
+        if os.path.isfile(self.refresh_token_file):
+            with open(self.refresh_token_file, "r", encoding="utf-8") as f:
+                refresh_token = json.load(f)
+                try:
+                    self.account_information = minecraft_launcher_lib.microsoft_account.complete_refresh(CLIENT_ID, None, REDIRECT_URL, refresh_token)
+                    self.accept()  # Close the dialog if login is successful
+                except minecraft_launcher_lib.exceptions.InvalidRefreshToken:
+                    write_log("Invalid refresh token", "latest")
 
-    class RequestHandler(BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass # Suppress logging messages to prevent writing to a NoneType object
+        if not self.account_information:
+            login_url, self.state, self.code_verifier = minecraft_launcher_lib.microsoft_account.get_secure_login_data(CLIENT_ID, REDIRECT_URL)
+            self.web_view.load(QUrl(login_url))
+            self.web_view.urlChanged.connect(self.new_url)
+            self.show()
 
-        def do_GET(self):
-            try:
-                parsed_url = urlparse(self.path)
-                query = parse_qs(parsed_url.query)
-                if "code" in query and "state" in query and query["state"][0] == self.server.auth_window.state:
-                    self.server.auth_window.auth_code = query["code"][0]
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/html; charset=utf-8')
-                    self.end_headers()
-                    if self.wfile:
-                        try:
-                            self.wfile.write(lang(current_language, "auth_success").encode('utf-8'))
-                        except:
-                            messagebox.showerror("Success", lang(current_language, "auth_success"))
-                    self.server.auth_window.root.quit()
-                else:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'text/html')
-                    self.end_headers()
-                    if self.wfile:
-                        try:
-                            self.wfile.write(lang(current_language, "auth_failure").encode('utf-8'))
-                        except:
-                            messagebox.showerror("Error", lang(current_language, "auth_failure"))
-                    self.server.auth_window.auth_code = None
-                    self.root.quit()
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                if self.wfile:
-                    self.wfile.write(f"<html><body><h1>Internal Server Error</h1><p>{str(e)}</p></body></html>".encode('utf-8'))
+    def new_url(self, url: QUrl):
+        try:
+            auth_code = minecraft_launcher_lib.microsoft_account.parse_auth_code_url(url.toString(), self.state)
+            self.account_information = minecraft_launcher_lib.microsoft_account.complete_login(CLIENT_ID, None, REDIRECT_URL, auth_code, self.code_verifier)
+            self.save_refresh_token(self.account_information["refresh_token"])
+            self.accept()  # Close the dialog if login is successful
+        except Exception as e:
+            pass
 
-def generate_state_and_code_verifier():
-    state = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-    code_verifier = ''.join(random.choices(string.ascii_letters + string.digits, k=128))
-    return state, code_verifier
+    def save_refresh_token(self, refresh_token):
+        with open(self.refresh_token_file, "w", encoding="utf-8") as f:
+            json.dump(refresh_token, f, ensure_ascii=False, indent=4)
 
-def build_authorization_url(state, code_verifier):
-    params = {
-        "client_id": CLIENT_ID,
-        "response_type": "code",
-        "redirect_uri": REDIRECT_URI,
-        "scope": SCOPE,
-        "state": state,
-        "code_challenge": code_verifier,
-        "code_challenge_method": "plain",
-        "prompt": "select_account"
-    }
-    auth_url = f"{AUTHORIZE_URL}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
-    return auth_url
+    def get_account_information(self):
+        return self.account_information
 
-def exchange_code_for_tokens(auth_code, code_verifier):
-    data = {
-        "client_id": CLIENT_ID,
-        "grant_type": "authorization_code",
-        "code": auth_code,
-        "redirect_uri": REDIRECT_URI,
-        "code_verifier": code_verifier
-    }
-    response = requests.post(TOKEN_URL, data=data)
-    return response.json()
 
-def exchange_microsoft_token_for_xbox_token(access_token):
-    xbox_data = {
-        "Properties": {
-            "AuthMethod": "RPS",
-            "SiteName": "user.auth.xboxlive.com",
-            "RpsTicket": f"d={access_token}"
-        },
-        "RelyingParty": "http://auth.xboxlive.com",
-        "TokenType": "JWT"
-    }
-    xbox_response = requests.post(XBOX_AUTH_URL, json=xbox_data)
-    return xbox_response.json()
+def login_qt():
+    app = QApplication(sys.argv)
+    QWebEngineProfile.defaultProfile().setHttpAcceptLanguage(QLocale.system().name().split("_")[0])
+    dialog = LoginDialog()
+    if dialog.account_information:
+        return dialog.get_account_information()
+    dialog.exec_()  # Use exec_() in PyQt5
+    return dialog.get_account_information()
 
-def exchange_xbox_token_for_xsts_token(xbox_token):
-    xsts_data = {
-        "Properties": {
-            "SandboxId": "RETAIL",
-            "UserTokens": [xbox_token]
-        },
-        "RelyingParty": "rp://api.minecraftservices.com/",
-        "TokenType": "JWT"
-    }
-    xsts_response = requests.post(XBOX_XSTS_URL, json=xsts_data)
-    return xsts_response.json()
+def login():
+    QWebEngineProfile.defaultProfile().setHttpAcceptLanguage(QLocale.system().name().split("_")[0])
+    dialog = LoginDialog()
+    if dialog.account_information:
+        return dialog.get_account_information()
+    dialog.exec_()  # Use exec_() in PyQt5
+    return dialog.get_account_information()
 
-def exchange_xsts_token_for_mc_token(xsts_token, uhs):
-    mc_data = {
-        "identityToken": f"XBL3.0 x={uhs};{xsts_token}"
-    }
-    mc_response = requests.post(MC_AUTH_URL, json=mc_data)
-    return mc_response.json()
 
-def fetch_minecraft_profile(mc_access_token):
-    headers = {"Authorization": f"Bearer {mc_access_token}"}
-    profile_response = requests.get(MC_PROFILE_URL, headers=headers)
-    return profile_response.json()
-
-def authenticate_and_fetch_profile():
-    state, code_verifier = generate_state_and_code_verifier()
-    
-    auth_url = build_authorization_url(state, code_verifier)
-
-    auth_window = AuthWindow(auth_url, state)
-    
-    try:
-        auth_window.root.mainloop()
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
-    finally:
-        if auth_window.httpd:
-            auth_window.httpd.shutdown()
-            auth_window.httpd.server_close()
-        auth_window.root.destroy()
-
-    if auth_window.auth_code:
-        tokens = exchange_code_for_tokens(auth_window.auth_code, code_verifier)
-        xbox_tokens = exchange_microsoft_token_for_xbox_token(tokens['access_token'])
-        xsts_tokens = exchange_xbox_token_for_xsts_token(xbox_tokens['Token'])
-        mc_tokens = exchange_xsts_token_for_mc_token(xsts_tokens['Token'], xsts_tokens['DisplayClaims']['xui'][0]['uhs'])
-        profile = fetch_minecraft_profile(mc_tokens['access_token'])
-        return profile, mc_tokens['access_token']
+if __name__ == "__main__":
+    account_info = login()
+    if account_info:
+        print(account_info)
     else:
-        return None, None
-    
-def logout():
-    webbrowser.open(LOGOUT_URL)
+        print("Login failed or was cancelled")

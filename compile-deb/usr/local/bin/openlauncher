@@ -1,2 +1,2 @@
 #!/bin/bash
-/usr/share/openlauncher/OpenLauncher.bin
+/usr/share/openlauncher/OpenLauncher.bin $@

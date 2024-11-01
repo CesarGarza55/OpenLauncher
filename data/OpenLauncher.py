@@ -1,25 +1,58 @@
 import re, time, subprocess, random, atexit, minecraft_launcher_lib
-import json, os, sys, uuid, webbrowser, requests
+import json, os, sys, uuid, webbrowser, requests, argparse
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, 
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
                              QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject, QThread
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
 from pypresence import Presence
 import variables
+from variables import write_log
 from updater import update
 from mod_manager import show_mod_manager
-from microsoft_auth import authenticate_and_fetch_profile, logout, fetch_minecraft_profile
+from microsoft_auth import login, login_qt
 from lang import lang, change_language, current_language
+from run import mc_run
+
+parser = argparse.ArgumentParser(description='Run the desired Minecraft version whithout using a GUI')
+parser.add_argument('-mc_ver', type=str, help='Minecraft version to run')
+parser.add_argument('-mc_name', type=str, help='Minecraft username (only for offline mode)')
+parser.add_argument('-jvm_args', type=str, help='JVM arguments (optional)')
+parser.add_argument('-online', type=str, help='Use the online mode (optional) (true/false)')
+parser.add_argument('-mc_dir', type=str, help='Minecraft directory (optional)')
+args = parser.parse_args()
+
+if args.mc_ver or args.mc_name or args.jvm_args or args.online or args.mc_dir:
+    if args.online == "true":
+        if not os.path.exists(variables.refresh_token_file):
+            messagebox.showerror("Error", lang(current_language,"no_refresh_token"))
+            sys.exit()
+        try:
+            profile = login_qt()
+            if 'id' in profile and 'name' in profile:
+                args.mc_name = profile['name']
+                args.online = profile['access_token']
+            else:
+                messagebox.showerror("Error", "Could not authenticate")
+                sys.exit()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not authenticate: {e}")
+            sys.exit()
+    mc = mc_run(args.mc_ver, args.mc_name, args.jvm_args, args.online, args.mc_dir)
+    if mc == "No version":
+        messagebox.showerror("Error", lang(current_language,"no_version"))
+    if mc == "MC_FAIL":
+        messagebox.showerror("Error", lang(current_language,"mc_fail"))
+    sys.exit()
 
 # When qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in "" error appears on Linux use this
-# This is a workaround to use XCB instead of Wayland to avoid the error and make the application work properly
+# This is a workaround to use x11 instead of Wayland to avoid the error and make the application work properly
 # When the error appears, the application works, but i'ts better to avoid it to prevent future problems
 if sys.platform == "linux" and "wayland" in os.environ.get("XDG_SESSION_TYPE", "").lower():
-    os.environ["QT_QPA_PLATFORM"] = "xcb"
+    os.environ["QT_QPA_PLATFORM"] = "x11"
 
 # Load the system language
 system_lang = current_language
@@ -56,33 +89,21 @@ class Worker(QRunnable):
         finally:
             self.signals.finished.emit()
 
-# Function to write a log file
-def write_log(text = "", log_type = "latest"):
-    text = f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {text}\n"
-    os.makedirs(f'{app_dir}/logs', exist_ok=True)
-    with open(f'{app_dir}/logs/{log_type}.log', 'a') as f:
-        f.write(text)
-
 # Authenticate the user and fetch the profile
 def authenticate():
     try:
-        profile, access_token = authenticate_and_fetch_profile()
-        return profile, access_token
+        profile = login()
+        return profile
     except Exception as e:
         messagebox.showerror("Error", f"Could not authenticate: {e}")
-        return None, None    
-    
-def reauthenticate():
+
+def logout():
     try:
-        if messagebox.askyesno("Error", lang(system_lang,"token_expired")):
-            profile, access_token = authenticate()
-            return profile, access_token
-        else:
-            return "offline", "offline"
+        os.remove(variables.refresh_token_file)
+        messagebox.showinfo("Information", lang(system_lang,"logout_success"))
     except Exception as e:
-        messagebox.showerror("Error", f"Could not authenticate: {e}")
-        return None, None
-    
+        messagebox.showerror("Error", f"Could not log out: {e}")
+
 # Check for updates and update the launcher if necessary
 update()
 
@@ -159,8 +180,10 @@ def open_launcher_dir():
         if sys.platform == "win32":
             subprocess.Popen(['explorer', app_dir])
         elif sys.platform == "linux":
-            # subprocess.Popen(['gio', 'open',  app_dir]) Use this if xdg-open doesn't work on your system
-            subprocess.Popen(['xdg-open',  app_dir])
+            try:
+                subprocess.Popen(['gio', 'open',  app_dir])
+            except Exception as e:
+                subprocess.Popen(['xdg-open',  app_dir])
     else:
         messagebox.showerror("Error", f"Directory {app_dir} does not exist")
 
@@ -172,8 +195,10 @@ def open_minecraft_dir():
         if sys.platform == "win32":
             subprocess.Popen(['explorer', minecraft_directory])
         elif sys.platform == "linux":
-            # subprocess.Popen(['gio', 'open',  minecraft_directory]) Use this if xdg-open doesn't work on your system
-            subprocess.Popen(['xdg-open',  minecraft_directory])
+            try:
+                subprocess.Popen(['gio', 'open',  minecraft_directory])
+            except Exception as e:
+                subprocess.Popen(['xdg-open',  minecraft_directory])
     else:
         print(f"Directory {minecraft_directory} does not exist")
 
@@ -444,14 +469,8 @@ class Ui_MainWindow(object):
         self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Ignored)
 
         self.verticalLayout.addItem(self.verticalSpacer_2)
-
-
         self.horizontalLayout.addLayout(self.verticalLayout)
-
-
         self.horizontalLayout_3.addLayout(self.horizontalLayout)
-
-
         self.verticalLayout_3.addLayout(self.horizontalLayout_3)
 
         self.console_output = QTextEdit(self.centralwidget)
@@ -481,7 +500,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.comboBox = QComboBox(self.centralwidget)
         self.comboBox.setObjectName(u"comboBox")
-        self.comboBox.setMinimumSize(QSize(250, 30))
+        self.comboBox.setMinimumSize(QSize(200, 30))
 
         self.horizontalLayout_4.addWidget(self.comboBox)
 
@@ -491,9 +510,19 @@ class Ui_MainWindow(object):
 
         self.pushButton_4 = QPushButton(self.centralwidget)
         self.pushButton_4.setObjectName(u"pushButton_4")
-        self.pushButton_4.setMinimumSize(QSize(250, 30))
+        self.pushButton_4.setMinimumSize(QSize(200, 30))
 
         self.horizontalLayout_4.addWidget(self.pushButton_4)
+
+        self.horizontalSpacer_5 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.horizontalLayout_4.addItem(self.horizontalSpacer_5)
+
+        self.pushButton_8 = QPushButton(self.centralwidget)
+        self.pushButton_8.setObjectName(u"pushButton_8")
+        self.pushButton_8.setMinimumSize(QSize(200, 30))
+
+        self.horizontalLayout_4.addWidget(self.pushButton_8)
 
         self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
@@ -501,7 +530,7 @@ class Ui_MainWindow(object):
 
         self.pushButton_5 = QPushButton(self.centralwidget)
         self.pushButton_5.setObjectName(u"pushButton_5")
-        self.pushButton_5.setMinimumSize(QSize(250, 30))
+        self.pushButton_5.setMinimumSize(QSize(200, 30))
 
         self.horizontalLayout_4.addWidget(self.pushButton_5)
 
@@ -540,6 +569,7 @@ class Ui_MainWindow(object):
         self.pushButton_5.setStyleSheet(self.bt_style)
         self.pushButton_6.setStyleSheet(self.bt_style)
         self.pushButton_7.setStyleSheet(self.bt_style)
+        self.pushButton_8.setStyleSheet(self.bt_style)
         
         self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
         self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
@@ -629,6 +659,7 @@ class Ui_MainWindow(object):
         self.pushButton_4.clicked.connect(self.settings_window)
         self.pushButton_5.clicked.connect(self.run_minecraft)
         self.pushButton_6.clicked.connect(self.open_mod_manager)
+        self.pushButton_8.clicked.connect(self.shortcuts_window)
         self.checkBox.clicked.connect(self.toggle_snapshots)
 
         self.update_list_versions()
@@ -647,14 +678,14 @@ class Ui_MainWindow(object):
                 ask_update = user_data.get('ask_update')
                 discord_rpc = user_data.get('discord_rpc')
                 maximize = user_data.get('maximized')
-                access_token = user_data.get('token')
-                if access_token != "" and access_token is not None:
+                if os.path.exists(variables.refresh_token_file):
                     try:
-                        profile = fetch_minecraft_profile(access_token)
+                        profile = login()                        
                     except Exception as e:
                         print(f"Error: {e}")
                         profile = "No connection"
                     if profile and 'id' in profile and 'name' in profile:
+                        access_token = profile['access_token']
                         self.lineEdit.setVisible(False)
                         self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
                         self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
@@ -670,29 +701,15 @@ class Ui_MainWindow(object):
                         self.pushButton_7.setText(lang(system_lang,"no_internet"))
                         self.pushButton_7.setStyleSheet(self.bt_style)
                         self.pushButton_7.clicked.disconnect()
+                        self.pushButton_7.setDisabled(True)
                     else:
                         self.lineEdit.setVisible(True)
                         self.label.setText(lang(system_lang,"label_username"))
                         self.label.setAlignment(Qt.AlignLeft)
                         self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                        self.pushButton_7.setText(lang(system_lang,"relogin_microsoft"))
-                        warning_style = """
-                            QPushButton {
-                                background-color: rgba(255, 0, 0, 0.5);
-                                color: #000000;
-                                border-radius: 5px;
-                            }
-                            QPushButton:hover {
-                                background-color: rgba(255, 0, 0, 0.8);
-                            }
-                            QPushButton:disabled {
-                                background-color: rgba(128, 128, 128, 0.6);
-                                color: #cccccc;
-                            }
-                        """
-                        self.pushButton_7.setStyleSheet(warning_style)
+                        self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
                         self.pushButton_7.clicked.disconnect()
-                        self.pushButton_7.clicked.connect(self.reauthenticate_microsoft)
+                        self.pushButton_7.clicked.connect(self.login_microsoft)
                 # Apply the data to the widgets and variables
                 if(user_name != "" and last_version != ""):
                     if user_name is not None:
@@ -728,8 +745,7 @@ class Ui_MainWindow(object):
                 'last_version': last_version,  # Save the last version used
                 'ask_update': ask_update, # Save the state of the checkbox
                 'discord_rpc': discord_rpc, # Save the state of the discord rpc
-                'maximized': self.isMaximized(),
-                'token': access_token
+                'maximized': self.isMaximized() # Save the state of the window
             }
             # Save data to a file
             with open(f'{app_dir}/config/user_data.json', 'w') as f:
@@ -760,50 +776,15 @@ class Ui_MainWindow(object):
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
         self.pushButton_6.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
+        self.pushButton_8.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
     # retranslateUi
-    
-    def reauthenticate_microsoft(self):
-        global access_token
-        try:
-            profile, token = reauthenticate()
-            if profile == "offline" and token == "offline":
-                self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
-                self.pushButton_7.setStyleSheet(self.bt_style)
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.login_microsoft)
-                with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
-                    json.dump("", f)
-                self.lineEdit.setVisible(True)
-                self.label.setText(lang(system_lang,"label_username"))
-                self.label.setAlignment(Qt.AlignLeft)
-                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                self.lineEdit.setText("")
-                access_token = ""
-                self.save_data()
-            elif profile and 'id' in profile and 'name' in profile:
-                access_token = token
-                self.lineEdit.setText(profile['name'])
-                self.lineEdit.setVisible(False)
-                self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
-                self.label.setAlignment(Qt.AlignCenter)
-                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
-                self.pushButton_7.setStyleSheet(self.bt_style)
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.logout_microsoft)
-                with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
-                    json.dump(profile['id'], f)
-
-                self.save_data()
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not login: {e}")
 
     def login_microsoft(self):
         global access_token
         try:
-            profile, token = authenticate()
+            profile = authenticate()
             if profile and 'id' in profile and 'name' in profile:
-                access_token = token
+                access_token = profile['access_token']
                 self.lineEdit.setText(profile['name'])
                 self.lineEdit.setVisible(False)
                 self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
@@ -1101,8 +1082,7 @@ class Ui_MainWindow(object):
             'last_version': self.comboBox.currentText(),  # Save the last version used
             'ask_update': variables.ask_update, # Save the state of the checkbox
             'discord_rpc': discord_rpc, # Save the state of the discord rpc
-            'maximized': MainWindow.isMaximized(self),
-            'token': access_token
+            'maximized': MainWindow.isMaximized(self)
         }
 
         # Create the config directory if it does not exist
@@ -1532,7 +1512,6 @@ class Ui_MainWindow(object):
         # Create the layout
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignHCenter)  # Center the elements
-        layout.setSpacing(15)  # Add spacing between the elements
         
         # Create the background label
         bg_label = QLabel(window_settings)
@@ -1568,6 +1547,8 @@ class Ui_MainWindow(object):
             border-radius: 5px; 
             padding: 5px;
         """)
+        if jvm_arguments != "" and jvm_arguments != variables.defaultJVM:
+            entry_jvm_arguments.setText(" ".join(jvm_arguments))
         layout.addWidget(entry_jvm_arguments)                                  
         
         # Checkbox to enable Discord Rich Presence
@@ -1719,6 +1700,84 @@ class Ui_MainWindow(object):
     def open_mod_manager(self):
         show_mod_manager(bg_color, icon, self.comboBox.currentText(), bg_path, bg_blur, system_lang)
 
+    def shortcuts_window(self):
+        global access_token, jvm_arguments
+        # Create the window
+        window_shortcuts = QDialog()
+        window_shortcuts.setWindowTitle(lang(system_lang,"shortcuts"))
+        window_shortcuts.setFixedSize(400, 350)
+        window_shortcuts.setWindowFlags(window_shortcuts.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_shortcuts.setWindowIcon(QIcon(icon))
+        window_shortcuts.setStyleSheet("background-color: rgb(45, 55, 65);")
+
+        # Center the window on the screen
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        window_width = window_shortcuts.width()
+        window_height = window_shortcuts.height()
+        position_right = int(screen_geometry.width()/2 - window_width/2)
+        position_down = int(screen_geometry.height()/2 - window_height/2)
+        window_shortcuts.move(position_right, position_down)
+
+        # Create the layout
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignHCenter)  # Center the elements
+        layout.setSpacing(15)  # Add spacing between the elements
+
+        # Create the background label
+        bg_label = QLabel(window_shortcuts)
+        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_shortcuts.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        bg_label.setGeometry(0, 0, window_width, window_height)
+
+        bg_label_2 = QLabel(window_shortcuts)
+        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        bg_label_2.setGeometry(0, 0, window_width, window_height)
+
+        # Apply blur effect to the background label
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(bg_blur)
+        bg_label.setGraphicsEffect(blur_effect)
+
+        # Create the label for the shortcuts
+        label_shortcuts = QLabel(lang(system_lang,"shortcuts_info"))
+        label_shortcuts.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
+        label_shortcuts.setAlignment(Qt.AlignJustify)
+        label_shortcuts.setFixedWidth(380)
+        label_shortcuts.setWordWrap(True)
+        label_shortcuts.setOpenExternalLinks(False)
+        label_shortcuts.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        layout.addWidget(label_shortcuts)
+
+        label_shortcuts.linkActivated.connect(lambda link: webbrowser.open(link))
+
+        def copy_parameters():
+            # Convert the list of JVM arguments to a string
+            jvm = " ".join(jvm_arguments)
+            # Copy the parameters to the clipboard
+            clipboard = QApplication.clipboard()
+            if access_token != "":
+                command = f"-mc_ver {self.comboBox.currentText()} -online true"
+            else:
+                command = f"-mc_name {self.lineEdit.text()} -mc_ver {self.comboBox.currentText()}"
+
+            if jvm_arguments != variables.defaultJVM:
+                command += f" -jvm_args \"{jvm}\""
+
+            clipboard.setText(command)
+            # Show a message box
+            messagebox.showinfo(lang(system_lang,"parameters_copied"), lang(system_lang,"parameters_copied_info"))
+
+            window_shortcuts.accept()
+
+        # Create the button to copy the current parameters
+        bt_copy = QPushButton(lang(system_lang,"copy_parameters"))
+        bt_copy.setFixedSize(380, 30)
+        bt_copy.setStyleSheet(self.bt_style)
+        bt_copy.clicked.connect(lambda: copy_parameters())
+        layout.addWidget(bt_copy)
+
+        window_shortcuts.setLayout(layout)
+        window_shortcuts.exec_()
+
     def get_started(self):
         # Create the window
         window_get_started = QDialog()
@@ -1844,7 +1903,6 @@ class Ui_MainWindow(object):
 
         # Mostrar la ventana
         window_get_started.exec_()
-
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
