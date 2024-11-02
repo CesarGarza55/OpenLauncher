@@ -39,24 +39,38 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
     ```
 
 3. Compile:
-
-    PyInstaller
+   
+    1. Run the `compile-windows.bat` script to compile the project.
+   
+    compile-windows.bat:
     ```bash
     py -m pip install -r data/requirements_windows.txt
-    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ --icon "data\img\creeper.ico" ^
+    pyinstaller --clean --workpath ./temp --noconfirm --windowed --distpath ./ --icon "data\img\creeper.ico" ^
         --add-data "data\img;img/" ^
         --add-data "data\updater.py;." ^
         --add-data "data\variables.py;." ^
         --add-data "data\mod_manager.py;." ^
         --add-data "data\microsoft_auth.py;." ^
         --add-data "data\lang.py;." ^
+        --add-data "data\run.py;." ^
         "data\OpenLauncher.py"
     del OpenLauncher.spec
     rmdir /s /q temp
     ```
-    Or run compile-windows.bat
-   
-5. You need to install Java to be able to play:
+    2. Make sure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
+    3. Open NSIS and click on "Compile NSI scripts":
+
+
+       ![{789A5A1C-FFC6-4CCF-A7A8-F7D2442C5709}](https://github.com/user-attachments/assets/daba00d4-e5ee-46e6-9f41-14f60e8e3b7d)
+
+    4. Click on "Load Script..." to load the `script/compile.nsi` script file.
+
+
+       ![{ACE19409-B779-4FE9-B3CA-F2350765D323}](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
+    
+    5. Once the compilation is successful, open the output file OpenLauncher.exe to begin the installation.
+
+4. You need to install Java to be able to play:
 
     [https://www.java.com/es/download/](https://www.java.com/es/download/)
 
@@ -79,8 +93,57 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
     ```
     
 3. Compile:
+   1. Debian / Ubuntu:
+    ```bash
+    #!/bin/bash
+    set -e
 
-   PyInstaller
+    # Create the directory structure
+    DEST_DIR="compile-deb/usr/share/openlauncher"
+    mkdir -p "$DEST_DIR"
+
+    # Compile the source code if the binary does not exist
+    if [ ! -f "OpenLauncher.bin" ]; then
+        echo "OpenLauncher.bin is not compiled yet and will be compiled now"
+        chmod +x compile-linux.sh
+        ./compile-linux.sh
+        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
+    else
+        rm OpenLauncher.bin
+        echo "OpenLauncher.bin will be recompiled to ensure the latest version is packaged"
+        chmod +x compile-linux.sh
+        ./compile-linux.sh
+        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
+    fi
+
+    # Copy the necessary files
+    cp OpenLauncher.bin "$DEST_DIR"
+
+    # Ensure the binary is executable
+    chmod +x "$DEST_DIR/OpenLauncher.bin"
+
+    # Ensure the permissions are set correctly
+    chmod -R 0755 compile-deb
+
+    # Compile the deb package
+    dpkg-deb --build compile-deb "OpenLauncher.deb"
+
+    # Ask the user if they want to install the package
+    read -p "Do you want to install the package? [y/n]: " INSTALL
+    if [ "$INSTALL" == "y" ]; then
+        sudo dpkg -i "OpenLauncher.deb"
+    fi
+    ```
+    
+    Next, you can execute the script to start the compilation process:
+
+    ```bash
+    ./compile-debian.sh
+    ```
+
+
+
+   2. Generic Linux systems:
     ```bash
     #!/bin/bash
     set -e
@@ -170,56 +233,14 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
     # Deactivate the virtual environment
     echo -e "${GREEN}Deactivating virtual environment...${NC}"
     deactivate
+    ```
+
+    Next, you can execute the script to start the compilation process:
 
     ```bash
     ./compile-linux.sh
     ```
     
-    Debian / Ubuntu:
-    ```bash
-    #!/bin/bash
-    set -e
-
-    # Create the directory structure
-    DEST_DIR="compile-deb/usr/share/openlauncher"
-    mkdir -p "$DEST_DIR"
-
-    # Compile the source code if the binary does not exist
-    if [ ! -f "OpenLauncher.bin" ]; then
-        echo "OpenLauncher.bin is not compiled yet and will be compiled now"
-        chmod +x compile-linux.sh
-        ./compile-linux.sh
-        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
-    else
-        rm OpenLauncher.bin
-        echo "OpenLauncher.bin will be recompiled to ensure the latest version is packaged"
-        chmod +x compile-linux.sh
-        ./compile-linux.sh
-        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
-    fi
-
-    # Copy the necessary files
-    cp OpenLauncher.bin "$DEST_DIR"
-
-    # Ensure the binary is executable
-    chmod +x "$DEST_DIR/OpenLauncher.bin"
-
-    # Ensure the permissions are set correctly
-    chmod -R 0755 compile-deb
-
-    # Compile the deb package
-    dpkg-deb --build compile-deb "OpenLauncher.deb"
-
-    # Ask the user if they want to install the package
-    read -p "Do you want to install the package? [y/n]: " INSTALL
-    if [ "$INSTALL" == "y" ]; then
-        sudo dpkg -i "OpenLauncher.deb"
-    fi
-    ```
-
-    ```bash
-    ./compile-debian.sh
-    ```
 4. You need to install Java to be able to play, by default it should be possible with:
 
     ```bash
@@ -230,11 +251,18 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
+Or run:
+
+   ```bash
+   chmod +x OpenLauncher.bin
+   ```
+
+
 ## Download options
 
-- Windows: .exe
-- Linux (compiled): .bin
-- Linux (Debian/Ubuntu) .deb
+- Windows Installer: .exe
+- Linux Installer (Debian/Ubuntu): .deb
+- Linux Generic (compiled): .bin
 
 
 ## Usage
