@@ -1,4 +1,4 @@
-import json
+import json, locale
 import os, sys
 import variables
 
@@ -24,7 +24,11 @@ if os.path.exists(f'{variables.app_directory}/config/config.json'):
         except json.JSONDecodeError:
             current_language = "en"
 else:
-    current_language = "en"
+    current_language = locale.getdefaultlocale()[0].split('_')[0]
+    if current_language not in lang_codes:
+        current_language = "en"
+    
+    
 
 languages = {
     "en": {
@@ -134,6 +138,16 @@ languages = {
         "no_refresh_token": "You must be logged in to use the online mode, please run OpenLauncher without arguments to open the GUI and log in",
         "no_version": "No version has been selected, please run OpenLauncher -mc_ver <version> -mc_name <username> -online <true/false> to run Minecraft",
         "mc_fail": "An error occurred while trying to run Minecraft please run OpenLauncher without arguments to open the GUI",
+        "ask_update": "Check for updates",
+        "update_available": "An update is available, do you want to download it?",
+        "downloading": "Downloading...",
+        "download_format": "Select Download Format",
+        "select_folder": "Please select the download location.",
+        "download_cancelled": "Download cancelled.",
+        "download_success": "The download has been completed successfully.",
+        "open_bin": "You can open the .bin file using the command './dest' or open it using the file manager.",
+        "xterm_not_found": "The automatic installation of the .deb file has failed. Please install it manually using the command 'sudo dpkg -i dest'",
+        "update_complete": "The update has been installed successfully."
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -242,6 +256,16 @@ languages = {
         "no_refresh_token": "Debes iniciar sesión para usar el modo en línea, por favor ejecuta OpenLauncher sin argumentos para abrir la GUI e iniciar sesión",
         "no_version": "No se ha seleccionado ninguna versión, por favor ejecuta OpenLauncher -mc_ver <version> -mc_name <username> -online <true/false> para ejecutar Minecraft",
         "mc_fail": "Ocurrió un error al intentar ejecutar Minecraft por favor ejecuta OpenLauncher sin argumentos para abrir la GUI",
+        "ask_update": "Buscar actualizaciones",
+        "update_available": "Hay una actualización disponible, ¿quieres descargarla?",
+        "downloading": "Descargando...",
+        "download_format": "Seleccionar Formato de Descarga",
+        "select_folder": "Por favor selecciona la ubicación de la descarga.",
+        "download_cancelled": "Descarga cancelada.",
+        "download_success": "La descarga se ha completado correctamente.",
+        "open_bin": "Puedes abrir el archivo .bin usando el comando './dest' o abrirlo usando el administrador de archivos.",
+        "xterm_not_found": "La instalación automática del archivo .deb ha fallado. Por favor, instálalo manualmente usando el comando 'sudo dpkg -i dest'",
+        "update_complete": "La actualización se ha instalado correctamente."
     }
 }
 

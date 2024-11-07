@@ -273,12 +273,12 @@ When you open the application, a welcome window greets you. You can disable this
 
 The main interface shows different sections:
 
-![image](https://github.com/user-attachments/assets/bd337d4b-e24c-44dd-8bb6-d2ec0dcb3e3c)
+![image](https://github.com/user-attachments/assets/61cad53e-bed9-4357-be34-c395b2013fc8)
 
 
 To install a version, use the following interface where you select the version and click install:
 
-![image](https://github.com/user-attachments/assets/8174c08a-827f-47f9-897d-9dbd9076cb4b)
+![install](https://github.com/user-attachments/assets/b6de93eb-d632-4f62-b2e7-618114729bde)
 
 
 By default the following JVM arguments are used:
@@ -289,11 +289,11 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![image](https://github.com/user-attachments/assets/377374ba-d60c-4957-bb6e-7c78239ec804)
+![settings](https://github.com/user-attachments/assets/3e7068e6-099d-4bf5-a65a-2e9c1dad0b0c)
 
 The new mod manager allows you to manage mods sorted by game version so you can install all the mods you want and then disable the ones you don't want to use:
 
-![imagen](https://github.com/user-attachments/assets/92f17c0a-90c2-4e25-90a3-3ce244b44679)
+![mods](https://github.com/user-attachments/assets/c0300b42-b579-46ff-bea9-dc9722371fac)
 
 ## Logging in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
@@ -328,21 +328,21 @@ My PC Specs:
 - CPU: AMD Ryzen 5 3450U 4-Core 2.1GHz
 - GPU: Radeon Vega 8 Graphics
 - RAM: 16GB DDR4 SODIMM 2400MHz
-- Operating System: Ubuntu 24.04.1 LTS x86_64 
+- Operating System: Debian 12 (bookworm) x86_64 
 
 Tested Minecraft Version:
 - RAM Allocated: 2GB (Default JVM Arguments)
 - Minecraft Version: 1.21.1
-- Fabric: 0.16.5
+- Fabric: 0.16.7
+- Shaders: [MakeUp-UltraFast-9.0.c](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-![imagen](https://github.com/user-attachments/assets/7fdc4cc9-066a-4f07-ae02-32bf9ddaefb6)
-
+![test](https://github.com/user-attachments/assets/6dff0fe9-51a3-4def-8579-0352def325b6)
 
 ## Bugs
 
-For some reason (I don't know if it's a problem with my Linux distribution) there are times when the launcher crashes when running the game, but there are also times when it doesn't happen, so I assume it may be my own distribution.
+There was previously a minor bug that caused the launcher to close when installing versions or running the game. This was due to how subprocesses are managed, and IN THEORY, this issue has been fixed as of beta-1.5.1. However, if the error persists, please report it in the issues section, and I will continue working to resolve it.
 
-Occasionally, the Microsoft login may cause the launcher to crash, but you can try again, and this issue shouldn't occur frequently.
+Keeping the software bug-free is challenging since it’s designed to work with both Windows and Linux. With so many Linux distributions out there, it’s especially complex to manage compatibility across such a wide variety of systems.
 
 ## Linux errors
 
@@ -375,7 +375,7 @@ OpenLauncher uses the following libraries and tools:
 - pypresence
 - requests
 
-The project is based on the following project: [This](https://github.com/Irr22/Minecraft-launcher)
+The project is based on the this [project](https://github.com/Irr22/Minecraft-launcher).
 
 ## Disclaimer
 

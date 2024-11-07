@@ -71,7 +71,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "beta-1.5.0"
+launcher_version = "beta-1.5.1"
 
 # User UUID
 user_uuid = ""
@@ -82,10 +82,20 @@ script_dir = os.path.dirname(__file__)
 # Set the paths for the images
 bg_path = os.path.join(script_dir, 'img/bg.png').replace("\\", "/")
 icon = os.path.join(script_dir, 'img/icon.png').replace("\\", "/")
-bg_blur = 6
+bg_blur = 10
+minecraft_icon = os.path.join(script_dir, 'img/minecraft.png').replace("\\", "/")
+fabric_icon = os.path.join(script_dir, 'img/fabric.png').replace("\\", "/")
+forge_icon = os.path.join(script_dir, 'img/forge.png').replace("\\", "/")
+mod_icon = os.path.join(script_dir, 'img/command_block.png').replace("\\", "/")
+settings_icon = os.path.join(script_dir, 'img/settings.png').replace("\\", "/")
+play_icon = os.path.join(script_dir, 'img/play.png').replace("\\", "/")
+shortcut_icon = os.path.join(script_dir, 'img/shortcut.png').replace("\\", "/")
+logout_icon = os.path.join(script_dir, 'img/logout.png').replace("\\", "/")
+login_icon = os.path.join(script_dir, 'img/login.png').replace("\\", "/")
+steve_icon = os.path.join(script_dir, 'img/steve.png').replace("\\", "/")
 
 # Set the variable theme
-bg_color = "25, 50, 100"
+bg_color = "17, 33, 115"
 
 # Set app directory
 if sys.platform == "win32":

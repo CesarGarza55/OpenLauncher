@@ -1,9 +1,9 @@
 import re, time, subprocess, random, atexit, minecraft_launcher_lib
 import json, os, sys, uuid, webbrowser, requests, argparse
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, 
+from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox,
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
-                             QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, 
+                             QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction,
                              QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
@@ -68,22 +68,61 @@ system_lang = current_language
 # Class to run a function in a separate thread 
 # (idk why but it doesn't work with threading.Thread and i had to use QRunnable,
 # I really don't know what's exactly happening here, but it works, so i will keep it like that)
-class WorkerSignals(QObject):
+class CommandWorkerSignals(QObject):
     finished = pyqtSignal()
     error = pyqtSignal(str)
+    output = pyqtSignal(str)
 
-class Worker(QRunnable):
+class CommandWorker(QRunnable):
+    def __init__(self, command):
+        super(CommandWorker, self).__init__()
+        self.command = command
+        self.signals = CommandWorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        process = None
+        try:
+            if sys.platform == 'win32':
+                # Don't show the console window
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, universal_newlines=True)
+            elif sys.platform == 'linux':
+                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+            for line in iter(process.stdout.readline, ''):
+                self.signals.output.emit(line.strip())  # Emit the output to be handled in the main thread
+            process.stdout.close()
+            process.wait()
+        except Exception as e:
+            self.signals.error.emit(f"Could not start Minecraft: {e}")
+        finally:
+            if process:
+                process.stdout.close()
+                process.stderr.close()
+                process.wait()
+            self.signals.finished.emit()
+
+class FunctionWorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+    output = pyqtSignal(str)
+
+class FunctionWorker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
-        super(Worker, self).__init__()
+        super(FunctionWorker, self).__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        self.signals = WorkerSignals()
+        self.signals = FunctionWorkerSignals()
 
     @pyqtSlot()
     def run(self):
         try:
-            self.fn(*self.args, **self.kwargs)
+            result = self.fn(*self.args, **self.kwargs)
+            if result is not None:
+                self.signals.output.emit(str(result))
         except Exception as e:
             self.signals.error.emit(str(e))
         finally:
@@ -105,7 +144,14 @@ def logout():
         messagebox.showerror("Error", f"Could not log out: {e}")
 
 # Check for updates and update the launcher if necessary
-update()
+if os.path.exists(os.path.join(variables.app_directory, "config/user_data.json")):
+    with open(os.path.join(variables.app_directory, "config/user_data.json"), "r") as f:
+        user_data = json.load(f)
+        ask_update = user_data.get("ask_update")
+        if ask_update == "yes":
+            update()
+else:
+    ask_update = variables.ask_update
 
 access_token = ""
 
@@ -155,6 +201,13 @@ def discord_controller():
         cleanup()
         discord_rpc = False
         discord_error = ""
+
+def ask_update_controller():
+    global ask_update
+    if ask_update == "yes":
+        ask_update = "no"
+    else:
+        ask_update = "yes"
 
 # if the Discord Rich Presence is enabled, clean up the connection when the application is closed
 if discord_rpc:
@@ -328,6 +381,7 @@ class StdoutRedirector:
 
     def write(self, string):
         self.text_widget.moveCursor(QTextCursor.End)
+        self.text_widget.ensureCursorVisible()
         self.text_widget.insertPlainText(string)
 
     def flush(self):
@@ -363,7 +417,7 @@ class Ui_MainWindow(object):
         self.discord_e = QLabel(self.centralwidget)
         self.discord_e.setObjectName(u"discord_e")
         self.discord_e.setText(discord_error)
-        self.discord_e.setStyleSheet("color: #ff0000; background-color: transparent; font-weight: bold; font-size: 12px;")
+        self.discord_e.setStyleSheet("color: #ff0000; background-color: transparent; font-size: 12px;")
         self.discord_e.setAlignment(Qt.AlignCenter)
         self.verticalLayout_3.addWidget(self.discord_e)
 
@@ -406,7 +460,6 @@ class Ui_MainWindow(object):
         self.pushButton_7.setSizePolicy(sizePolicy1)
         self.pushButton_7.setMinimumSize(QSize(250, 30))
         self.pushButton_7.setMaximumSize(QSize(350, 30))
-        self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
         self.pushButton_7.clicked.connect(self.login_microsoft)
         self.verticalLayout_2.addWidget(self.pushButton_7)
 
@@ -572,7 +625,7 @@ class Ui_MainWindow(object):
         self.pushButton_8.setStyleSheet(self.bt_style)
         
         self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
-        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
+        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
         self.lineEdit.setStyleSheet("""
             QLineEdit {
                 background-color: rgba("""f'{bg_color}'""", 0.5); 
@@ -593,8 +646,8 @@ class Ui_MainWindow(object):
                 background-color: rgba({bg_color}, 0.5);
                 color: #ffffff;
                 border-radius: 5px;
-                font-weight: bold;
                 font-size: 14px;
+                font-weight: bold;
             }}
             QCheckBox::indicator {{
                 width: 20px;
@@ -602,22 +655,22 @@ class Ui_MainWindow(object):
             }}
             QCheckBox::indicator:unchecked {{
                 border-radius: 5px;
-                border: 2px solid rgb(255, 255, 255);
-                background-color: transparent;
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                background-color: rgba({bg_color}, 0.5);
             }}
             QCheckBox::indicator:checked {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color_darker}, 0.5);
-                background-color: rgba({bg_color_darker}, 0.5);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 1);
             }}
             QCheckBox::indicator:unchecked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgb({bg_color_darker});
+                border: 2px solid rgb(255, 255, 255);
             }}
             QCheckBox::indicator:checked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color_darker}, 0.8);
-                background-color: rgba({bg_color_darker}, 0.8);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 0.5);
             }}
             QCheckBox:disabled {{
                 color: #cccccc;
@@ -666,7 +719,45 @@ class Ui_MainWindow(object):
         global jvm_arguments
         global maximize
         global discord_rpc
+        global user_name
         global access_token
+        global ask_update
+        global user_uuid
+        if os.path.exists(variables.refresh_token_file):
+            try:
+                profile = login()                        
+            except Exception as e:
+                print(f"Error: {e}")
+                profile = "No connection"
+            if profile and 'id' in profile and 'name' in profile:
+                access_token = profile['access_token']
+                user_name = profile['name']
+                user_uuid = profile['id']
+                self.lineEdit.setVisible(False)
+                self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
+                self.label.setAlignment(Qt.AlignCenter)
+                self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
+                self.pushButton_7.setIcon(QIcon(variables.logout_icon))
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.clicked.connect(self.logout_microsoft)
+            elif profile == "No connection":
+                self.lineEdit.setVisible(True)
+                self.label.setText(lang(system_lang,"label_username"))
+                self.label.setAlignment(Qt.AlignLeft)
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
+                self.pushButton_7.setText(lang(system_lang,"no_internet"))
+                self.pushButton_7.setStyleSheet(self.bt_style)
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.setDisabled(True)
+            else:
+                self.lineEdit.setVisible(True)
+                self.label.setText(lang(system_lang,"label_username"))
+                self.label.setAlignment(Qt.AlignLeft)
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
+                self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
+                self.pushButton_7.clicked.disconnect()
+                self.pushButton_7.clicked.connect(self.login_microsoft)
         # Load the data from the user_data.json file
         if os.path.exists(f'{app_dir}/config/user_data.json'):
             with open(f'{app_dir}/config/user_data.json', 'r') as f:
@@ -678,38 +769,6 @@ class Ui_MainWindow(object):
                 ask_update = user_data.get('ask_update')
                 discord_rpc = user_data.get('discord_rpc')
                 maximize = user_data.get('maximized')
-                if os.path.exists(variables.refresh_token_file):
-                    try:
-                        profile = login()                        
-                    except Exception as e:
-                        print(f"Error: {e}")
-                        profile = "No connection"
-                    if profile and 'id' in profile and 'name' in profile:
-                        access_token = profile['access_token']
-                        self.lineEdit.setVisible(False)
-                        self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
-                        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                        self.label.setAlignment(Qt.AlignCenter)
-                        self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
-                        self.pushButton_7.clicked.disconnect()
-                        self.pushButton_7.clicked.connect(self.logout_microsoft)
-                    elif profile == "No connection":
-                        self.lineEdit.setVisible(True)
-                        self.label.setText(lang(system_lang,"label_username"))
-                        self.label.setAlignment(Qt.AlignLeft)
-                        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                        self.pushButton_7.setText(lang(system_lang,"no_internet"))
-                        self.pushButton_7.setStyleSheet(self.bt_style)
-                        self.pushButton_7.clicked.disconnect()
-                        self.pushButton_7.setDisabled(True)
-                    else:
-                        self.lineEdit.setVisible(True)
-                        self.label.setText(lang(system_lang,"label_username"))
-                        self.label.setAlignment(Qt.AlignLeft)
-                        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
-                        self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
-                        self.pushButton_7.clicked.disconnect()
-                        self.pushButton_7.clicked.connect(self.login_microsoft)
                 # Apply the data to the widgets and variables
                 if(user_name != "" and last_version != ""):
                     if user_name is not None:
@@ -727,7 +786,10 @@ class Ui_MainWindow(object):
                     MainWindow.showMaximized()
                     self.on_resize(MainWindow)                  
         else:
-            user_name = self.lineEdit.text()
+            if user_name == "" or user_name == None:
+                user_name = self.lineEdit.text()
+            else:
+                self.lineEdit.setText(user_name)
             last_version = self.comboBox.currentText()
             show_snapshots = False
             jvm_arguments = variables.defaultJVM
@@ -750,7 +812,6 @@ class Ui_MainWindow(object):
             # Save data to a file
             with open(f'{app_dir}/config/user_data.json', 'w') as f:
                 json.dump(data, f)
-        global user_uuid
         # Load the UUID from the user_uuid.json file
         if os.path.exists(f'{app_dir}/config/user_uuid.json') and os.path.getsize(f'{app_dir}/config/user_uuid.json') > 0:
             with open(f'{app_dir}/config/user_uuid.json', 'r') as f:
@@ -776,21 +837,49 @@ class Ui_MainWindow(object):
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
         self.pushButton_5.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
         self.pushButton_6.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
+        self.pushButton_7.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
         self.pushButton_8.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
+
+        # Set the icons for the buttons
+        self.pushButton.setIcon(QIcon(variables.minecraft_icon))
+        self.pushButton.setIconSize(QSize(20, 20))
+        self.pushButton_2.setIcon(QIcon(variables.fabric_icon))
+        self.pushButton_2.setIconSize(QSize(20, 20))
+        self.pushButton_3.setIcon(QIcon(variables.forge_icon))
+        self.pushButton_3.setIconSize(QSize(30, 30))
+        self.pushButton_4.setIcon(QIcon(variables.settings_icon))
+        self.pushButton_4.setIconSize(QSize(20, 20))
+        self.pushButton_5.setIcon(QIcon(variables.play_icon))
+        self.pushButton_5.setIconSize(QSize(20, 20))
+        self.pushButton_6.setIcon(QIcon(variables.mod_icon))
+        self.pushButton_6.setIconSize(QSize(20, 20))
+        self.pushButton_7.setIcon(QIcon(variables.login_icon))
+        self.pushButton_7.setIconSize(QSize(20, 20))
+        self.pushButton_8.setIcon(QIcon(variables.shortcut_icon))
+        self.pushButton_8.setIconSize(QSize(20, 20))
+        
+        # Create an action with an icon
+        icon_action = QAction(QIcon(variables.steve_icon), "", self.lineEdit)
+
+        # Add the action to the line edit
+        self.lineEdit.addAction(icon_action, QLineEdit.LeadingPosition)
+        
     # retranslateUi
 
     def login_microsoft(self):
-        global access_token
+        global access_token, user_name
         try:
             profile = authenticate()
             if profile and 'id' in profile and 'name' in profile:
                 access_token = profile['access_token']
+                user_name = profile['name']
                 self.lineEdit.setText(profile['name'])
                 self.lineEdit.setVisible(False)
                 self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
                 self.label.setAlignment(Qt.AlignCenter)
-                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
                 self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
+                self.pushButton_7.setIcon(QIcon(variables.logout_icon))
                 self.pushButton_7.clicked.disconnect()
                 self.pushButton_7.clicked.connect(self.logout_microsoft)
                 with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
@@ -805,7 +894,7 @@ class Ui_MainWindow(object):
                 self.lineEdit.setVisible(True)
                 self.label.setText(lang(system_lang,"label_username"))
                 self.label.setAlignment(Qt.AlignLeft)
-                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
                 self.lineEdit.setText("")
                 self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
                 self.pushButton_7.clicked.disconnect()
@@ -828,9 +917,10 @@ class Ui_MainWindow(object):
         self.lineEdit.setVisible(True)
         self.label.setText(lang(system_lang,"label_username"))
         self.label.setAlignment(Qt.AlignLeft)
-        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-weight: bold; font-size: 14px; border-radius: 5px;")
+        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
         self.lineEdit.setText("")
         self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
+        self.pushButton_7.setIcon(QIcon(variables.login_icon))
         self.pushButton_7.clicked.disconnect()
         self.pushButton_7.clicked.connect(self.login_microsoft)
         self.save_data()
@@ -1048,7 +1138,14 @@ class Ui_MainWindow(object):
     # Function to configure the dropdown
     def configure_dropdown(self, vers, installed_versions_list):
         self.comboBox.clear()
-        self.comboBox.addItems(installed_versions_list)
+        # Add versions with icons
+        for version in installed_versions_list:
+            if "forge" in version:
+                self.comboBox.addItem(QIcon(variables.forge_icon), version)
+            elif "fabric" in version:
+                self.comboBox.addItem(QIcon(variables.fabric_icon), version)
+            else:
+                self.comboBox.addItem(QIcon(variables.minecraft_icon), version)
         index = self.comboBox.findText(vers, QtCore.Qt.MatchFixedString)
         if index >= 0:
             self.comboBox.setCurrentIndex(index)
@@ -1068,7 +1165,7 @@ class Ui_MainWindow(object):
     
     # Function to save the data
     def save_data(self):
-        global jvm_arguments, discord_rpc, access_token
+        global jvm_arguments, discord_rpc, access_token, ask_update
         if jvm_arguments != "":
             arg = jvm_arguments
         else:
@@ -1080,7 +1177,7 @@ class Ui_MainWindow(object):
             'toggle_snapshots': self.checkBox.isChecked(),  # save the state of the checkbox
             'jvm_arguments': arg,  # Save the JVM arguments
             'last_version': self.comboBox.currentText(),  # Save the last version used
-            'ask_update': variables.ask_update, # Save the state of the checkbox
+            'ask_update': ask_update, # Save the state of the checkbox
             'discord_rpc': discord_rpc, # Save the state of the discord rpc
             'maximized': MainWindow.isMaximized(self)
         }
@@ -1120,6 +1217,7 @@ class Ui_MainWindow(object):
     # The only thing is that the console output is not shown because the app crashes
     # But the game runs fine (idk if in another distro it works fine but in Ubuntu with KDE it crashes)
     def run_minecraft(self):
+        global jvm_arguments, access_token, user_uuid, user_name
         # Clear the console output
         self.console_output.clear()
         
@@ -1135,12 +1233,14 @@ class Ui_MainWindow(object):
                 messagebox.showinfo(lang(system_lang,"java_not_installed"), lang(system_lang,"java_not_installed_linux"))
             return
 
-        mine_user = self.lineEdit.text()
+        if access_token == "" or access_token is None:
+            mine_user = self.lineEdit.text()
+        else:
+            mine_user = user_name
         if not mine_user:
             messagebox.showerror("Error", lang(system_lang,"no_username"))
             return
 
-        global jvm_arguments, access_token
         if not jvm_arguments:
             arg = variables.defaultJVM
         else:
@@ -1180,38 +1280,31 @@ class Ui_MainWindow(object):
             try:
                 minecraft_command = minecraft_launcher_lib.command.get_minecraft_command(version, minecraft_directory, options)
 
-                def run_command(command):
-                    process = None
-                    try:
-                        if sys.platform == 'win32':
-                            # Don't show the console window
-                            startupinfo = subprocess.STARTUPINFO()
-                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, universal_newlines=True)
-                        elif sys.platform == 'linux':
-                            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-                        for line in iter(process.stdout.readline, ''):
-                            print(line.strip())  # Print the output to the console widget
-                        process.stdout.close()
-                        process.wait()
-                    except Exception as e:
-                        self.signals.error.emit(f"Could not start Minecraft: {e}")
-                    finally:
-                        if process:
-                            process.stdout.close()
-                            process.stderr.close()
-                            process.wait()
-                        self.signals.finished.emit()
-
-                worker = Worker(run_command, minecraft_command)
-                worker.signals.finished.connect(self.on_minecraft_finished)
-                worker.signals.error.connect(self.on_minecraft_error)
-                QThreadPool.globalInstance().start(worker)
+                self.worker = CommandWorker(minecraft_command)
+                self.worker.signals.output.connect(self.handle_output)
+                self.worker.signals.error.connect(self.on_minecraft_error)
+                self.worker.signals.finished.connect(self.on_minecraft_finished)
+                QThreadPool.globalInstance().start(self.worker)
 
             except Exception as e:
                 messagebox.showerror("Error", f"Could not start Minecraft: {e}")
                 self.enable_buttons()
+
+    def handle_output(self, output):
+        self.console_output.append(output)
+        # Scroll to the bottom of the console
+        self.console_output.verticalScrollBar().setValue(self.console_output.verticalScrollBar().maximum())
+    
+    def on_installation_finished(self):
+        self.progressBar.setValue(0)
+        self.enable_buttons()
+
+    def on_installation_error(self, error_message):
+        # Create the log file
+        write_log(error_message, "installation_error")
+        
+        # Enable the buttons
+        self.enable_buttons()
 
     def on_minecraft_finished(self):
         self.progressBar.setValue(0)
@@ -1235,10 +1328,12 @@ class Ui_MainWindow(object):
         self.comboBox.setEnabled(True)
         self.checkBox.setEnabled(True)
 
-    # Function to start the installation of the versions in a separate thread
-    # It's weird but it works and it's the only way I found to make it work with the QThreadPool
+    # Function to start the installation of the versions in a separate thread with worker
     def start_installation(self, install_function, version):
-        worker = Worker(install_function, version)
+        worker = FunctionWorker(install_function, version)
+        worker.signals.output.connect(self.handle_output)
+        worker.signals.error.connect(self.on_installation_error)
+        worker.signals.finished.connect(self.on_installation_finished)
         QThreadPool.globalInstance().start(worker)
 
     # Function to run the installation of the versions of Minecraft
@@ -1511,8 +1606,10 @@ class Ui_MainWindow(object):
 
         # Create the layout
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignHCenter)  # Center the elements
-        
+        layout.setAlignment(Qt.AlignHCenter)
+        layout.setSpacing(10)  # Add spacing between elements
+        layout.setContentsMargins(10, 10, 10, 10)  # Add margins around the layout
+
         # Create the background label
         bg_label = QLabel(window_settings)
         bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_settings.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
@@ -1523,19 +1620,17 @@ class Ui_MainWindow(object):
         blur_effect.setBlurRadius(bg_blur)
         bg_label.setGraphicsEffect(blur_effect)
 
+        # Create a group box for JVM settings
+        jvm_group = QGroupBox()
+        jvm_group.setStyleSheet("background-color: rgba(0, 0, 0, 0.3); border-radius: 10px;")
+        jvm_layout = QVBoxLayout()
+
         # Create the label for the JVM arguments
-        label_jvm_arguments = QLabel(lang(system_lang,"label_jvm_args"))
+        label_jvm_arguments = QLabel(lang(system_lang, "label_jvm_args"))
         label_jvm_arguments.setStyleSheet("color: white; font-size: 12px; background-color: transparent;")
         label_jvm_arguments.setAlignment(Qt.AlignCenter)
         label_jvm_arguments.setWordWrap(True)
-        layout.addWidget(label_jvm_arguments)
-
-        # Create the label for the tip
-        label_tip = QLabel(lang(system_lang,"jvm_tip"))
-        label_tip.setStyleSheet("color: yellow; font-size: 11px; background-color: transparent;")
-        label_tip.setAlignment(Qt.AlignCenter)
-        label_tip.setWordWrap(True)
-        layout.addWidget(label_tip)
+        jvm_layout.addWidget(label_jvm_arguments)
 
         # Create the entry for the JVM arguments
         entry_jvm_arguments = QLineEdit()
@@ -1549,13 +1644,23 @@ class Ui_MainWindow(object):
         """)
         if jvm_arguments != "" and jvm_arguments != variables.defaultJVM:
             entry_jvm_arguments.setText(" ".join(jvm_arguments))
-        layout.addWidget(entry_jvm_arguments)                                  
+        jvm_layout.addWidget(entry_jvm_arguments)
+
+        # Create the tip label
+        label_tip = QLabel(lang(system_lang, "jvm_tip"))
+        label_tip.setStyleSheet("color: yellow; font-size: 11px; background-color: transparent;")
+        label_tip.setAlignment(Qt.AlignCenter)
+        label_tip.setWordWrap(True)
+        jvm_layout.addWidget(label_tip)
+
+        # Add JVM settings layout to the group box
+        jvm_group.setLayout(jvm_layout)
+        layout.addWidget(jvm_group)
         
-        # Checkbox to enable Discord Rich Presence
-        discord_checkbox = QCheckBox(lang(system_lang,"discord_rpc"))
-        discord_checkbox.setStyleSheet(f"""
+        # Checkbox style
+        checkbox_style = f"""
             QCheckBox {{
-                background-color: transparent;
+                background-color: rgba({bg_color}, 0.5);
                 color: #ffffff;
                 font-size: 14px;
                 font-weight: bold;
@@ -1566,43 +1671,52 @@ class Ui_MainWindow(object):
             }}
             QCheckBox::indicator:unchecked {{
                 border-radius: 5px;
-                border: 2px solid rgb(255, 255, 255);
-                background-color: transparent;
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                background-color: rgba({bg_color}, 0.5);
             }}
             QCheckBox::indicator:checked {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color}, 0.5);
-                background-color: rgba({bg_color}, 0.5);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 1);
             }}
             QCheckBox::indicator:unchecked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgb({bg_color});
+                border: 2px solid rgb(255, 255, 255);
             }}
             QCheckBox::indicator:checked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color}, 0.8);
-                background-color: rgba({bg_color}, 0.8);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 0.5);
             }}
             QCheckBox:disabled {{
                 color: #cccccc;
             }}
-        """)
+        """
+
+        # Discord Rich Presence Checkbox
+        discord_checkbox = QCheckBox(lang(system_lang, "discord_rpc"))
+        discord_checkbox.setStyleSheet(checkbox_style)
         discord_checkbox.clicked.connect(lambda: [discord_controller(), self.update_error_discord(), self.save_data()])
         layout.addWidget(discord_checkbox)
 
-        # update the discord checkbox
-        discord_checkbox.setChecked(discord_rpc)
+        # Ask for updates Checkbox
+        ask_update_checkbox = QCheckBox(lang(system_lang, "ask_update"))
+        ask_update_checkbox.setStyleSheet(checkbox_style)
+        ask_update_checkbox.setChecked(ask_update == "yes")
+        ask_update_checkbox.clicked.connect(lambda: [ask_update_controller(), self.save_data()])
+        layout.addWidget(ask_update_checkbox)
 
-        # Language combobox
-        label_lang = QLabel(lang(system_lang,"language"))
-        label_lang.setStyleSheet("color: white; font-size: 14px; font-weight: bold; background-color: transparent;")
-        label_lang.setWordWrap(True)
-        layout.addWidget(label_lang)
+        # Language selection as horizontal layout
+        horizontal_layout = QHBoxLayout()
+        label_lang = QLabel(lang(system_lang, "language"))
+        label_lang.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
+        horizontal_layout.addWidget(label_lang)
 
-        # Create the combobox for the languages
-        available_langs = lang(system_lang,"available_languages")
         lang_combobox = QComboBox()
-        lang_combobox.setFixedSize(400, 30)
+        # Set lang_combobox to expand horizontally and have a fixed height
+        lang_combobox.setFixedHeight(30)
+        lang_combobox.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed))
+        available_langs = lang(system_lang, "available_languages")
         for key, value in available_langs.items():
             lang_combobox.addItem(value, key)
         lang_combobox.setStyleSheet("""
@@ -1614,15 +1728,11 @@ class Ui_MainWindow(object):
             QComboBox:hover {
                 background-color: rgba("""f'{bg_color}'""", 1);
             }
-            QComboBox:disabled {
-                background-color: rgba(128, 128, 128, 0.6);
-                color: #cccccc;
-            }
         """)
         lang_combobox.setCurrentText(available_langs[system_lang])
-
-        layout.addWidget(lang_combobox)
-
+        horizontal_layout.addWidget(lang_combobox)
+        layout.addLayout(horizontal_layout)
+        
         def set_lang():
             global system_lang
             new_lang = lang_combobox.currentData()
@@ -1665,32 +1775,24 @@ class Ui_MainWindow(object):
             else:
                 jvm_arguments = variables.defaultJVM
 
-        # Button to save the settings
-        bt_save = QPushButton(lang(system_lang,"save"))
+        # Save button
+        bt_save = QPushButton(lang(system_lang, "save"))
         bt_save.setFixedSize(400, 30)
         bt_save.setStyleSheet(self.bt_style)
         bt_save.clicked.connect(lambda: [set_jvm(), self.save_data(), window_settings.accept()])
         layout.addWidget(bt_save)
 
-        # Button to open all the directories
-        bt_mine_path = QPushButton(lang(system_lang,"open_minecraft_directory"))
-        bt_mine_path.setFixedSize(400, 30)
-        bt_mine_path.setStyleSheet(self.bt_style)
-        bt_mine_path.clicked.connect(lambda: [open_minecraft_dir(), window_settings.accept()])
-        layout.addWidget(bt_mine_path)
+        # Open directories buttons
+        def create_button(text, callback):
+            button = QPushButton(text)
+            button.setFixedSize(400, 30)
+            button.setStyleSheet(self.bt_style)
+            button.clicked.connect(lambda: [callback(), window_settings.accept()])
+            return button
 
-        bt_app_path = QPushButton(lang(system_lang,"open_launcher_directory"))
-        bt_app_path.setFixedSize(400, 30)
-        bt_app_path.setStyleSheet(self.bt_style)
-        bt_app_path.clicked.connect(lambda: [open_launcher_dir(), window_settings.accept()])
-        layout.addWidget(bt_app_path)
-        
-        # Button to open the plugins website
-        bt_plugins_path = QPushButton(lang(system_lang,"open_themes_website"))
-        bt_plugins_path.setFixedSize(400, 30)
-        bt_plugins_path.setStyleSheet(self.bt_style)
-        bt_plugins_path.clicked.connect(lambda: [window_settings.accept(), open_plugins_website()])
-        layout.addWidget(bt_plugins_path)
+        layout.addWidget(create_button(lang(system_lang, "open_minecraft_directory"), open_minecraft_dir))
+        layout.addWidget(create_button(lang(system_lang, "open_launcher_directory"), open_launcher_dir))
+        layout.addWidget(create_button(lang(system_lang, "open_themes_website"), open_plugins_website))
 
         # Configure the layout
         window_settings.setLayout(layout)
@@ -1920,8 +2022,7 @@ if __name__ == "__main__":
     if not os.path.exists(config_path):
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, 'w') as f:
-            json.dump({"first_time": True, "lang": "en"}, f)
-        change_language("en")
+            json.dump({"first_time": True, "lang": current_language}, f)
         window.get_started()
     else:
         with open(config_path, 'r') as f:
