@@ -65,6 +65,7 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
 
     4. Click on "Load Script..." to load the `script/compile.nsi` script file.
 
+       Alternatively, use the `compile-compress.nsi` script to reduce installer size by ~30 MB, though it will increase build time.
 
        ![{ACE19409-B779-4FE9-B3CA-F2350765D323}](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
     
