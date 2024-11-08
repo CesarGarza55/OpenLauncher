@@ -71,7 +71,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "beta-1.5.1"
+launcher_version = "beta-1.5.2"
 
 # User UUID
 user_uuid = ""
