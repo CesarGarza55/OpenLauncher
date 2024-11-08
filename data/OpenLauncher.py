@@ -17,6 +17,24 @@ from microsoft_auth import login, login_qt
 from lang import lang, change_language, current_language
 from run import mc_run
 
+jvm_arguments = ""
+maximize = False
+discord_rpc = False
+user_name = ""
+access_token = ""
+ask_update = "yes"
+user_uuid = ""
+
+# Function to handle exceptions and show a messagebox with the error instead of crashing the application directly
+def handle_exception(exc_type, exc_value, exc_traceback):
+    # Log the exception
+    write_log(f"Exception: {exc_type}, {exc_value}", "exception")
+    # Show the exception in a messagebox
+    messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
+
+# Set the exception hook to the handle_exception function
+sys.excepthook = handle_exception
+
 parser = argparse.ArgumentParser(description='Run the desired Minecraft version whithout using a GUI')
 parser.add_argument('-mc_ver', type=str, help='Minecraft version to run')
 parser.add_argument('-mc_name', type=str, help='Minecraft username (only for offline mode)')

@@ -147,7 +147,8 @@ languages = {
         "download_success": "The download has been completed successfully.",
         "open_bin": "You can open the .bin file using the command './dest' or open it using the file manager.",
         "xterm_not_found": "The automatic installation of the .deb file has failed. Please install it manually using the command 'sudo dpkg -i dest'",
-        "update_complete": "The update has been installed successfully."
+        "update_complete": "The update has been installed successfully.",
+        "error_occurred": "An error occurred: ",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -265,7 +266,8 @@ languages = {
         "download_success": "La descarga se ha completado correctamente.",
         "open_bin": "Puedes abrir el archivo .bin usando el comando './dest' o abrirlo usando el administrador de archivos.",
         "xterm_not_found": "La instalación automática del archivo .deb ha fallado. Por favor, instálalo manualmente usando el comando 'sudo dpkg -i dest'",
-        "update_complete": "La actualización se ha instalado correctamente."
+        "update_complete": "La actualización se ha instalado correctamente.",
+        "error_occurred": "Ocurrió un error: ",
     }
 }
 
