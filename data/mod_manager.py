@@ -1,6 +1,6 @@
 import os, subprocess, sys, shutil
 from tkinter import messagebox
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QBrush, QColor, QPixmap
@@ -45,7 +45,7 @@ class ModManager(QDialog):
             mod_path = os.path.join(self.mod_directory, mod)
             mod_size = os.path.getsize(mod_path) / (1024 * 1024)  # Size in MB
             mod_text = f"{mod} ({mod_size:.2f} MB)"
-            mod_text = mod_text.replace(f"{self.version}_", "")
+            mod_text = mod_text.split('_')[1]
             version = mod.split('_')[0]
             if mod.endswith(".jar"):  # Jar mod
                 if version not in self.active_mods:
@@ -114,12 +114,25 @@ class ModManager(QDialog):
                 color: #cccccc;
             }
         """
+        # Function to handle the item clicked event to only allow selecting items from the same list
+        def on_item_clicked(item):
+            list_widget = item.listWidget()
+            modifiers = QtWidgets.QApplication.keyboardModifiers()
+            if not (modifiers & QtCore.Qt.ControlModifier or modifiers & QtCore.Qt.ShiftModifier):
+                for i in range(list_widget.count()):
+                    if list_widget.item(i) != item:
+                        list_widget.item(i).setSelected(False)
+            if list_widget == self.active_mods_list:
+                self.inactive_mods_list.clearSelection()
+            elif list_widget == self.inactive_mods_list:
+                self.active_mods_list.clearSelection()
 
         # Create the list of active mods
         self.active_mods_list = QListWidget()
-        self.active_mods_list.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.active_mods_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.populate_mod_list(self.active_mods_list, self.active_mods)
         self.active_mods_list.setStyleSheet(list_style)
+        self.active_mods_list.itemClicked.connect(on_item_clicked)
 
         # Create the label for the inactive mods list
         inactive_mods_label = QLabel(lang(self.current_lang, "inactive_mods"))
@@ -128,9 +141,10 @@ class ModManager(QDialog):
 
         # Create the list of inactive mods
         self.inactive_mods_list = QListWidget()
-        self.inactive_mods_list.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.inactive_mods_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.populate_mod_list(self.inactive_mods_list, self.inactive_mods)
         self.inactive_mods_list.setStyleSheet(list_style)
+        self.inactive_mods_list.itemClicked.connect(on_item_clicked)
 
         # Add the lists and labels to the horizontal layout
         active_mods_layout = QVBoxLayout()
@@ -165,23 +179,29 @@ class ModManager(QDialog):
         # Function to move selected mods from active to inactive
         def deactivate_mods():
             selected_mods = self.active_mods_list.selectedItems()
+            i = 0
             for mod in selected_mods:
                 mod_name = mod.text().split(" (")[0]
-                mod_name = f"{self.version}_{mod_name}"
-                old_path = os.path.join(self.mod_directory, mod_name)
-                new_path = os.path.join(self.mod_directory, mod_name.replace(".jar", ".olpkg"))
+                # Find the mod in the files searching for file with name in file
+                for file in os.listdir(self.mod_directory):
+                    if mod_name in file:
+                        old_path = os.path.join(self.mod_directory, file)
+                new_path = old_path.replace(".jar", ".olpkg")
                 if os.path.exists(old_path):
                     if not os.path.exists(new_path):
                         os.rename(old_path, new_path)
                         self.active_mods_list.takeItem(self.active_mods_list.row(mod))
-                        mod_size = os.path.getsize(new_path) / (1024 * 1024)  # Size in MB
+                        mod_size = os.path.getsize(new_path) / (1024 * 1024) # Size in MB
                         mod_text = f"{mod_name.replace('.jar', '.olpkg')} ({mod_size:.2f} MB)"
-                        mod_text = mod_text.replace(f"{self.version}_", "")
-                        version = mod_name.split('_')[0]
-                        if version not in self.inactive_mods:
-                            self.inactive_mods[version] = []
-                        self.inactive_mods[version].append(mod_text)
-                        self.active_mods[version].remove(mod.text())
+                        if self.is_in_list(self.inactive_mods_list, mod_name.replace(f"{self.version}_", "")):
+                            self.update_list_item(self.inactive_mods_list, mod_name.replace(f"{self.version}_", ""), mod_text)
+                        else:
+                            version = mod_name.split('_')[0]
+                            if version not in self.inactive_mods:
+                                self.inactive_mods[version] = []
+                            self.inactive_mods[version].append(mod_text)
+                            self.inactive_mods[version].sort()
+                            i+=1
                     else:
                         messagebox.showerror("Error", lang(self.current_lang, "mod_already_exists"))
                 else:
@@ -190,27 +210,37 @@ class ModManager(QDialog):
             self.remove_empty_versions()
             self.populate_mod_list(self.active_mods_list, self.active_mods)
             self.populate_mod_list(self.inactive_mods_list, self.inactive_mods)
+            # Restart the window to update the list because idk why it doesn't update correctly, it's a bug but restarting the window fixes it even if it's not the best solution
+            if i > 0:
+                self.close()
+                show_mod_manager(self.bg_color, self.icon, self.version, self.bg_path, self.bg_blur, self.current_lang)
 
         # Function to move selected mods from inactive to active
         def activate_mods():
             selected_mods = self.inactive_mods_list.selectedItems()
+            i = 0
             for mod in selected_mods:
                 mod_name = mod.text().split(" (")[0]
-                mod_name = f"{self.version}_{mod_name}"
-                old_path = os.path.join(self.mod_directory, mod_name)
-                new_path = os.path.join(self.mod_directory, mod_name.replace(".olpkg", ".jar"))
+                # Find the mod in the files searching for file with name in file
+                for file in os.listdir(self.mod_directory):
+                    if mod_name in file:
+                        old_path = os.path.join(self.mod_directory, file)
+                new_path = old_path.replace(".olpkg", ".jar")
                 if os.path.exists(old_path):
                     if not os.path.exists(new_path):
                         os.rename(old_path, new_path)
                         self.inactive_mods_list.takeItem(self.inactive_mods_list.row(mod))
-                        mod_size = os.path.getsize(new_path) / (1024 * 1024)  # Size in MB
+                        mod_size = os.path.getsize(new_path) / (1024 * 1024)
                         mod_text = f"{mod_name.replace('.olpkg', '.jar')} ({mod_size:.2f} MB)"
-                        mod_text = mod_text.replace(f"{self.version}_", "")
-                        version = mod_name.split('_')[0]
-                        if version not in self.active_mods:
-                            self.active_mods[version] = []
-                        self.active_mods[version].append(mod_text)
-                        self.inactive_mods[version].remove(mod.text())
+                        if self.is_in_list(self.active_mods_list, mod_name.replace(f"{self.version}_", "")):
+                            self.update_list_item(self.active_mods_list, mod_name.replace(f"{self.version}_", ""), mod_text)
+                        else:
+                            version = mod_name.split('_')[0]
+                            if version not in self.active_mods:
+                                self.active_mods[version] = []
+                            self.active_mods[version].append(mod_text)
+                            self.active_mods[version].sort()
+                            i+=1
                     else:
                         messagebox.showerror("Error", lang(self.current_lang, "mod_already_exists"))
                 else:
@@ -219,6 +249,10 @@ class ModManager(QDialog):
             self.remove_empty_versions()
             self.populate_mod_list(self.active_mods_list, self.active_mods)
             self.populate_mod_list(self.inactive_mods_list, self.inactive_mods)
+            # Restart the window to update the list because idk why it doesn't update correctly, it's a bug but restarting the window fixes it even if it's not the best solution
+            if i > 0:
+                self.close()
+                show_mod_manager(self.bg_color, self.icon, self.version, self.bg_path, self.bg_blur, self.current_lang)
 
         # Function to install mods
         def install_mods():
@@ -329,10 +363,6 @@ class ModManager(QDialog):
 
         # Disable button if no version is installed
         if self.version == "No version installed":
-            self.active_mods_list.setEnabled(False)
-            self.inactive_mods_list.setEnabled(False)
-            activate_button.setEnabled(False)
-            deactivate_button.setEnabled(False)
             install_button.setEnabled(False)
             info_label.hide()
 

@@ -14,3 +14,4 @@ OpenLauncher.deb
 OpenLauncher.bin.spec
 config
 OpenLauncher
+output-build

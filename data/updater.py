@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 from lang import lang, current_language
+from variables import check_network
 import variables
 
 def version_to_tuple(version):
@@ -97,6 +98,8 @@ def clean_up():
         pass
 
 def update():
+    if not check_network():
+        return
     repo_latest = "https://github.com/CesarGarza55/OpenLauncher/releases/latest"
     try:
         update = requests.get(f"{repo_latest}")
@@ -199,8 +202,6 @@ def update():
         else:
             clean_up()
     except Exception as e:
-        show_custom_message("Error", f"{e}", "error")
-        sys.exit()
-
+        pass
 if __name__ == "__main__":
     update()

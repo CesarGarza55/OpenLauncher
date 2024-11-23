@@ -1,0 +1,6 @@
+pyinstaller
+minecraft_launcher_lib
+PyQt5
+PyQtWebEngine
+pypresence
+requests

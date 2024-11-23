@@ -3,9 +3,9 @@ SetCompressor /SOLID lzma
 Name "OpenLauncher"
 
 ; Definitions
-!define FILE_DIR "..\OpenLauncher"
+!define FILE_DIR "..\output-build"
 Icon "logo.ico"
-OutFile "OpenLauncher.exe"
+OutFile "..\OpenLauncher.exe"
 
 ; Include files
 !include "MUI2.nsh"

@@ -4,7 +4,7 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox,
                              QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
                              QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction,
-                             QProgressBar, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
+                             QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
@@ -30,7 +30,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     # Log the exception
     write_log(f"Exception: {exc_type}, {exc_value}", "exception")
     # Show the exception in a messagebox
-    messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
+    # messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
 
 # Set the exception hook to the handle_exception function
 sys.excepthook = handle_exception
@@ -361,10 +361,12 @@ try:
     versions = minecraft_launcher_lib.utils.get_version_list()
     forge_versions = minecraft_launcher_lib.forge.list_forge_versions()
     fabric_versions = minecraft_launcher_lib.fabric.get_all_minecraft_versions()
+    fabric_loaders = minecraft_launcher_lib.fabric.get_all_loader_versions()
 except Exception as e:
     versions = list()
     forge_versions = list()
     fabric_versions = list()
+    fabric_loaders = list()
 
 # Create lists to store the versions
 all_versions = list()
@@ -372,6 +374,7 @@ releases = list()
 snapshots = list()
 fabric_releases = list()
 fabric_all = list()
+fabric_loader = list()
 forge_all = list()
 
 # Add the versions to the lists
@@ -387,7 +390,10 @@ for i in range(0, len(fabric_versions)):
         fabric_releases.append(fabric_versions[i]['version'])
 
     fabric_all.append(fabric_versions[i]['version'])
-    
+
+for i in range(0, len(fabric_loaders)):
+    fabric_loader.append(fabric_loaders[i]['version'])
+
 for i in forge_versions:
     forge_all.append(i)
 
@@ -558,15 +564,6 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_3.addWidget(self.console_output)
 
-        self.progressBar = QProgressBar(self.centralwidget)
-        self.progressBar.setObjectName(u"progressBar")
-        self.progressBar.setMaximumSize(QSize(16777215, 15))
-        self.progressBar.setValue(0)
-        self.progressBar.setTextVisible(True)
-        self.progressBar.setVisible(False)
-
-        self.verticalLayout_3.addWidget(self.progressBar)
-
         self.horizontalLayout_4 = QHBoxLayout()
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.comboBox = QComboBox(self.centralwidget)
@@ -706,18 +703,6 @@ class Ui_MainWindow(object):
             QComboBox:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
                 color: #cccccc;
-            }
-        """)
-        self.progressBar.setStyleSheet("""
-            QProgressBar {
-                background-color: rgba("""f'{bg_color}'""", 0.5);
-                color: #ffffff;
-                border-radius: 5px;
-                text-align: right;
-            }
-            QProgressBar::chunk {
-                background-color: rgb("""f'{bg_color}'""");
-                width: 20px;
             }
         """)
         tooltip_stylesheet = "QToolTip { color: #ffffff; background-color: #333333; border: 1px solid white; }"
@@ -969,19 +954,13 @@ class Ui_MainWindow(object):
     # Function to set the maximum value of the progress bar
     def set_max(self, new_max: int):
         pass
-        """global current_max
-        current_max = new_max
-        self.progressBar.setValue(0)  # Reset the progress bar
-"""
+    
     # Function to update the progress bar
     def set_progress(self, progress_value: int):
-        """if current_max != 0:
-            progress_percentage = int(progress_value / current_max) * 100
-            self.progressBar.setValue(progress_percentage)
-"""     
         pass
+
     # Function to install Minecraft version in a separate thread
-    def install_minecraft(self, version):
+    def install_minecraft(self, version, loader = None):
         if version:
             # Print the version to be installed
             print(lang(system_lang,"minecraft_installation").replace("1.0", version))
@@ -1029,9 +1008,8 @@ class Ui_MainWindow(object):
             messagebox.showerror("Error", "No version entered")
 
     # Function to install Fabric in a separate thread
-    def install_fabric(self, version):
+    def install_fabric(self, version, loader = None):
         if version:
-            
             print(lang(system_lang,"forge_installation").replace("1.0", version).replace("Forge", "Fabric"))
             # Disable the buttons
             self.pushButton.setEnabled(False)
@@ -1051,7 +1029,10 @@ class Ui_MainWindow(object):
                     "setProgress": self.set_progress,
                     "setMax": self.set_max
                     }
-                    minecraft_launcher_lib.fabric.install_fabric(version, minecraft_directory, callback=callback)
+                    if loader == None:
+                        minecraft_launcher_lib.fabric.install_fabric(version, minecraft_directory, callback=callback)
+                    else:
+                        minecraft_launcher_lib.fabric.install_fabric(version, minecraft_directory, callback=callback, loader_version=loader)
                     messagebox.showinfo("Fabric", lang(system_lang,"forge_installed").replace("1.0", version).replace("Forge", "Fabric"))
                 else:
                     messagebox.showerror("Error", lang(system_lang,"forge_not_found").replace("Forge", "Fabric"))
@@ -1070,8 +1051,7 @@ class Ui_MainWindow(object):
                 # Update the list of versions
                 self.update_list_versions()
                 # Set the selected version
-                codename = f"fabric-loader-{minecraft_launcher_lib.fabric.get_latest_loader_version()}-{version}"
-                print(codename)
+                codename = f"fabric-loader-{loader}-{version}"
                 index = self.comboBox.findText(codename, QtCore.Qt.MatchFixedString)
                 if index >= 0:
                     self.comboBox.setCurrentIndex(index)
@@ -1079,7 +1059,7 @@ class Ui_MainWindow(object):
             messagebox.showerror("Error", "No version entered")
             
     # Function to install Forge in a separate thread
-    def install_forge(self, version):
+    def install_forge(self, version, loader = None):
         if version:
             print(lang(system_lang,"forge_installation").replace("1.0", version))
             # Disable the buttons
@@ -1314,7 +1294,6 @@ class Ui_MainWindow(object):
         self.console_output.verticalScrollBar().setValue(self.console_output.verticalScrollBar().maximum())
     
     def on_installation_finished(self):
-        self.progressBar.setValue(0)
         self.enable_buttons()
 
     def on_installation_error(self, error_message):
@@ -1325,7 +1304,6 @@ class Ui_MainWindow(object):
         self.enable_buttons()
 
     def on_minecraft_finished(self):
-        self.progressBar.setValue(0)
         self.enable_buttons()
 
     def on_minecraft_error(self, error_message):
@@ -1347,8 +1325,8 @@ class Ui_MainWindow(object):
         self.checkBox.setEnabled(True)
 
     # Function to start the installation of the versions in a separate thread with worker
-    def start_installation(self, install_function, version):
-        worker = FunctionWorker(install_function, version)
+    def start_installation(self, install_function, version, loader=None):
+        worker = FunctionWorker(install_function, version, loader)
         worker.signals.output.connect(self.handle_output)
         worker.signals.error.connect(self.on_installation_error)
         worker.signals.finished.connect(self.on_installation_finished)
@@ -1444,7 +1422,7 @@ class Ui_MainWindow(object):
         # Create the window
         window_versions = QDialog()
         window_versions.setWindowTitle(f"{lang(system_lang,'install')} Fabric")
-        window_versions.setFixedSize(300, 150)
+        window_versions.setFixedSize(300, 200)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         window_versions.setWindowIcon(QIcon(icon))
         window_versions.setStyleSheet("background-color: rgb(45, 55, 65);")
@@ -1489,12 +1467,25 @@ class Ui_MainWindow(object):
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
-        # Create the dropdown
+        # Create the dropdown for the versions
         versions_drop = QComboBox()
         versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
         versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
         layout.addWidget(versions_drop)
+
+        # Create the label for the loader
+        loader_label = QLabel(lang(system_lang,"loader_label"))
+        loader_label.setStyleSheet("background-color: transparent; color: white;")
+        loader_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(loader_label)
+
+        # Create the dropdown for the loader
+        loader_drop = QComboBox()
+        loader_drop.addItems(fabric_loader)
+        loader_drop.setCurrentText(fabric_loader[0])
+        loader_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
+        layout.addWidget(loader_drop)
 
         # Create the install button
         bt_install_fabric = QPushButton(lang(system_lang,"install"))
@@ -1509,7 +1500,7 @@ class Ui_MainWindow(object):
                 background-color: rgba("""f'{bg_color}'""", 1);
             }
         """)
-        bt_install_fabric.clicked.connect(lambda: [window_versions.accept(), self.start_installation(self.install_fabric, versions_drop.currentText())])
+        bt_install_fabric.clicked.connect(lambda: [window_versions.accept(), self.start_installation(self.install_fabric, versions_drop.currentText(), loader_drop.currentText())])
         layout.addWidget(bt_install_fabric)
 
         # Execute the window
@@ -1715,6 +1706,7 @@ class Ui_MainWindow(object):
         discord_checkbox = QCheckBox(lang(system_lang, "discord_rpc"))
         discord_checkbox.setStyleSheet(checkbox_style)
         discord_checkbox.clicked.connect(lambda: [discord_controller(), self.update_error_discord(), self.save_data()])
+        discord_checkbox.setChecked(discord_rpc == True)
         layout.addWidget(discord_checkbox)
 
         # Ask for updates Checkbox
@@ -2028,6 +2020,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        # Center the window on the screen
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        window_width = self.width()
+        window_height = self.height()
+        position_right = int(screen_geometry.width()/2 - window_width/2)
+        position_down = int(screen_geometry.height()/2 - window_height/2)
+        self.move(position_right, position_down)
         # Redirect the standard output to the QTextEdit widget
         sys.stdout = StdoutRedirector(self.console_output)
 

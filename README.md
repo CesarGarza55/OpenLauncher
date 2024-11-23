@@ -4,6 +4,10 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
 
 (For the moment only designed for Windows and Linux)
 
+## WARNING FOR WINDOWS USERS
+
+**Warning**: On Windows, there is a known issue where the launcher might be detected as a false positive by antivirus software because it does not have a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
+
 ## Features
 
 - **Microsoft Account Login**: Now supports logging in with an official Microsoft account.
@@ -44,18 +48,14 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
    
     compile-windows.bat:
     ```bash
+    @echo off
     py -m pip install -r data/requirements_windows.txt
-    pyinstaller --clean --workpath ./temp --noconfirm --windowed --distpath ./ --icon "data\img\creeper.ico" ^
-        --add-data "data\img;img/" ^
-        --add-data "data\updater.py;." ^
-        --add-data "data\variables.py;." ^
-        --add-data "data\mod_manager.py;." ^
-        --add-data "data\microsoft_auth.py;." ^
-        --add-data "data\lang.py;." ^
-        --add-data "data\run.py;." ^
-        "data\OpenLauncher.py"
-    del OpenLauncher.spec
-    rmdir /s /q temp
+    python compile.py build
+    
+    echo OpenLauncher compiled successfully!
+    echo You can create the installer with NSIS by running the compile.nsi file with NSIS.
+    echo Press any key to exit...
+    pause >nul
     ```
     2. Make sure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
     3. Open NSIS and click on "Compile NSI scripts":
@@ -370,9 +370,10 @@ This project is licensed under the GPL-2.0 License. For more details, see the [L
 ## Credits
 OpenLauncher uses the following libraries and tools:
 
-- pyinstaller
+- cx_Freeze
 - minecraft_launcher_lib
 - PyQt5
+- Tkinter
 - pypresence
 - requests
 

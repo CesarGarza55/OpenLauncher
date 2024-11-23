@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QVBoxLayout
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile  # Cambiado aquí
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
 from PyQt5.QtCore import QUrl, QLocale
 from variables import write_log
 import minecraft_launcher_lib

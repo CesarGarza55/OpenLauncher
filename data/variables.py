@@ -2,6 +2,7 @@ import os
 import pathlib
 import sys
 import time
+import requests
 import minecraft_launcher_lib
 
 # Website URL
@@ -71,7 +72,8 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-launcher_version = "beta-1.5.2"
+version = "1.5.3"
+launcher_version = f"beta-{version}"
 
 # User UUID
 user_uuid = ""
@@ -133,3 +135,13 @@ def write_log(text = "", log_type = "latest"):
     os.makedirs(f'{app_directory}/logs', exist_ok=True)
     with open(f'{app_directory}/logs/{log_type}.log', 'a') as f:
         f.write(text)
+
+# Detect if the system has internet connection
+def check_network():
+    try:
+        response = requests.get("https://www.google.com/", timeout=5)
+        return response.status_code == 200
+    except requests.ConnectionError:
+        return False
+    except requests.Timeout:
+        return False
