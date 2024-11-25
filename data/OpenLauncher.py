@@ -1596,6 +1596,26 @@ class Ui_MainWindow(object):
         window_versions.setLayout(layout)
         window_versions.exec_()
 
+    def set_language(self, new_lang):
+    # Set the new language
+        global system_lang, user_name, access_token
+        system_lang = new_lang
+        if access_token != "":
+            self.label.setText(f"{lang(system_lang,'logged_as')} {user_name}")
+            self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
+        else:
+            self.label.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"label_username"), None))
+            self.pushButton_7.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
+        self.checkBox.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"checkbox_snapshots"), None))
+        self.pushButton.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
+        self.pushButton_2.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
+        self.pushButton_3.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
+        self.pushButton_4.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
+        self.pushButton_5.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
+        self.pushButton_6.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
+        self.pushButton_8.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
+        
+
     def settings_window(self):
         # Create the window
         window_settings = QDialog()
@@ -1762,12 +1782,34 @@ class Ui_MainWindow(object):
             
             # Update the language in the configuration file
             config["lang"] = new_lang
+
+            # Set the language in the application
+            self.set_language(new_lang)
+
+            # Set the language in the settings window
+            window_settings.setWindowTitle(lang(new_lang, "settings"))
+            label_jvm_arguments.setText(lang(new_lang, "label_jvm_args"))
+            label_tip.setText(lang(new_lang, "jvm_tip"))
+            discord_checkbox.setText(lang(new_lang, "discord_rpc"))
+            ask_update_checkbox.setText(lang(new_lang, "ask_update"))
+            label_lang.setText(lang(new_lang, "language"))
+            bt_save.setText(lang(new_lang, "save"))
+            bt_open_minecraft.setText(lang(new_lang, "open_minecraft_directory"))
+            bt_open_launcher.setText(lang(new_lang, "open_launcher_directory"))
+            bt_open_themes.setText(lang(new_lang, "open_themes_website"))
             
+            # Temporarily disconnect the signal to avoid recursion
+            lang_combobox.blockSignals(True)
+            lang_combobox.clear()
+            available_langs = lang(new_lang, "available_languages")
+            for key, value in available_langs.items():
+                lang_combobox.addItem(value, key)
+            lang_combobox.setCurrentText(available_langs[system_lang])
+            lang_combobox.blockSignals(False)
+
             # Write the configuration file
             with open(config_path, 'w') as f:
                 json.dump(config, f, indent=4)
-                if messagebox.askyesno("Language", lang(system_lang,"restart_app")):
-                    sys.exit()
 
         # Connect the combobox to the function
         lang_combobox.currentIndexChanged.connect(set_lang)
@@ -1792,17 +1834,23 @@ class Ui_MainWindow(object):
         bt_save.clicked.connect(lambda: [set_jvm(), self.save_data(), window_settings.accept()])
         layout.addWidget(bt_save)
 
-        # Open directories buttons
-        def create_button(text, callback):
-            button = QPushButton(text)
-            button.setFixedSize(400, 30)
-            button.setStyleSheet(self.bt_style)
-            button.clicked.connect(lambda: [callback(), window_settings.accept()])
-            return button
+        bt_open_minecraft = QPushButton(lang(system_lang, "open_minecraft_directory"))
+        bt_open_minecraft.setFixedSize(400, 30)
+        bt_open_minecraft.setStyleSheet(self.bt_style)
+        bt_open_minecraft.clicked.connect(open_minecraft_dir)
+        layout.addWidget(bt_open_minecraft)
 
-        layout.addWidget(create_button(lang(system_lang, "open_minecraft_directory"), open_minecraft_dir))
-        layout.addWidget(create_button(lang(system_lang, "open_launcher_directory"), open_launcher_dir))
-        layout.addWidget(create_button(lang(system_lang, "open_themes_website"), open_plugins_website))
+        bt_open_launcher = QPushButton(lang(system_lang, "open_launcher_directory"))
+        bt_open_launcher.setFixedSize(400, 30)
+        bt_open_launcher.setStyleSheet(self.bt_style)
+        bt_open_launcher.clicked.connect(open_launcher_dir)
+        layout.addWidget(bt_open_launcher)
+
+        bt_open_themes = QPushButton(lang(system_lang, "open_themes_website"))
+        bt_open_themes.setFixedSize(400, 30)
+        bt_open_themes.setStyleSheet(self.bt_style)
+        bt_open_themes.clicked.connect(open_plugins_website)
+        layout.addWidget(bt_open_themes)
 
         # Configure the layout
         window_settings.setLayout(layout)

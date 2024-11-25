@@ -6,11 +6,22 @@ OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, 
 
 ## WARNING FOR WINDOWS USERS
 
-**Warning**: On Windows, there is a known issue where the launcher might be detected as a false positive by antivirus software because it does not have a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
+**Warning**: On Windows, there is a known issue where the launcher may be flagged as a false positive by antivirus software due to the absence of a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
+
+If you encounter issues downloading the [installer](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe), please consider using the [portable](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher-Portable-Windows.zip) version of the launcher as an alternative.
+
+To verify its safety, I have scanned the launcher with VirusTotal, and it was not detected by any antivirus engine. You can view the scan results below.
+
+![image](https://github.com/user-attachments/assets/5685f609-36d1-432f-b628-a25cb916312b)
+
+The installed executable of the launcher has also been scanned with VirusTotal and shows no issues.
+
+![image](https://github.com/user-attachments/assets/7b7aa152-5f54-4457-9273-7c955cf85a4e)
 
 ## Features
 
 - **Microsoft Account Login**: Now supports logging in with an official Microsoft account.
+- **Discord Rich Presence**: Displays various fun messages while you play.
 - **Custom Interface**: Utilizes PyQt5 for a modern and customizable look.
 - **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
 - **Open Source**: Easily extendable and modifiable by the community.

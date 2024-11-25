@@ -1,4 +1,5 @@
 @echo off
+if exist output_build rmdir /s /q output_build
 py -m pip install -r data/requirements_windows.txt
 python compile.py build
 
