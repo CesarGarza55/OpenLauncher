@@ -1,10 +1,7 @@
 import re, time, subprocess, random, atexit, minecraft_launcher_lib
 import json, os, sys, uuid, webbrowser, requests, argparse
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox,
-                             QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, 
-                             QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction,
-                             QApplication, QMessageBox, QDialog, QGraphicsBlurEffect)
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox, QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
@@ -24,6 +21,7 @@ user_name = ""
 access_token = ""
 ask_update = "yes"
 user_uuid = ""
+show_snapshots = False
 
 # Function to handle exceptions and show a messagebox with the error instead of crashing the application directly
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -33,7 +31,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     # messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
 
 # Set the exception hook to the handle_exception function
-sys.excepthook = handle_exception
+#sys.excepthook = handle_exception
 
 parser = argparse.ArgumentParser(description='Run the desired Minecraft version whithout using a GUI')
 parser.add_argument('-mc_ver', type=str, help='Minecraft version to run')
@@ -83,73 +81,10 @@ system_lang = current_language
 # I will keep making updates, but i'm not sure if i will be able to fix all the bugs someday
 # The code is a mess, but hey, it works, and that's what matters XD
 
-# Class to run a function in a separate thread 
-# (idk why but it doesn't work with threading.Thread and i had to use QRunnable,
-# I really don't know what's exactly happening here, but it works, so i will keep it like that)
-class CommandWorkerSignals(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
-    output = pyqtSignal(str)
-
-class CommandWorker(QRunnable):
-    def __init__(self, command):
-        super(CommandWorker, self).__init__()
-        self.command = command
-        self.signals = CommandWorkerSignals()
-
-    @pyqtSlot()
-    def run(self):
-        process = None
-        try:
-            if sys.platform == 'win32':
-                # Don't show the console window
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, universal_newlines=True)
-            elif sys.platform == 'linux':
-                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-            for line in iter(process.stdout.readline, ''):
-                self.signals.output.emit(line.strip())  # Emit the output to be handled in the main thread
-            process.stdout.close()
-            process.wait()
-        except Exception as e:
-            self.signals.error.emit(f"Could not start Minecraft: {e}")
-        finally:
-            if process:
-                process.stdout.close()
-                process.stderr.close()
-                process.wait()
-            self.signals.finished.emit()
-
-class FunctionWorkerSignals(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
-    output = pyqtSignal(str)
-
-class FunctionWorker(QRunnable):
-    def __init__(self, fn, *args, **kwargs):
-        super(FunctionWorker, self).__init__()
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-        self.signals = FunctionWorkerSignals()
-
-    @pyqtSlot()
-    def run(self):
-        try:
-            result = self.fn(*self.args, **self.kwargs)
-            if result is not None:
-                self.signals.output.emit(str(result))
-        except Exception as e:
-            self.signals.error.emit(str(e))
-        finally:
-            self.signals.finished.emit()
-
 # Authenticate the user and fetch the profile
 def authenticate():
     try:
-        profile = login()
+        profile = login(system_lang, icon)
         return profile
     except Exception as e:
         messagebox.showerror("Error", f"Could not authenticate: {e}")
@@ -157,7 +92,6 @@ def authenticate():
 def logout():
     try:
         os.remove(variables.refresh_token_file)
-        messagebox.showinfo("Information", lang(system_lang,"logout_success"))
     except Exception as e:
         messagebox.showerror("Error", f"Could not log out: {e}")
 
@@ -397,6 +331,68 @@ for i in range(0, len(fabric_loaders)):
 for i in forge_versions:
     forge_all.append(i)
 
+# Class to run a function in a separate thread 
+# (idk why but it doesn't work with threading.Thread and i had to use QRunnable,
+# I really don't know what's exactly happening here, but it works, so i will keep it like that)
+class CommandWorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+    output = pyqtSignal(str)
+
+class CommandWorker(QRunnable):
+    def __init__(self, command):
+        super(CommandWorker, self).__init__()
+        self.command = command
+        self.signals = CommandWorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        process = None
+        try:
+            if sys.platform == 'win32':
+                # Don't show the console window
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, universal_newlines=True)
+            elif sys.platform == 'linux':
+                process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+            for line in iter(process.stdout.readline, ''):
+                self.signals.output.emit(line.strip())  # Emit the output to be handled in the main thread
+            process.stdout.close()
+            process.wait()
+        except Exception as e:
+            self.signals.error.emit(f"Could not start Minecraft: {e}")
+        finally:
+            if process:
+                process.stdout.close()
+                process.stderr.close()
+                process.wait()
+            self.signals.finished.emit()
+
+class FunctionWorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+    output = pyqtSignal(str)
+
+class FunctionWorker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super(FunctionWorker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = FunctionWorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+            if result is not None:
+                self.signals.output.emit(str(result))
+        except Exception as e:
+            self.signals.error.emit(str(e))
+        finally:
+            self.signals.finished.emit()
 
 # Create a class to redirect the standard output to the QTextEdit widget
 class StdoutRedirector:
@@ -411,7 +407,6 @@ class StdoutRedirector:
     def flush(self):
         pass
             
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         global discord_error
@@ -436,26 +431,31 @@ class Ui_MainWindow(object):
 
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName(u"gridLayout")
-        self.verticalLayout_3 = QVBoxLayout()
-        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+
+        # Top group
+        self.top_group = QGroupBox(self.centralwidget)
+        self.top_group.setStyleSheet(f"background-color: rgba({bg_color}, 0.3); border-radius: 5px;")
+        self.top_group_layout = QVBoxLayout(self.top_group)
+        self.top_group_layout.setObjectName(u"top_group_layout")
+
         self.discord_e = QLabel(self.centralwidget)
         self.discord_e.setObjectName(u"discord_e")
         self.discord_e.setText(discord_error)
         self.discord_e.setStyleSheet("color: #ff0000; background-color: transparent; font-size: 12px;")
         self.discord_e.setAlignment(Qt.AlignCenter)
-        self.verticalLayout_3.addWidget(self.discord_e)
+        self.top_group_layout.addWidget(self.discord_e)
 
-        self.horizontalLayout_3 = QHBoxLayout()
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.horizontalLayout = QHBoxLayout()
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.verticalLayout_2 = QVBoxLayout()
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
+
         self.label = QLabel(self.centralwidget)
         self.label.setObjectName(u"label")
-        self.label.setAlignment(Qt.AlignLeft)
-        self.label.setMaximumHeight(30)
-        #self.horizontalLayout_2.addWidget(self.label)
+        self.label.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+        self.label.setWordWrap(True)
         self.verticalLayout_2.addWidget(self.label)
         self.lineEdit = QLineEdit(self.centralwidget)
         self.lineEdit.setObjectName(u"lineEdit")
@@ -464,91 +464,78 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lineEdit.sizePolicy().hasHeightForWidth())
         self.lineEdit.setSizePolicy(sizePolicy)
-        self.lineEdit.setMinimumSize(QSize(250, 30))
+        self.lineEdit.setMinimumSize(QSize(350, 30))
         self.lineEdit.setMaximumSize(QSize(350, 16777215))
         self.lineEdit.setPlaceholderText(lang(system_lang,"user_placeholder"))
+        self.lineEdit.setAlignment(Qt.AlignCenter)
+        # Deselect the line edit at the start
+        self.lineEdit.setFocusPolicy(Qt.NoFocus)
 
-        #self.horizontalLayout_2.addWidget(self.lineEdit)
         self.verticalLayout_2.addWidget(self.lineEdit)
 
-        #self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        #self.horizontalLayout_2.addItem(self.horizontalSpacer_2)
-        
-        #self.verticalLayout_2.addLayout(self.horizontalLayout_2)
-
-        self.pushButton_7 = QPushButton(self.centralwidget)
-        self.pushButton_7.setObjectName(u"pushButton_7")
+        self.btn_account = QPushButton(self.centralwidget)
+        self.btn_account.setObjectName(u"btn_account")
         sizePolicy1 = QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
-        sizePolicy1.setHeightForWidth(self.pushButton_7.sizePolicy().hasHeightForWidth())
-        self.pushButton_7.setSizePolicy(sizePolicy1)
-        self.pushButton_7.setMinimumSize(QSize(250, 30))
-        self.pushButton_7.setMaximumSize(QSize(350, 30))
-        self.pushButton_7.clicked.connect(self.login_microsoft)
-        self.verticalLayout_2.addWidget(self.pushButton_7)
+        sizePolicy1.setHeightForWidth(self.btn_account.sizePolicy().hasHeightForWidth())
+        self.btn_account.setSizePolicy(sizePolicy1)
+        self.btn_account.setMinimumSize(QSize(350, 30))
+        self.btn_account.setMaximumSize(QSize(350, 30))
+        self.btn_account.clicked.connect(self.login_microsoft)
+        self.verticalLayout_2.addWidget(self.btn_account)
 
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Minimum)
-
-        self.verticalLayout_2.addItem(self.verticalSpacer)
-        
-        self.checkBox = QCheckBox(self.centralwidget)
-        self.checkBox.setObjectName(u"checkBox")
-        self.verticalLayout_2.addWidget(self.checkBox)
-
-        self.horizontalLayout_3.addLayout(self.verticalLayout_2)
-
-        self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.addLayout(self.verticalLayout_2)
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
         self.horizontalLayout.addItem(self.horizontalSpacer)
 
         self.verticalLayout = QVBoxLayout()
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.pushButton = QPushButton(self.centralwidget)
-        self.pushButton.setObjectName(u"pushButton")
+        self.btn_minecraft = QPushButton(self.centralwidget)
+        self.btn_minecraft.setObjectName(u"pushButton")
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
-        self.pushButton.setSizePolicy(sizePolicy1)
-        self.pushButton.setMinimumSize(QSize(250, 30))
-        self.pushButton.setMaximumSize(QSize(350, 30))
+        sizePolicy1.setHeightForWidth(self.btn_minecraft.sizePolicy().hasHeightForWidth())
+        self.btn_minecraft.setSizePolicy(sizePolicy1)
+        self.btn_minecraft.setMinimumSize(QSize(350, 30))
+        self.btn_minecraft.setMaximumSize(QSize(350, 30))
 
-        self.verticalLayout.addWidget(self.pushButton)
+        self.verticalLayout.addWidget(self.btn_minecraft)
 
-        self.pushButton_2 = QPushButton(self.centralwidget)
-        self.pushButton_2.setObjectName(u"pushButton_2")
-        sizePolicy1.setHeightForWidth(self.pushButton_2.sizePolicy().hasHeightForWidth())
-        self.pushButton_2.setSizePolicy(sizePolicy1)
-        self.pushButton_2.setMinimumSize(QSize(250, 30))
-        self.pushButton_2.setMaximumSize(QSize(350, 30))
+        self.btn_fabric = QPushButton(self.centralwidget)
+        self.btn_fabric.setObjectName(u"btn_fabric")
+        sizePolicy1.setHeightForWidth(self.btn_fabric.sizePolicy().hasHeightForWidth())
+        self.btn_fabric.setSizePolicy(sizePolicy1)
+        self.btn_fabric.setMinimumSize(QSize(350, 30))
+        self.btn_fabric.setMaximumSize(QSize(350, 30))
 
-        self.verticalLayout.addWidget(self.pushButton_2)
+        self.verticalLayout.addWidget(self.btn_fabric)
 
-        self.pushButton_3 = QPushButton(self.centralwidget)
-        self.pushButton_3.setObjectName(u"pushButton_3")
-        sizePolicy1.setHeightForWidth(self.pushButton_3.sizePolicy().hasHeightForWidth())
-        self.pushButton_3.setSizePolicy(sizePolicy1)
-        self.pushButton_3.setMinimumSize(QSize(250, 30))
-        self.pushButton_3.setMaximumSize(QSize(350, 30))
+        self.btn_forge = QPushButton(self.centralwidget)
+        self.btn_forge.setObjectName(u"btn_forge")
+        sizePolicy1.setHeightForWidth(self.btn_forge.sizePolicy().hasHeightForWidth())
+        self.btn_forge.setSizePolicy(sizePolicy1)
+        self.btn_forge.setMinimumSize(QSize(350, 30))
+        self.btn_forge.setMaximumSize(QSize(350, 30))
 
-        self.verticalLayout.addWidget(self.pushButton_3)
+        self.verticalLayout.addWidget(self.btn_forge)
 
-        self.pushButton_6 = QPushButton(self.centralwidget)
-        self.pushButton_6.setObjectName(u"pushButton_6")
-        sizePolicy1.setHeightForWidth(self.pushButton_6.sizePolicy().hasHeightForWidth())
-        self.pushButton_6.setSizePolicy(sizePolicy1)
-        self.pushButton_6.setMinimumSize(QSize(250, 30))
-        self.pushButton_6.setMaximumSize(QSize(350, 30))
+        self.btn_mod_manger = QPushButton(self.centralwidget)
+        self.btn_mod_manger.setObjectName(u"btn_mod_manger")
+        sizePolicy1.setHeightForWidth(self.btn_mod_manger.sizePolicy().hasHeightForWidth())
+        self.btn_mod_manger.setSizePolicy(sizePolicy1)
+        self.btn_mod_manger.setMinimumSize(QSize(350, 30))
+        self.btn_mod_manger.setMaximumSize(QSize(350, 30))
 
-        self.verticalLayout.addWidget(self.pushButton_6)
+        self.verticalLayout.addWidget(self.btn_mod_manger)
 
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Ignored)
-
-        self.verticalLayout.addItem(self.verticalSpacer_2)
         self.horizontalLayout.addLayout(self.verticalLayout)
-        self.horizontalLayout_3.addLayout(self.horizontalLayout)
-        self.verticalLayout_3.addLayout(self.horizontalLayout_3)
+        self.top_group_layout.addLayout(self.horizontalLayout)
+        self.gridLayout.addWidget(self.top_group, 0, 0, 1, 1)
+
+        # Bottom group
+        self.bottom_group = QGroupBox(self.centralwidget)
+        self.bottom_group.setStyleSheet(f"background-color: rgba({bg_color}, 0.3); border-radius: 5px;")
+        self.bottom_group_layout = QVBoxLayout(self.bottom_group)
+        self.bottom_group_layout.setObjectName(u"bottom_group_layout")
 
         self.console_output = QTextEdit(self.centralwidget)
         self.console_output.setObjectName(u"console_output")
@@ -557,18 +544,23 @@ class Ui_MainWindow(object):
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.console_output.sizePolicy().hasHeightForWidth())
         self.console_output.setSizePolicy(sizePolicy2)
-        self.console_output.setMinimumSize(QSize(0, 280))
+        self.console_output.setMinimumSize(QSize(0, 200))
         self.console_output.setInputMethodHints(Qt.ImhMultiLine|Qt.ImhNoEditMenu)
         self.console_output.setTextInteractionFlags(Qt.TextSelectableByKeyboard|Qt.TextSelectableByMouse)
         self.console_output.setReadOnly(True)
 
-        self.verticalLayout_3.addWidget(self.console_output)
+        self.bottom_group_layout.addWidget(self.console_output)
 
         self.horizontalLayout_4 = QHBoxLayout()
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.comboBox = QComboBox(self.centralwidget)
         self.comboBox.setObjectName(u"comboBox")
+        sizePolicy3 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy3.setHorizontalStretch(1)
+        sizePolicy3.setVerticalStretch(0)
         self.comboBox.setMinimumSize(QSize(200, 30))
+        self.comboBox.setMaximumSize(QSize(500, 30))
+        self.comboBox.setSizePolicy(sizePolicy3)
 
         self.horizontalLayout_4.addWidget(self.comboBox)
 
@@ -576,37 +568,41 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_3)
 
-        self.pushButton_4 = QPushButton(self.centralwidget)
-        self.pushButton_4.setObjectName(u"pushButton_4")
-        self.pushButton_4.setMinimumSize(QSize(200, 30))
+        self.btn_settings = QPushButton(self.centralwidget)
+        self.btn_settings.setObjectName(u"btn_settings")
+        self.btn_settings.setMinimumSize(QSize(200, 30))
+        self.btn_settings.setMaximumSize(QSize(500, 30))
+        self.btn_settings.setSizePolicy(sizePolicy3)
 
-        self.horizontalLayout_4.addWidget(self.pushButton_4)
+        self.horizontalLayout_4.addWidget(self.btn_settings)
 
         self.horizontalSpacer_5 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_5)
 
-        self.pushButton_8 = QPushButton(self.centralwidget)
-        self.pushButton_8.setObjectName(u"pushButton_8")
-        self.pushButton_8.setMinimumSize(QSize(200, 30))
+        self.btn_shortcuts = QPushButton(self.centralwidget)
+        self.btn_shortcuts.setObjectName(u"btn_shortcuts")
+        self.btn_shortcuts.setMinimumSize(QSize(200, 30))
+        self.btn_shortcuts.setMaximumSize(QSize(500, 30))
+        self.btn_shortcuts.setSizePolicy(sizePolicy3)
 
-        self.horizontalLayout_4.addWidget(self.pushButton_8)
+        self.horizontalLayout_4.addWidget(self.btn_shortcuts)
 
         self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_4)
 
-        self.pushButton_5 = QPushButton(self.centralwidget)
-        self.pushButton_5.setObjectName(u"pushButton_5")
-        self.pushButton_5.setMinimumSize(QSize(200, 30))
+        self.btn_play = QPushButton(self.centralwidget)
+        self.btn_play.setObjectName(u"btn_play")
+        self.btn_play.setMinimumSize(QSize(200, 30))
+        self.btn_play.setMaximumSize(QSize(500, 30))
+        self.btn_play.setSizePolicy(sizePolicy3)
 
-        self.horizontalLayout_4.addWidget(self.pushButton_5)
+        self.horizontalLayout_4.addWidget(self.btn_play)
 
+        self.bottom_group_layout.addLayout(self.horizontalLayout_4)
 
-        self.verticalLayout_3.addLayout(self.horizontalLayout_4)
-
-
-        self.gridLayout.addLayout(self.verticalLayout_3, 0, 0, 1, 1)
+        self.gridLayout.addWidget(self.bottom_group, 1, 0, 1, 1)
 
         MainWindow.setCentralWidget(self.centralwidget)
 
@@ -630,21 +626,23 @@ class Ui_MainWindow(object):
                 color: #cccccc;
             }
         """
-        self.pushButton.setStyleSheet(self.bt_style)
-        self.pushButton_2.setStyleSheet(self.bt_style)
-        self.pushButton_3.setStyleSheet(self.bt_style)
-        self.pushButton_4.setStyleSheet(self.bt_style)
-        self.pushButton_5.setStyleSheet(self.bt_style)
-        self.pushButton_6.setStyleSheet(self.bt_style)
-        self.pushButton_7.setStyleSheet(self.bt_style)
-        self.pushButton_8.setStyleSheet(self.bt_style)
+        self.btn_minecraft.setStyleSheet(self.bt_style)
+        self.btn_fabric.setStyleSheet(self.bt_style)
+        self.btn_forge.setStyleSheet(self.bt_style)
+        self.btn_settings.setStyleSheet(self.bt_style)
+        self.btn_play.setStyleSheet(self.bt_style)
+        self.btn_mod_manger.setStyleSheet(self.bt_style)
+        self.btn_account.setStyleSheet(self.bt_style)
+        self.btn_shortcuts.setStyleSheet(self.bt_style)
         
-        self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff;")
+        self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff; border: none; border-radius: 5px; font-size: 12px;")
         self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
         self.lineEdit.setStyleSheet("""
             QLineEdit {
                 background-color: rgba("""f'{bg_color}'""", 0.5); 
                 color: #ffffff;
+                border-radius: 5px;
+                border: none;
             }
             QLineEdit:hover {
                 background-color: rgba("""f'{bg_color}'""", 0.8);
@@ -653,43 +651,6 @@ class Ui_MainWindow(object):
                 background-color: rgba(128, 128, 128, 0.6);
                 color: #cccccc;
             }
-        """)
-        # Convert the color components to integers and make them darker
-        bg_color_darker = ",".join(str(max(0, min(255, int(x) - 30))) for x in bg_color.split(","))
-        self.checkBox.setStyleSheet(f"""
-            QCheckBox {{
-                background-color: rgba({bg_color}, 0.5);
-                color: #ffffff;
-                border-radius: 5px;
-                font-size: 14px;
-                font-weight: bold;
-            }}
-            QCheckBox::indicator {{
-                width: 20px;
-                height: 20px;
-            }}
-            QCheckBox::indicator:unchecked {{
-                border-radius: 5px;
-                border: 2px solid rgba(255, 255, 255, 0.5);
-                background-color: rgba({bg_color}, 0.5);
-            }}
-            QCheckBox::indicator:checked {{
-                border-radius: 5px;
-                border: 2px solid rgba(255, 255, 255, 1);
-                background-color: rgba(255, 255, 255, 1);
-            }}
-            QCheckBox::indicator:unchecked:hover {{
-                border-radius: 5px;
-                border: 2px solid rgb(255, 255, 255);
-            }}
-            QCheckBox::indicator:checked:hover {{
-                border-radius: 5px;
-                border: 2px solid rgba(255, 255, 255, 1);
-                background-color: rgba(255, 255, 255, 0.5);
-            }}
-            QCheckBox:disabled {{
-                color: #cccccc;
-            }}
         """)
         self.comboBox.setStyleSheet("""
             QComboBox {
@@ -704,19 +665,24 @@ class Ui_MainWindow(object):
                 background-color: rgba(128, 128, 128, 0.6);
                 color: #cccccc;
             }
+            QComboBox QAbstractItemView {
+                background-color: rgba("""f'{bg_color}'""", 0.5); 
+                color: #ffffff; 
+                border-radius: 5px;
+            }
         """)
+        self.comboBox.setMaxVisibleItems(10)
         tooltip_stylesheet = "QToolTip { color: #ffffff; background-color: #333333; border: 1px solid white; }"
         QApplication.instance().setStyleSheet(tooltip_stylesheet)
 
         # Connect the buttons to the functions
-        self.pushButton.clicked.connect(self.install_normal_versions)
-        self.pushButton_2.clicked.connect(self.install_fabric_versions)
-        self.pushButton_3.clicked.connect(self.install_forge_versions)
-        self.pushButton_4.clicked.connect(self.settings_window)
-        self.pushButton_5.clicked.connect(self.run_minecraft)
-        self.pushButton_6.clicked.connect(self.open_mod_manager)
-        self.pushButton_8.clicked.connect(self.shortcuts_window)
-        self.checkBox.clicked.connect(self.toggle_snapshots)
+        self.btn_minecraft.clicked.connect(self.install_normal_versions)
+        self.btn_fabric.clicked.connect(self.install_fabric_versions)
+        self.btn_forge.clicked.connect(self.install_forge_versions)
+        self.btn_settings.clicked.connect(self.settings_window)
+        self.btn_play.clicked.connect(self.run_minecraft)
+        self.btn_mod_manger.clicked.connect(self.open_mod_manager)
+        self.btn_shortcuts.clicked.connect(self.shortcuts_window)
 
         self.update_list_versions()
         global jvm_arguments
@@ -728,39 +694,39 @@ class Ui_MainWindow(object):
         global user_uuid
         if os.path.exists(variables.refresh_token_file):
             try:
-                profile = login()                        
+                profile = login(system_lang, icon)
             except Exception as e:
-                print(f"Error: {e}")
+                profile = None
+            if not variables.check_network():
                 profile = "No connection"
-            if profile and 'id' in profile and 'name' in profile:
+            if profile == "No connection":
+                self.lineEdit.setVisible(True)
+                self.label.setText(lang(system_lang,"label_username"))
+                
+                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
+                self.btn_account.setText(lang(system_lang,"no_internet"))
+                self.btn_account.setStyleSheet(self.bt_style)
+                self.btn_account.clicked.disconnect()
+                self.btn_account.setDisabled(True)
+            elif profile and 'id' in profile and 'name' in profile:
                 access_token = profile['access_token']
                 user_name = profile['name']
                 user_uuid = profile['id']
                 self.lineEdit.setVisible(False)
                 self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
-                self.label.setAlignment(Qt.AlignCenter)
-                self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
-                self.pushButton_7.setIcon(QIcon(variables.logout_icon))
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.logout_microsoft)
-            elif profile == "No connection":
-                self.lineEdit.setVisible(True)
-                self.label.setText(lang(system_lang,"label_username"))
-                self.label.setAlignment(Qt.AlignLeft)
-                self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
-                self.pushButton_7.setText(lang(system_lang,"no_internet"))
-                self.pushButton_7.setStyleSheet(self.bt_style)
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.setDisabled(True)
+                self.btn_account.setText(lang(system_lang,"logout_microsoft"))
+                self.btn_account.setIcon(QIcon(variables.logout_icon))
+                self.btn_account.clicked.disconnect()
+                self.btn_account.clicked.connect(self.logout_microsoft)
             else:
                 self.lineEdit.setVisible(True)
                 self.label.setText(lang(system_lang,"label_username"))
-                self.label.setAlignment(Qt.AlignLeft)
+                
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
-                self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.login_microsoft)
+                self.btn_account.setText(lang(system_lang,"login_microsoft"))
+                self.btn_account.clicked.disconnect()
+                self.btn_account.clicked.connect(self.login_microsoft)
         # Load the data from the user_data.json file
         if os.path.exists(f'{app_dir}/config/user_data.json'):
             with open(f'{app_dir}/config/user_data.json', 'r') as f:
@@ -780,14 +746,15 @@ class Ui_MainWindow(object):
                         index = self.comboBox.findText(last_version, QtCore.Qt.MatchFixedString)
                         if index >= 0:
                             self.comboBox.setCurrentIndex(index)
-                self.checkBox.setChecked(show_snapshots)
                 first_load = True
                 if discord_rpc == True and first_load == True:
                     connect_discord()  
                     first_load = False
                 if maximize == True:
-                    MainWindow.showMaximized()
-                    self.on_resize(MainWindow)                  
+                    #MainWindow.showMaximized()
+                    #self.on_resize(MainWindow)
+                    # Idk why but it's buggy when the window starts maximized so i will keep it like this for now
+                    pass
         else:
             if user_name == "" or user_name == None:
                 user_name = self.lineEdit.text()
@@ -833,39 +800,38 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", f'{lang(system_lang,"launcher_name")} — {variables.launcher_version}', None))
         self.label.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"label_username"), None))
-        self.checkBox.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"checkbox_snapshots"), None))
-        self.pushButton.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
-        self.pushButton_2.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
-        self.pushButton_3.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
-        self.pushButton_4.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
-        self.pushButton_5.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
-        self.pushButton_6.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
-        self.pushButton_7.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
-        self.pushButton_8.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
+        self.btn_minecraft.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
+        self.btn_fabric.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
+        self.btn_forge.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
+        self.btn_settings.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
+        self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
+        self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
+        self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
+        self.btn_shortcuts.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
 
         # Set the icons for the buttons
-        self.pushButton.setIcon(QIcon(variables.minecraft_icon))
-        self.pushButton.setIconSize(QSize(20, 20))
-        self.pushButton_2.setIcon(QIcon(variables.fabric_icon))
-        self.pushButton_2.setIconSize(QSize(20, 20))
-        self.pushButton_3.setIcon(QIcon(variables.forge_icon))
-        self.pushButton_3.setIconSize(QSize(30, 30))
-        self.pushButton_4.setIcon(QIcon(variables.settings_icon))
-        self.pushButton_4.setIconSize(QSize(20, 20))
-        self.pushButton_5.setIcon(QIcon(variables.play_icon))
-        self.pushButton_5.setIconSize(QSize(20, 20))
-        self.pushButton_6.setIcon(QIcon(variables.mod_icon))
-        self.pushButton_6.setIconSize(QSize(20, 20))
-        self.pushButton_7.setIcon(QIcon(variables.login_icon))
-        self.pushButton_7.setIconSize(QSize(20, 20))
-        self.pushButton_8.setIcon(QIcon(variables.shortcut_icon))
-        self.pushButton_8.setIconSize(QSize(20, 20))
+        self.btn_minecraft.setIcon(QIcon(variables.minecraft_icon))
+        self.btn_minecraft.setIconSize(QSize(20, 20))
+        self.btn_fabric.setIcon(QIcon(variables.fabric_icon))
+        self.btn_fabric.setIconSize(QSize(20, 20))
+        self.btn_forge.setIcon(QIcon(variables.forge_icon))
+        self.btn_forge.setIconSize(QSize(30, 30))
+        self.btn_settings.setIcon(QIcon(variables.settings_icon))
+        self.btn_settings.setIconSize(QSize(20, 20))
+        self.btn_play.setIcon(QIcon(variables.play_icon))
+        self.btn_play.setIconSize(QSize(20, 20))
+        self.btn_mod_manger.setIcon(QIcon(variables.mod_icon))
+        self.btn_mod_manger.setIconSize(QSize(20, 20))
+        self.btn_account.setIcon(QIcon(variables.login_icon))
+        self.btn_account.setIconSize(QSize(20, 20))
+        self.btn_shortcuts.setIcon(QIcon(variables.shortcut_icon))
+        self.btn_shortcuts.setIconSize(QSize(20, 20))
         
         # Create an action with an icon
         icon_action = QAction(QIcon(variables.steve_icon), "", self.lineEdit)
 
-        # Add the action to the line edit
-        self.lineEdit.addAction(icon_action, QLineEdit.LeadingPosition)
+        # Add the action to the line edit (currently disabled for better visibility)
+        # self.lineEdit.addAction(icon_action, QLineEdit.LeadingPosition)
         
     # retranslateUi
 
@@ -879,12 +845,11 @@ class Ui_MainWindow(object):
                 self.lineEdit.setText(profile['name'])
                 self.lineEdit.setVisible(False)
                 self.label.setText(f"{lang(system_lang,'logged_as')} {profile['name']}")
-                self.label.setAlignment(Qt.AlignCenter)
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
-                self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
-                self.pushButton_7.setIcon(QIcon(variables.logout_icon))
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.logout_microsoft)
+                self.btn_account.setText(lang(system_lang,"logout_microsoft"))
+                self.btn_account.setIcon(QIcon(variables.logout_icon))
+                self.btn_account.clicked.disconnect()
+                self.btn_account.clicked.connect(self.logout_microsoft)
                 with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
                     json.dump(profile['id'], f)
 
@@ -896,37 +861,41 @@ class Ui_MainWindow(object):
 
                 self.lineEdit.setVisible(True)
                 self.label.setText(lang(system_lang,"label_username"))
-                self.label.setAlignment(Qt.AlignLeft)
+                
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
                 self.lineEdit.setText("")
-                self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
-                self.pushButton_7.clicked.disconnect()
-                self.pushButton_7.clicked.connect(self.login_microsoft)
+                self.btn_account.setText(lang(system_lang,"login_microsoft"))
+                self.btn_account.clicked.disconnect()
+                self.btn_account.clicked.connect(self.login_microsoft)
                 with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
                     json.dump("", f)
                 access_token = ""
                 self.save_data()
         except Exception as e:
-            messagebox.showerror("Error", "Something went wrong, please try again later")
             write_log(e, "microsoft_auth")
 
     def logout_microsoft(self):
-        logout()
-        global access_token
-        access_token = ""
-        with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
-            json.dump("", f)
-        
-        self.lineEdit.setVisible(True)
-        self.label.setText(lang(system_lang,"label_username"))
-        self.label.setAlignment(Qt.AlignLeft)
-        self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
-        self.lineEdit.setText("")
-        self.pushButton_7.setText(lang(system_lang,"login_microsoft"))
-        self.pushButton_7.setIcon(QIcon(variables.login_icon))
-        self.pushButton_7.clicked.disconnect()
-        self.pushButton_7.clicked.connect(self.login_microsoft)
-        self.save_data()
+        if not messagebox.askyesno(lang(system_lang,"ask_logout_title"), lang(system_lang,"ask_logout_desc")):
+            return
+        try:
+            logout()
+            global access_token
+            access_token = ""
+            with open(f'{app_dir}/config/user_uuid.json', 'w') as f:
+                json.dump("", f)
+            
+            self.lineEdit.setVisible(True)
+            self.label.setText(lang(system_lang,"label_username"))
+            
+            self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
+            self.lineEdit.setText("")
+            self.btn_account.setText(lang(system_lang,"login_microsoft"))
+            self.btn_account.setIcon(QIcon(variables.login_icon))
+            self.btn_account.clicked.disconnect()
+            self.btn_account.clicked.connect(self.login_microsoft)
+            self.save_data()
+        except Exception as e:
+            write_log(e, "microsoft_logout")
 
     def on_resize(self, event):
         size = event.size()
@@ -965,14 +934,13 @@ class Ui_MainWindow(object):
             # Print the version to be installed
             print(lang(system_lang,"minecraft_installation").replace("1.0", version))
             # Disable the buttons
-            self.pushButton.setEnabled(False)
-            self.pushButton_2.setEnabled(False)
-            self.pushButton_3.setEnabled(False)
-            self.pushButton_5.setEnabled(False)
-            self.pushButton_7.setEnabled(False)
+            self.btn_minecraft.setEnabled(False)
+            self.btn_fabric.setEnabled(False)
+            self.btn_forge.setEnabled(False)
+            self.btn_play.setEnabled(False)
+            self.btn_account.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
-            self.checkBox.setEnabled(False)
 
             # Install the version
             try:
@@ -989,14 +957,13 @@ class Ui_MainWindow(object):
                 raise
             finally:
                 # Enable the buttons
-                self.pushButton.setEnabled(True)
-                self.pushButton_2.setEnabled(True)
-                self.pushButton_3.setEnabled(True)
-                self.pushButton_5.setEnabled(True)
-                self.pushButton_7.setEnabled(True)
+                self.btn_minecraft.setEnabled(True)
+                self.btn_fabric.setEnabled(True)
+                self.btn_forge.setEnabled(True)
+                self.btn_play.setEnabled(True)
+                self.btn_account.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
-                self.checkBox.setEnabled(True)
                 # Update the list of versions
                 self.update_list_versions()
                 # Set the selected version
@@ -1012,14 +979,13 @@ class Ui_MainWindow(object):
         if version:
             print(lang(system_lang,"forge_installation").replace("1.0", version).replace("Forge", "Fabric"))
             # Disable the buttons
-            self.pushButton.setEnabled(False)
-            self.pushButton_2.setEnabled(False)
-            self.pushButton_3.setEnabled(False)
-            self.pushButton_5.setEnabled(False)
-            self.pushButton_7.setEnabled(False)
+            self.btn_minecraft.setEnabled(False)
+            self.btn_fabric.setEnabled(False)
+            self.btn_forge.setEnabled(False)
+            self.btn_play.setEnabled(False)
+            self.btn_account.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
-            self.checkBox.setEnabled(False)
             try:
                 # Verifies that the version of Minecraft is supported by Fabric
                 if minecraft_launcher_lib.fabric.is_minecraft_version_supported(version):
@@ -1040,14 +1006,13 @@ class Ui_MainWindow(object):
                 messagebox.showerror("Error", f"Fabric could not be installed: {e}")
             finally:
                 # Enable the buttons
-                self.pushButton.setEnabled(True)
-                self.pushButton_2.setEnabled(True)
-                self.pushButton_3.setEnabled(True)
-                self.pushButton_5.setEnabled(True)
-                self.pushButton_7.setEnabled(True)
+                self.btn_minecraft.setEnabled(True)
+                self.btn_fabric.setEnabled(True)
+                self.btn_forge.setEnabled(True)
+                self.btn_play.setEnabled(True)
+                self.btn_account.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
-                self.checkBox.setEnabled(True)
                 # Update the list of versions
                 self.update_list_versions()
                 # Set the selected version
@@ -1063,14 +1028,13 @@ class Ui_MainWindow(object):
         if version:
             print(lang(system_lang,"forge_installation").replace("1.0", version))
             # Disable the buttons
-            self.pushButton.setEnabled(False)
-            self.pushButton_2.setEnabled(False)
-            self.pushButton_3.setEnabled(False)
-            self.pushButton_5.setEnabled(False)
-            self.pushButton_7.setEnabled(False)
+            self.btn_minecraft.setEnabled(False)
+            self.btn_fabric.setEnabled(False)
+            self.btn_forge.setEnabled(False)
+            self.btn_play.setEnabled(False)
+            self.btn_account.setEnabled(False)
             self.lineEdit.setEnabled(False)
             self.comboBox.setEnabled(False)
-            self.checkBox.setEnabled(False)
 
             # Install Forge
             try:
@@ -1092,14 +1056,13 @@ class Ui_MainWindow(object):
                 messagebox.showerror("Error", f"Forge could not be installed: {e}")
             finally:
                 # Enable the buttons
-                self.pushButton.setEnabled(True)
-                self.pushButton_2.setEnabled(True)
-                self.pushButton_3.setEnabled(True)
-                self.pushButton_5.setEnabled(True)
-                self.pushButton_7.setEnabled(True)
+                self.btn_minecraft.setEnabled(True)
+                self.btn_fabric.setEnabled(True)
+                self.btn_forge.setEnabled(True)
+                self.btn_play.setEnabled(True)
+                self.btn_account.setEnabled(True)
                 self.lineEdit.setEnabled(True)
                 self.comboBox.setEnabled(True)
-                self.checkBox.setEnabled(True)
                 # Update the list of versions
                 self.update_list_versions()
                 # Set the selected version
@@ -1128,10 +1091,7 @@ class Ui_MainWindow(object):
     # Function to toggle snapshots
     def toggle_snapshots(self):
         global show_snapshots
-        if self.checkBox.isChecked():
-            show_snapshots = True
-        else:
-            show_snapshots = False
+        show_snapshots = not show_snapshots
 
     # Function to configure the dropdown
     def configure_dropdown(self, vers, installed_versions_list):
@@ -1153,6 +1113,9 @@ class Ui_MainWindow(object):
         installed_versions = minecraft_launcher_lib.utils.get_installed_versions(minecraft_directory)
         installed_versions_list = [version['id'] for version in installed_versions]
 
+        # Invert the list to show the latest versions first
+        installed_versions_list = installed_versions_list[::-1]
+
         if len(installed_versions_list) != 0:
             vers = installed_versions_list[0]
         else:
@@ -1163,7 +1126,7 @@ class Ui_MainWindow(object):
     
     # Function to save the data
     def save_data(self):
-        global jvm_arguments, discord_rpc, access_token, ask_update
+        global jvm_arguments, discord_rpc, access_token, ask_update, show_snapshots, user_uuid
         if jvm_arguments != "":
             arg = jvm_arguments
         else:
@@ -1172,7 +1135,7 @@ class Ui_MainWindow(object):
         # Save the data to a file
         data = {
             'name': self.lineEdit.text(), # Save the user name
-            'toggle_snapshots': self.checkBox.isChecked(),  # save the state of the checkbox
+            'toggle_snapshots': show_snapshots,  # save the state of the checkbox
             'jvm_arguments': arg,  # Save the JVM arguments
             'last_version': self.comboBox.currentText(),  # Save the last version used
             'ask_update': ask_update, # Save the state of the checkbox
@@ -1250,15 +1213,14 @@ class Ui_MainWindow(object):
         self.save_data()
 
         # Disable the buttons
-        self.pushButton.setEnabled(False)
-        self.pushButton_2.setEnabled(False)
-        self.pushButton_3.setEnabled(False)
-        self.pushButton_5.setEnabled(False)
-        self.pushButton_7.setEnabled(False)
-        self.pushButton_6.setEnabled(False)
+        self.btn_minecraft.setEnabled(False)
+        self.btn_fabric.setEnabled(False)
+        self.btn_forge.setEnabled(False)
+        self.btn_play.setEnabled(False)
+        self.btn_account.setEnabled(False)
+        self.btn_mod_manger.setEnabled(False)
         self.lineEdit.setEnabled(False)
         self.comboBox.setEnabled(False)
-        self.checkBox.setEnabled(False)
 
         # Set version to the selected version
         version = self.comboBox.currentText()
@@ -1314,15 +1276,14 @@ class Ui_MainWindow(object):
         self.enable_buttons()
 
     def enable_buttons(self):
-        self.pushButton.setEnabled(True)
-        self.pushButton_2.setEnabled(True)
-        self.pushButton_3.setEnabled(True)
-        self.pushButton_5.setEnabled(True)
-        self.pushButton_7.setEnabled(True)
-        self.pushButton_6.setEnabled(True)
+        self.btn_minecraft.setEnabled(True)
+        self.btn_fabric.setEnabled(True)
+        self.btn_forge.setEnabled(True)
+        self.btn_play.setEnabled(True)
+        self.btn_account.setEnabled(True)
+        self.btn_mod_manger.setEnabled(True)
         self.lineEdit.setEnabled(True)
         self.comboBox.setEnabled(True)
-        self.checkBox.setEnabled(True)
 
     # Function to start the installation of the versions in a separate thread with worker
     def start_installation(self, install_function, version, loader=None):
@@ -1334,7 +1295,7 @@ class Ui_MainWindow(object):
 
     # Function to run the installation of the versions of Minecraft
     def install_normal_versions(self):
-        self.toggle_snapshots()
+        global show_snapshots
         self.save_data()
         if not versions:
             QMessageBox.critical(None, "Error", lang(system_lang,"no_internet"))
@@ -1387,9 +1348,12 @@ class Ui_MainWindow(object):
 
         # Create the dropdown
         versions_drop = QComboBox()
-        versions_drop.addItems(versions_list)
+        for i in versions_list:
+            versions_drop.addItem(QIcon(variables.minecraft_icon), i)
+        #versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px; font-size: 12px;")
+        versions_drop.setMaxVisibleItems(10)
         layout.addWidget(versions_drop)
 
         # Create the install button
@@ -1414,7 +1378,7 @@ class Ui_MainWindow(object):
 
     # Function to install the versions of fabric
     def install_fabric_versions(self):
-        self.toggle_snapshots()
+        global show_snapshots
         self.save_data()
         if not versions:
             QMessageBox.critical(None, "Error", lang(system_lang,"no_internet"))
@@ -1469,9 +1433,12 @@ class Ui_MainWindow(object):
 
         # Create the dropdown for the versions
         versions_drop = QComboBox()
-        versions_drop.addItems(versions_list)
+        for i in versions_list:
+            versions_drop.addItem(QIcon(variables.minecraft_icon), i)
+        #versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px; font-size: 12px;")
+        versions_drop.setMaxVisibleItems(10)
         layout.addWidget(versions_drop)
 
         # Create the label for the loader
@@ -1482,9 +1449,12 @@ class Ui_MainWindow(object):
 
         # Create the dropdown for the loader
         loader_drop = QComboBox()
-        loader_drop.addItems(fabric_loader)
+        #loader_drop.addItems(fabric_loader)
+        for i in fabric_loader:
+            loader_drop.addItem(QIcon(variables.fabric_icon), i)
         loader_drop.setCurrentText(fabric_loader[0])
         loader_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
+        loader_drop.setMaxVisibleItems(10)
         layout.addWidget(loader_drop)
 
         # Create the install button
@@ -1509,7 +1479,7 @@ class Ui_MainWindow(object):
 
     # Function to install the forge versions
     def install_forge_versions(self):
-        self.toggle_snapshots()
+        global show_snapshots
         self.save_data()
         if not forge_versions:
             QMessageBox.critical(None, "Error", lang(system_lang,"no_internet"))
@@ -1571,9 +1541,12 @@ class Ui_MainWindow(object):
 
         # Create the dropdown
         versions_drop = QComboBox()
-        versions_drop.addItems(versions_list)
+        for i in forge_versions:
+            versions_drop.addItem(QIcon(variables.forge_icon), i)
+        #versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
-        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px;")
+        versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px; font-size: 12px;")
+        versions_drop.setMaxVisibleItems(10)
         layout.addWidget(versions_drop)
 
         # Create the install button
@@ -1602,25 +1575,25 @@ class Ui_MainWindow(object):
         system_lang = new_lang
         if access_token != "":
             self.label.setText(f"{lang(system_lang,'logged_as')} {user_name}")
-            self.pushButton_7.setText(lang(system_lang,"logout_microsoft"))
+            self.btn_account.setText(lang(system_lang,"logout_microsoft"))
         else:
             self.label.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"label_username"), None))
-            self.pushButton_7.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
-        self.checkBox.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"checkbox_snapshots"), None))
-        self.pushButton.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
-        self.pushButton_2.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
-        self.pushButton_3.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
-        self.pushButton_4.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
-        self.pushButton_5.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
-        self.pushButton_6.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
-        self.pushButton_8.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
+            self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
+        self.btn_minecraft.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
+        self.btn_fabric.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
+        self.btn_forge.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
+        self.btn_settings.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
+        self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
+        self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
+        self.btn_shortcuts.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
         
 
     def settings_window(self):
+        global show_snapshots
         # Create the window
         window_settings = QDialog()
         window_settings.setWindowTitle(lang(system_lang, "settings"))
-        window_settings.setFixedSize(420, 430)
+        window_settings.setFixedSize(500, 450)
         window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         window_settings.setWindowIcon(QIcon(icon))
         window_settings.setStyleSheet("background-color: rgb(45, 55, 65); border-radius: 10px;")
@@ -1652,6 +1625,7 @@ class Ui_MainWindow(object):
         # Create a group box for JVM settings
         jvm_group = QGroupBox()
         jvm_group.setStyleSheet("background-color: rgba(0, 0, 0, 0.3); border-radius: 10px;")
+        jvm_group.setMaximumHeight(100)
         jvm_layout = QVBoxLayout()
 
         # Create the label for the JVM arguments
@@ -1661,9 +1635,15 @@ class Ui_MainWindow(object):
         label_jvm_arguments.setWordWrap(True)
         jvm_layout.addWidget(label_jvm_arguments)
 
+        # Create the tip label
+        label_tip = QLabel(lang(system_lang, "jvm_tip"))
+        label_tip.setStyleSheet("color: yellow; font-size: 12px; background-color: transparent;")
+        label_tip.setAlignment(Qt.AlignCenter)
+        label_tip.setWordWrap(True)
+        jvm_layout.addWidget(label_tip)
+
         # Create the entry for the JVM arguments
         entry_jvm_arguments = QLineEdit()
-        entry_jvm_arguments.setFixedWidth(400)
         entry_jvm_arguments.setPlaceholderText("JVM arguments (-Xms512M -Xmx8G ...)")
         entry_jvm_arguments.setStyleSheet("""
             color: white; 
@@ -1675,17 +1655,45 @@ class Ui_MainWindow(object):
             entry_jvm_arguments.setText(" ".join(jvm_arguments))
         jvm_layout.addWidget(entry_jvm_arguments)
 
-        # Create the tip label
-        label_tip = QLabel(lang(system_lang, "jvm_tip"))
-        label_tip.setStyleSheet("color: yellow; font-size: 11px; background-color: transparent;")
-        label_tip.setAlignment(Qt.AlignCenter)
-        label_tip.setWordWrap(True)
-        jvm_layout.addWidget(label_tip)
-
         # Add JVM settings layout to the group box
         jvm_group.setLayout(jvm_layout)
         layout.addWidget(jvm_group)
         
+        lang_combobox = QComboBox()
+        # Set lang_combobox to expand horizontally and have a fixed height
+        lang_combobox.setFixedHeight(30)
+        lang_combobox.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed))
+        available_langs = lang(system_lang, "available_languages")
+        for key, value in available_langs.items():
+            lang_combobox.addItem(value, key)
+        lang_combobox.setStyleSheet("""
+            QComboBox {
+                background-color: rgba("""f'{bg_color}'""", 0.5); 
+                color: #ffffff; 
+                border-radius: 5px;
+                font-size: 12px;
+            }
+            QComboBox:hover {
+                background-color: rgba("""f'{bg_color}'""", 1);
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba("""f'{bg_color}'""", 0.5); 
+                color: #ffffff; 
+                border-radius: 5px;
+            }
+        """)
+        lang_combobox.setCurrentText(available_langs[system_lang])
+        lang_combobox.setMaxVisibleItems(10)
+
+        # Language selection as horizontal layout
+        horizontal_layout = QHBoxLayout()
+        label_lang = QLabel(lang(system_lang, "language"))
+        label_lang.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
+        horizontal_layout.addWidget(label_lang)
+
+        horizontal_layout.addWidget(lang_combobox)
+        layout.addLayout(horizontal_layout)
+
         # Checkbox style
         checkbox_style = f"""
             QCheckBox {{
@@ -1722,6 +1730,13 @@ class Ui_MainWindow(object):
             }}
         """
 
+        # Show snapshot versions Checkbox
+        snapshots_checkbox = QCheckBox(lang(system_lang, "checkbox_snapshots"))
+        snapshots_checkbox.setStyleSheet(checkbox_style)
+        snapshots_checkbox.setChecked(show_snapshots)
+        snapshots_checkbox.clicked.connect(lambda: [self.toggle_snapshots(), self.save_data()])
+        layout.addWidget(snapshots_checkbox)
+
         # Discord Rich Presence Checkbox
         discord_checkbox = QCheckBox(lang(system_lang, "discord_rpc"))
         discord_checkbox.setStyleSheet(checkbox_style)
@@ -1735,33 +1750,6 @@ class Ui_MainWindow(object):
         ask_update_checkbox.setChecked(ask_update == "yes")
         ask_update_checkbox.clicked.connect(lambda: [ask_update_controller(), self.save_data()])
         layout.addWidget(ask_update_checkbox)
-
-        # Language selection as horizontal layout
-        horizontal_layout = QHBoxLayout()
-        label_lang = QLabel(lang(system_lang, "language"))
-        label_lang.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
-        horizontal_layout.addWidget(label_lang)
-
-        lang_combobox = QComboBox()
-        # Set lang_combobox to expand horizontally and have a fixed height
-        lang_combobox.setFixedHeight(30)
-        lang_combobox.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed))
-        available_langs = lang(system_lang, "available_languages")
-        for key, value in available_langs.items():
-            lang_combobox.addItem(value, key)
-        lang_combobox.setStyleSheet("""
-            QComboBox {
-                background-color: rgba("""f'{bg_color}'""", 0.5); 
-                color: #ffffff; 
-                border-radius: 5px;
-            }
-            QComboBox:hover {
-                background-color: rgba("""f'{bg_color}'""", 1);
-            }
-        """)
-        lang_combobox.setCurrentText(available_langs[system_lang])
-        horizontal_layout.addWidget(lang_combobox)
-        layout.addLayout(horizontal_layout)
         
         def set_lang():
             global system_lang
@@ -1790,6 +1778,7 @@ class Ui_MainWindow(object):
             window_settings.setWindowTitle(lang(new_lang, "settings"))
             label_jvm_arguments.setText(lang(new_lang, "label_jvm_args"))
             label_tip.setText(lang(new_lang, "jvm_tip"))
+            snapshots_checkbox.setText(lang(new_lang, "checkbox_snapshots"))
             discord_checkbox.setText(lang(new_lang, "discord_rpc"))
             ask_update_checkbox.setText(lang(new_lang, "ask_update"))
             label_lang.setText(lang(new_lang, "language"))
@@ -1829,25 +1818,25 @@ class Ui_MainWindow(object):
 
         # Save button
         bt_save = QPushButton(lang(system_lang, "save"))
-        bt_save.setFixedSize(400, 30)
+        bt_save.setFixedSize(480, 30)
         bt_save.setStyleSheet(self.bt_style)
         bt_save.clicked.connect(lambda: [set_jvm(), self.save_data(), window_settings.accept()])
         layout.addWidget(bt_save)
 
         bt_open_minecraft = QPushButton(lang(system_lang, "open_minecraft_directory"))
-        bt_open_minecraft.setFixedSize(400, 30)
+        bt_open_minecraft.setFixedSize(480, 30)
         bt_open_minecraft.setStyleSheet(self.bt_style)
         bt_open_minecraft.clicked.connect(open_minecraft_dir)
         layout.addWidget(bt_open_minecraft)
 
         bt_open_launcher = QPushButton(lang(system_lang, "open_launcher_directory"))
-        bt_open_launcher.setFixedSize(400, 30)
+        bt_open_launcher.setFixedSize(480, 30)
         bt_open_launcher.setStyleSheet(self.bt_style)
         bt_open_launcher.clicked.connect(open_launcher_dir)
         layout.addWidget(bt_open_launcher)
 
         bt_open_themes = QPushButton(lang(system_lang, "open_themes_website"))
-        bt_open_themes.setFixedSize(400, 30)
+        bt_open_themes.setFixedSize(480, 30)
         bt_open_themes.setStyleSheet(self.bt_style)
         bt_open_themes.clicked.connect(open_plugins_website)
         layout.addWidget(bt_open_themes)
@@ -2061,7 +2050,7 @@ class Ui_MainWindow(object):
 
         window_get_started.setLayout(layout)
 
-        # Mostrar la ventana
+        # Show the window
         window_get_started.exec_()
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -2081,7 +2070,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 # Start the application
 if __name__ == "__main__":
     app = QApplication(sys.argv) # Create the application
-    app.setStyle('Fusion') # Set the style to Fusion
     window = MainWindow() # Create the window
     config_path = os.path.join(app_dir, 'config/config.json').replace('\\', '/')
     if not os.path.exists(config_path):

@@ -36,3 +36,6 @@ read -p "Do you want to install the package? [y/n]: " INSTALL
 if [ "$INSTALL" == "y" ]; then
     sudo dpkg -i "OpenLauncher.deb"
 fi
+
+# Remove the binary from the destination directory
+rm "$DEST_DIR/OpenLauncher.bin"
