@@ -31,7 +31,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     # messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
 
 # Set the exception hook to the handle_exception function
-#sys.excepthook = handle_exception
+sys.excepthook = handle_exception
 
 parser = argparse.ArgumentParser(description='Run the desired Minecraft version whithout using a GUI')
 parser.add_argument('-mc_ver', type=str, help='Minecraft version to run')
