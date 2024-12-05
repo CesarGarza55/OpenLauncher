@@ -392,7 +392,7 @@ OpenLauncher uses the following libraries and tools:
 - pypresence
 - requests
 
-The project is based on the this [project](https://github.com/Irr22/Minecraft-launcher).
+The initial concept of this project was inspired by [this project](https://github.com/Irr22/Minecraft-launcher). However, no original code from that project is used in the current version of OpenLauncher.
 
 ## Disclaimer
 
