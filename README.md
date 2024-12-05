@@ -309,7 +309,7 @@ The new mod manager allows you to manage mods sorted by game version so you can 
 
 ![imagen](https://github.com/user-attachments/assets/4e059b37-1732-46bc-94db-3a98769891ef)
 
-## Login in with Microsoft Account
+## Sign in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
 
 1. Open the launcher.
