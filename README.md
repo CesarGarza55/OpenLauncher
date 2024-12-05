@@ -145,6 +145,9 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     if [ "$INSTALL" == "y" ]; then
         sudo dpkg -i "OpenLauncher.deb"
     fi
+    
+    # Remove the binary from the destination directory
+    rm "$DEST_DIR/OpenLauncher.bin"
     ```
     
     Next, you can execute the script to start the compilation process:
@@ -285,12 +288,11 @@ When you open the application, a welcome window greets you. You can disable this
 
 The main interface shows different sections:
 
-![image](https://github.com/user-attachments/assets/61cad53e-bed9-4357-be34-c395b2013fc8)
-
+![imagen](https://github.com/user-attachments/assets/6b214dfd-7d65-4eb0-b723-c20bdf7acdf9)
 
 To install a version, use the following interface where you select the version and click install:
 
-![install](https://github.com/user-attachments/assets/b6de93eb-d632-4f62-b2e7-618114729bde)
+![imagen](https://github.com/user-attachments/assets/a019e385-7b45-4780-b51c-2f2659ea9527)
 
 
 By default the following JVM arguments are used:
@@ -301,19 +303,21 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![settings](https://github.com/user-attachments/assets/3e7068e6-099d-4bf5-a65a-2e9c1dad0b0c)
+![imagen](https://github.com/user-attachments/assets/cf29f0f0-dbc4-40b5-8fcd-c47617b2dc98)
 
 The new mod manager allows you to manage mods sorted by game version so you can install all the mods you want and then disable the ones you don't want to use:
 
-![mods](https://github.com/user-attachments/assets/c0300b42-b579-46ff-bea9-dc9722371fac)
+![imagen](https://github.com/user-attachments/assets/4e059b37-1732-46bc-94db-3a98769891ef)
 
-## Logging in with Microsoft Account
+## Login in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
 
 1. Open the launcher.
 2. Click on "Login with Microsoft"
 3. Enter your Microsoft account with Minecraft purchased
 4. Once the authentication process is complete, you will see your account appear in the launcher
+
+![imagen](https://github.com/user-attachments/assets/c7d15cf5-a397-4004-aa2a-0380dd39b35b)
 
 ## Themes
 
@@ -348,7 +352,7 @@ Tested Minecraft Version:
 - Fabric: 0.16.7
 - Shaders: [MakeUp-UltraFast-9.0.c](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-![test](https://github.com/user-attachments/assets/6dff0fe9-51a3-4def-8579-0352def325b6)
+![imagen](https://github.com/user-attachments/assets/a54aed8f-fe49-499c-8450-f8c5d2e25f99)
 
 ## Bugs
 
