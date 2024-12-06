@@ -153,6 +153,7 @@ languages = {
         "microsoft_login_title": "Login with Microsoft",
         "ask_logout_title": "Logout",
         "ask_logout_desc": "Are you sure you want to log out? If you log out, you will need to log in again to play with your Microsoft account.",
+        "invalid_username": "Invalid username, must be between 3 and 16 characters and not contain spaces or special characters",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -276,9 +277,9 @@ languages = {
         "microsoft_login_title": "Iniciar sesión con Microsoft",
         "ask_logout_title": "Cerrar sesión",
         "ask_logout_desc": "¿Estás seguro de que deseas cerrar sesión? Si cierras sesión, tendrás que iniciar sesión de nuevo para jugar con tu cuenta de Microsoft.",
+        "invalid_username": "Nombre de usuario inválido, debe tener entre 3 y 16 caracteres y no contener espacios ni caracteres especiales",
     }
 }
-
 def lang(lang_code, key):
     return languages.get(lang_code, "es").get(key, key)
 

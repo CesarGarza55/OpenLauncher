@@ -468,8 +468,9 @@ class Ui_MainWindow(object):
         self.lineEdit.setMaximumSize(QSize(350, 16777215))
         self.lineEdit.setPlaceholderText(lang(system_lang,"user_placeholder"))
         self.lineEdit.setAlignment(Qt.AlignCenter)
-        # Deselect the line edit at the start
-        self.lineEdit.setFocusPolicy(Qt.NoFocus)
+
+        # Don't focus the line edit when the window is opened
+        self.lineEdit.setFocusPolicy(Qt.ClickFocus)
 
         self.verticalLayout_2.addWidget(self.lineEdit)
 
@@ -643,6 +644,7 @@ class Ui_MainWindow(object):
                 color: #ffffff;
                 border-radius: 5px;
                 border: none;
+                padding: 5px;
             }
             QLineEdit:hover {
                 background-color: rgba("""f'{bg_color}'""", 0.8);
@@ -1172,11 +1174,16 @@ class Ui_MainWindow(object):
             return 'version' in output.decode('UTF-8').lower()
         except Exception:
             return False
+        
+    # Function to verify the username
+    def verify_username(self, username):
+        if len(username) < 3 or len(username) > 16:
+            return False
+        if not re.match("^[a-zA-Z0-9_]*$", username):
+            return False
+        return True
 
     # Function to run Minecraft 
-    # Idk why this crashes the app on Linux but at least opens Minecraft
-    # The only thing is that the console output is not shown because the app crashes
-    # But the game runs fine (idk if in another distro it works fine but in Ubuntu with KDE it crashes)
     def run_minecraft(self):
         global jvm_arguments, access_token, user_uuid, user_name
         # Clear the console output
@@ -1200,6 +1207,11 @@ class Ui_MainWindow(object):
             mine_user = user_name
         if not mine_user:
             messagebox.showerror("Error", lang(system_lang,"no_username"))
+            return
+        
+        # Verify if the username is valid
+        if not self.verify_username(mine_user):
+            messagebox.showerror("Error", lang(system_lang,"invalid_username"))
             return
 
         if not jvm_arguments:
