@@ -6,7 +6,7 @@ import requests
 import minecraft_launcher_lib
 
 # Website URL
-website_url = "https://openlauncher.totalh.net"
+website_url = "https://openlauncher.codevbox.com"
 
 # Set the default JVM arguments
 # Separate the arguments with a comma ("arg1", "arg2", "arg3")
@@ -72,7 +72,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.5.6"
+version = "1.5.7"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -95,6 +95,7 @@ shortcut_icon = os.path.join(script_dir, 'img/shortcut.png').replace("\\", "/")
 logout_icon = os.path.join(script_dir, 'img/logout.png').replace("\\", "/")
 login_icon = os.path.join(script_dir, 'img/login.png').replace("\\", "/")
 steve_icon = os.path.join(script_dir, 'img/steve.png').replace("\\", "/")
+warning_icon = os.path.join(script_dir, 'img/warning.png').replace("\\", "/")
 
 # Set the variable theme
 bg_color = "17, 33, 115"

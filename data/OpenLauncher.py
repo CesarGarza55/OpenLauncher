@@ -931,10 +931,10 @@ class Ui_MainWindow(object):
         pass
 
     # Function to install Minecraft version in a separate thread
-    def install_minecraft(self, version, loader = None):
+    def install_minecraft(self, version, loader=None):
         if version:
             # Print the version to be installed
-            print(lang(system_lang,"minecraft_installation").replace("1.0", version))
+            print(lang(system_lang, "minecraft_installation").replace("1.0", version))
             # Disable the buttons
             self.btn_minecraft.setEnabled(False)
             self.btn_fabric.setEnabled(False)
@@ -952,10 +952,10 @@ class Ui_MainWindow(object):
                     "setMax": self.set_max
                 }
                 minecraft_launcher_lib.install.install_minecraft_version(version, minecraft_directory, callback=callback)
-                #print(f'Version {version} has been installed')
-                messagebox.showinfo("Minecraft", lang(system_lang,"minecraft_installed").replace("1.0", version))
+                messagebox.showinfo("Minecraft", lang(system_lang, "minecraft_installed").replace("1.0", version))
             except Exception as e:
                 messagebox.showerror("Error", f"Could not install version: {e}")
+                self.signals.error.emit(str(e))
                 raise
             finally:
                 # Enable the buttons
@@ -972,7 +972,7 @@ class Ui_MainWindow(object):
                 index = self.comboBox.findText(version, QtCore.Qt.MatchFixedString)
                 if index >= 0:
                     self.comboBox.setCurrentIndex(index)
-                
+                self.signals.finished.emit()
         else:
             messagebox.showerror("Error", "No version entered")
 
@@ -1006,6 +1006,7 @@ class Ui_MainWindow(object):
                     messagebox.showerror("Error", lang(system_lang,"forge_not_found").replace("Forge", "Fabric"))
             except Exception as e:
                 messagebox.showerror("Error", f"Fabric could not be installed: {e}")
+                self.signals.error.emit(str(e))
             finally:
                 # Enable the buttons
                 self.btn_minecraft.setEnabled(True)
@@ -1022,6 +1023,7 @@ class Ui_MainWindow(object):
                 index = self.comboBox.findText(codename, QtCore.Qt.MatchFixedString)
                 if index >= 0:
                     self.comboBox.setCurrentIndex(index)
+                self.signals.finished.emit()
         else:
             messagebox.showerror("Error", "No version entered")
             
@@ -1056,6 +1058,7 @@ class Ui_MainWindow(object):
                     messagebox.showerror("Error", lang(system_lang,"forge_not_found"))
             except Exception as e:
                 messagebox.showerror("Error", f"Forge could not be installed: {e}")
+                self.signals.error.emit(str(e))
             finally:
                 # Enable the buttons
                 self.btn_minecraft.setEnabled(True)
@@ -1087,6 +1090,7 @@ class Ui_MainWindow(object):
                     self.comboBox.setCurrentIndex(index2)
                 elif index3 >= 0:
                     self.comboBox.setCurrentIndex(index3)
+                self.signals.finished.emit()
         else:
             messagebox.showerror("Error", "No version entered")
 
@@ -1273,9 +1277,6 @@ class Ui_MainWindow(object):
     def on_installation_error(self, error_message):
         # Create the log file
         write_log(error_message, "installation_error")
-        
-        # Enable the buttons
-        self.enable_buttons()
 
     def on_minecraft_finished(self):
         self.enable_buttons()
@@ -1310,11 +1311,11 @@ class Ui_MainWindow(object):
         global show_snapshots
         self.save_data()
         if not versions:
-            QMessageBox.critical(None, "Error", lang(system_lang,"no_internet"))
+            QMessageBox.critical(None, "Error", lang(system_lang, "no_internet"))
             return
         # Create the window
         window_versions = QDialog()
-        window_versions.setWindowTitle(f"{lang(system_lang,'install')} Minecraft")
+        window_versions.setWindowTitle(f"{lang(system_lang, 'install')} Minecraft")
         window_versions.setFixedSize(300, 150)
         window_versions.setWindowFlags(window_versions.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         window_versions.setWindowIcon(QIcon(icon))
@@ -1322,8 +1323,8 @@ class Ui_MainWindow(object):
         # Place the window in the center of the screen
         window_width = window_versions.width()
         window_height = window_versions.height()
-        position_right = int(window_versions.screen().geometry().width()/2 - window_width/2)
-        position_down = int(window_versions.screen().geometry().height()/2 - window_height/2)
+        position_right = int(window_versions.screen().geometry().width() / 2 - window_width / 2)
+        position_down = int(window_versions.screen().geometry().height() / 2 - window_height / 2)
         window_versions.move(position_right, position_down)
 
         # Verify if the snapshots are shown
@@ -1352,7 +1353,7 @@ class Ui_MainWindow(object):
         bg_label_2.setGeometry(0, 0, window_width, window_height)
 
         # Label with the information
-        info_label = QLabel(lang(system_lang,"info_label_minecraft"))
+        info_label = QLabel(lang(system_lang, "info_label_minecraft"))
         info_label.setStyleSheet("background-color: transparent; color: white;")
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setWordWrap(True)
@@ -1362,14 +1363,13 @@ class Ui_MainWindow(object):
         versions_drop = QComboBox()
         for i in versions_list:
             versions_drop.addItem(QIcon(variables.minecraft_icon), i)
-        #versions_drop.addItems(versions_list)
         versions_drop.setCurrentText(vers)
         versions_drop.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.6); color: white; border-radius: 5px; min-height: 30px; font-size: 12px;")
         versions_drop.setMaxVisibleItems(10)
         layout.addWidget(versions_drop)
 
         # Create the install button
-        bt_install_versions = QPushButton(lang(system_lang,"install"))
+        bt_install_versions = QPushButton(lang(system_lang, "install"))
         bt_install_versions.setStyleSheet("""
             QPushButton {
                 background-color: rgba("""f'{bg_color}'""", 0.6);
@@ -1591,6 +1591,7 @@ class Ui_MainWindow(object):
         else:
             self.label.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"label_username"), None))
             self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
+        self.lineEdit.setPlaceholderText(lang(system_lang,"user_placeholder"))
         self.btn_minecraft.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_minecraft"), None))
         self.btn_fabric.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader"), None))
         self.btn_forge.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_install_loader").replace("Fabric", "Forge"), None))
@@ -1857,9 +1858,20 @@ class Ui_MainWindow(object):
         window_settings.setLayout(layout)
         window_settings.exec_()
     
-    # Function to open the mod manager (works better than i thought :D)
+    # Function to open the mod manager (currently disabled and replaced by opening the mods directory)
     def open_mod_manager(self):
-        show_mod_manager(bg_color, icon, self.comboBox.currentText(), bg_path, bg_blur, system_lang)
+        # Open mods directory
+        mods_dir = os.path.join(minecraft_directory, "mods")
+        if not os.path.exists(mods_dir):
+            os.makedirs(mods_dir, exist_ok=True)
+        if sys.platform == "win32":
+            subprocess.Popen(['explorer', mods_dir])
+        elif sys.platform == "linux":
+            try:
+                subprocess.Popen(['gio', 'open',  mods_dir])
+            except Exception as e:
+                subprocess.Popen(['xdg-open',  mods_dir])
+        #show_mod_manager(bg_color, icon, self.comboBox.currentText(), bg_path, bg_blur, system_lang)
 
     def shortcuts_window(self):
         global access_token, jvm_arguments

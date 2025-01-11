@@ -1,45 +1,55 @@
-# OpenLauncher
+<p align="center">
+  <img width="100px" src="data/img/creeper.ico" align="center" alt="OpenLauncher" />
+  <h2 align="center">OpenLauncher</h2>
+  <p align="center">An open-source Minecraft launcher for Windows and Linux.</p>
+</p>
 
-OpenLauncher is an open-source Minecraft launcher developed in Python using Qt, Tkinter and the minecraft_launcher_lib library.
+<p align="center">
+    <img alt="Python" src="https://img.shields.io/badge/Python-0078d4?style=flat&logo=python&logoColor=white" />
+    <img alt="Windows" src="https://img.shields.io/badge/Windows-0078d4?style=flat&logo=data:image/svg+xml;base64,PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KDTwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIFRyYW5zZm9ybWVkIGJ5OiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4KPHN2ZyB3aWR0aD0iNjRweCIgaGVpZ2h0PSI2NHB4IiB2aWV3Qm94PSIwIDAgMjAgMjAiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgZmlsbD0iIzAwMDAwMCI+Cg08ZyBpZD0iU1ZHUmVwb19iZ0NhcnJpZXIiIHN0cm9rZS13aWR0aD0iMCIvPgoNPGcgaWQ9IlNWR1JlcG9fdHJhY2VyQ2FycmllciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cg08ZyBpZD0iU1ZHUmVwb19pY29uQ2FycmllciI+IDx0aXRsZT53aW5kb3dzIFsjZmZmZmZmXTwvdGl0bGU+IDxkZXNjPkNyZWF0ZWQgd2l0aCBTa2V0Y2guPC9kZXNjPiA8ZGVmcz4gPC9kZWZzPiA8ZyBpZD0iUGFnZS0xIiBzdHJva2U9Im5vbmUiIHN0cm9rZS13aWR0aD0iMSIgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj4gPGcgaWQ9IkRyaWJiYmxlLUxpZ2h0LVByZXZpZXciIHRyYW5zZm9ybT0idHJhbnNsYXRlKC02MC4wMDAwMDAsIC03NDM5LjAwMDAwMCkiIGZpbGw9IiNmZmZmZmYiPiA8ZyBpZD0iaWNvbnMiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDU2LjAwMDAwMCwgMTYwLjAwMDAwMCkiPiA8cGF0aCBkPSJNMTMuMTQ1ODY0Nyw3Mjg5LjQzNDI2IEMxMy4xNTA4NzcyLDcyOTEuNDMzMTYgMTMuMTU2ODkyMiw3Mjk0LjgyOTI5IDEzLjE2MTkwNDgsNzI5Ny40Njg4NCBDMTYuNzc1OTM5OCw3Mjk3Ljk1NzU3IDIwLjM4OTk3NDksNzI5OC40NjEzIDIzLjk5Nzk5NSw3Mjk5IEMyMy45OTc5OTUsNzI5NS44NDg3MyAyNC4wMDIwMDUsNzI5Mi43MTE0NiAyMy45OTc5OTUsNzI4OS43MTMxMSBDMjAuMzgwOTUyNCw3Mjg5LjcxMzExIDE2Ljc2NDkxMjMsNzI4OS40MzQyNiAxMy4xNDU4NjQ3LDcyODkuNDM0MjYgTTQsNzI4OS40MzUyNiBMNCw3Mjk2LjIyMTUzIEM2LjcyNTgxNDU0LDcyOTYuNTg5MzMgOS40NTE2MjkwNyw3Mjk2Ljk0MTEzIDEyLjE3MjQzMTEsNzI5Ny4zNDI5MSBDMTIuMTc3NDQzNiw3Mjk0LjcxNzM2IDEyLjE3MDQyNjEsNzI5Mi4wOTA4IDEyLjE3MDQyNjEsNzI4OS40NjUyNCBDOS40NDY2MTY1NCw3Mjg5LjQ3MDI0IDYuNzIzODA5NTIsNzI4OS40MjYyNyA0LDcyODkuNDM1MjYgTTQsNzI4MS44NDM0NCBMNCw3Mjg4LjYxMDcxIEM2LjcyNTgxNDU0LDcyODguNjE3NzEgOS40NTE2MjkwNyw3Mjg4LjU3NjczIDEyLjE3NzQ0MzYsNzI4OC41Nzk3MyBDMTIuMTc1NDM4Niw3Mjg1Ljk2MDE3IDEyLjE3NTQzODYsNzI4My4zNDM2MSAxMi4xNzI0MzExLDcyODAuNzI0MDUgQzkuNDQ0NjExNTMsNzI4MS4wNjQ4NiA2LjcxNjc5MTk4LDcyODEuNDI1NjcgNCw3MjgxLjg0MzQ0IE0yNCw3Mjg4LjQ3MTc5IEMyMC4zODc5Njk5LDcyODguNDg1NzggMTYuNzc1OTM5OCw3Mjg4LjU0MDc1IDEzLjE2MTkwNDgsNzI4OC41NTE3NSBDMTMuMTU5ODk5Nyw3Mjg1Ljg4OTIxIDEzLjE1OTg5OTcsNzI4My4yMjk2NyAxMy4xNjE5MDQ4LDcyODAuNTY5MTQgQzE2Ljc2ODkyMjMsNzI4MC4wMTg0NCAyMC4zODM5NTk5LDcyNzkuNTAwNzIgMjMuOTk3OTk1LDcyNzkgQzI0LDcyODIuMTU4MjYgMjMuOTk3OTk1LDcyODUuMzEzNTMgMjQsNzI4OC40NzE3OSIgaWQ9IndpbmRvd3MtWyNmZmZmZmZdIj4gPC9wYXRoPiA8L2c+IDwvZz4gPC9nPiA8L2c+Cg08L3N2Zz4=" />
+    <img alt="Linux" src="https://img.shields.io/badge/Linux-0078d4?style=flat&logo=linux&logoColor=white" />
+    <img alt="GitHub Stars" src="https://img.shields.io/github/stars/CesarGarza55/OpenLauncher?style=flat&logo=github&labelColor=0078d4&color=0078d4" />
+</p>
+<br>
 
-(For the moment only designed for Windows and Linux)
+**Note**: Currently, OpenLauncher is designed only for Windows and Linux.
 
-## WARNING FOR WINDOWS USERS
+## ⚠️ Warning for Windows Users
 
-**Warning**: On Windows, there is a known issue where the launcher may be flagged as a false positive by antivirus software due to the absence of a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
+**Warning**: On Windows, the launcher may be flagged as a false positive by antivirus software due to the absence of a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
 
-If you encounter issues downloading the [installer](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe), please consider using the [portable](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher-Portable-Windows.zip) version of the launcher as an alternative.
+If you encounter issues downloading the [installer](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe), consider using the [portable](https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher-Portable-Windows.zip) version as an alternative.
 
-To verify its safety, I have scanned the launcher with VirusTotal, and it was not detected by any antivirus engine. You can view the scan results below.
+I have scanned the launcher with VirusTotal, and it was not detected by any antivirus engine. You can view the scan results below.
 
-![image](https://github.com/user-attachments/assets/5685f609-36d1-432f-b628-a25cb916312b)
+![VirusTotal Scan](https://github.com/user-attachments/assets/5685f609-36d1-432f-b628-a25cb916312b)
 
 The installed executable of the launcher has also been scanned with VirusTotal and shows no issues.
 
-![image](https://github.com/user-attachments/assets/7b7aa152-5f54-4457-9273-7c955cf85a4e)
+![VirusTotal Scan](https://github.com/user-attachments/assets/7b7aa152-5f54-4457-9273-7c955cf85a4e)
 
-## Features
+## 🚀 Features
 
-- **Microsoft Account Login**: Now supports logging in with an official Microsoft account.
-- **Discord Rich Presence**: Displays various fun messages while you play.
-- **Custom Interface**: Utilizes PyQt5 for a modern and customizable look.
-- **Minecraft Compatibility**: Manages Minecraft versions using the minecraft_launcher_lib library.
+- **Microsoft Account Login**: Supports logging in with an official Microsoft account.
+- **Discord Rich Presence**: Displays fun messages while you play.
+- **Customizable Interface**: Utilizes PyQt5 for a modern and customizable look.
+- **Minecraft Compatibility**: Manages Minecraft versions using the `minecraft_launcher_lib` library.
 - **Open Source**: Easily extendable and modifiable by the community.
 - **Multiplatform**: Available for Windows and Linux operating systems.
-- **Oficial Themes**: Download and install themes to personalize your launcher.
-- **Community Themes**: Create and share custom themes with other users in the [website](https://openlauncher.totalh.net/)
-- **Theme Creator**: Design your own themes using the OpenLauncher [theme creator tool](https://openlauncher.totalh.net/create)
+- **Official Themes**: Download and install themes to personalize your launcher.
+- **Community Themes**: Create and share custom themes with other users on the [website](https://openlauncher.codevbox.com/).
+- **Theme Creator**: Design your own themes using the [theme creator tool](https://openlauncher.codevbox.com/create).
 - **Multilanguage Support**: Supports multiple languages for a better user experience.
 
-## Requirements
+## 📋 Requirements
 
 - Python 3.10 or higher
 - Java
 - pip (Python package manager)
 
-## Installation
+## 🛠️ Installation
 
-### Windows:
+### Windows
 
 1. Clone the repository:
     ```bash
@@ -50,35 +60,34 @@ The installed executable of the launcher has also been scanned with VirusTotal a
 2. Create a virtual environment (optional but recommended):
     ```bash
     python -m venv venv
-    source `venv\Scripts\activate`
+    source venv/Scripts/activate
     ```
 
 3. Compile:
    
     1. Run the `compile-windows.bat` script to compile the project.
    
-    compile-windows.bat:
+    `compile-windows.bat`:
     ```bash
     @echo off
     py -m pip install -r data/requirements_windows.txt
     python compile.py build
     
     echo OpenLauncher compiled successfully!
-    echo You can create the installer with NSIS by running the compile.nsi file with NSIS.
+    echo You can create the installer with NSIS by running the compile .nsi file with NSIS.
     echo Press any key to exit...
     pause >nul
     ```
-    2. Make sure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
+    2. Ensure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
     3. Open NSIS and click on "Compile NSI scripts":
 
-
-       ![{789A5A1C-FFC6-4CCF-A7A8-F7D2442C5709}](https://github.com/user-attachments/assets/daba00d4-e5ee-46e6-9f41-14f60e8e3b7d)
+       ![NSIS Compile](https://github.com/user-attachments/assets/daba00d4-e5ee-46e6-9f41-14f60e8e3b7d)
 
     4. Click on "Load Script..." to load the `script/compile.nsi` script file.
 
        Alternatively, use the `compile-compress.nsi` script to reduce installer size by ~30 MB, though it will increase build time.
 
-       ![{ACE19409-B779-4FE9-B3CA-F2350765D323}](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
+       ![NSIS Load Script](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
     
     5. Once the compilation is successful, open the output file OpenLauncher.exe to begin the installation.
 
@@ -86,8 +95,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
 
     [https://www.java.com/es/download/](https://www.java.com/es/download/)
 
-
-### Linux:
+### Linux
 
 1. Clone the repository:
     ```bash
@@ -95,7 +103,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     cd OpenLauncher
     ```
     
-2. Install python3, pip and Tkinter
+2. Install Python3, pip, and Tkinter:
     ```bash
     sudo apt update
     sudo apt upgrade
@@ -105,7 +113,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     ```
     
 3. Compile:
-   1. Debian / Ubuntu:
+   1. For Debian / Ubuntu:
     ```bash
     #!/bin/bash
     set -e
@@ -150,15 +158,13 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     rm "$DEST_DIR/OpenLauncher.bin"
     ```
     
-    Next, you can execute the script to start the compilation process:
+    Next, execute the script to start the compilation process:
 
     ```bash
     ./compile-debian.sh
     ```
 
-
-
-   2. Generic Linux systems:
+   2. For Generic Linux systems:
     ```bash
     #!/bin/bash
     set -e
@@ -188,8 +194,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
         if [ $? -ne 0 ]; then
             echo -e "${RED}Failed to create virtual environment${NC}"
             exit 1
-        fi
-    else
+        fi else
         echo -e "${GREEN}Virtual environment already exists${NC}"
     fi
 
@@ -250,19 +255,19 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     deactivate
     ```
 
-    Next, you can execute the script to start the compilation process:
+    Next, execute the script to start the compilation process:
 
     ```bash
     ./compile-linux.sh
     ```
-    
+
 4. You need to install Java to be able to play, by default it should be possible with:
 
     ```bash
     sudo apt install default-jre
     ```
 
-5. Mark the file as an program:
+5. Mark the file as an executable:
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
@@ -273,14 +278,14 @@ Or run:
    ```
 
 
-## Download options
+## 📥 Download options
 
 - Windows Installer: .exe
 - Linux Installer (Debian/Ubuntu): .deb
 - Linux Generic (compiled): .bin
 
 
-## Usage
+## 🕹️ Usage
 
 When you open the application, a welcome window greets you. You can disable this feature using a checkbox.
 
@@ -309,7 +314,7 @@ The new mod manager allows you to manage mods sorted by game version so you can 
 
 ![imagen](https://github.com/user-attachments/assets/4e059b37-1732-46bc-94db-3a98769891ef)
 
-## Sign in with Microsoft Account
+## 🔑 Sign in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
 
 1. Open the launcher.
@@ -319,27 +324,27 @@ To log in with your official Microsoft account, follow these steps:
 
 ![imagen](https://github.com/user-attachments/assets/c7d15cf5-a397-4004-aa2a-0380dd39b35b)
 
-## Themes
+## 🎨 Themes
 
 OpenLauncher allows you to customize the appearance of the launcher with themes. You can choose from official and community themes, as well as create your own.
 
 ### Official themes
-Official themes are provided by me, and you can find them at [https://openlauncher.totalh.net/plugins](https://openlauncher.totalh.net/plugins).
+Official themes are provided by me, and you can find them at [https://openlauncher.codevbox.com/plugins](https://openlauncher.codevbox.com/plugins).
 
 ### Community Themes
 
-Users can create and share their own themes on the official OpenLauncher website. Visit [https://openlauncher.totalh.net/community](https://openlauncher.totalh.net/community) to explore and download community themes.
+Users can create and share their own themes on the official OpenLauncher website. Visit [https://openlauncher.codevbox.com/community](https://openlauncher.codevbox.com/community) to explore and download community themes.
 
 ### Theme Creator
 
-If you want to create a custom theme, use the theme creator tool available on [https://openlauncher.totalh.net/create](https://openlauncher.totalh.net/create).
+If you want to create a custom theme, use the theme creator tool available on [https://openlauncher.codevbox.com/create](https://openlauncher.codevbox.com/create).
 
 ### Guide
 
-For a detailed guide on how to install themes, visit [https://openlauncher.totalh.net/guide](https://openlauncher.totalh.net/guide).
+For a detailed guide on how to install themes, visit [https://openlauncher.codevbox.com/guide](https://openlauncher.codevbox.com/guide).
 
 
-## Testing
+## 🧪 Testing
 My PC Specs:
 - CPU: AMD Ryzen 5 3450U 4-Core 2.1GHz
 - GPU: Radeon Vega 8 Graphics
@@ -354,13 +359,13 @@ Tested Minecraft Version:
 
 ![imagen](https://github.com/user-attachments/assets/a54aed8f-fe49-499c-8450-f8c5d2e25f99)
 
-## Bugs
+## 🐞 Bugs
 
 There was previously a minor bug that caused the launcher to close when installing versions or running the game. This was due to how subprocesses are managed, and IN THEORY, this issue has been fixed as of beta-1.5.1. However, if the error persists, please report it in the issues section, and I will continue working to resolve it.
 
 Keeping the software bug-free is challenging since it’s designed to work with both Windows and Linux. With so many Linux distributions out there, it’s especially complex to manage compatibility across such a wide variety of systems.
 
-## Linux errors
+## 🐧 Linux errors
 
 In some distributions, errors may occur due to the wide variety of systems available. If the executable does not open or fails to display anything when you run it, this may be due to an incompatibility or missing dependencies. To help identify the error and provide a possible solution in the future, you can run the application directly from the terminal using './OpenLauncher.bin' or 'openlauncher' if you installed the .deb package.
 
@@ -370,7 +375,7 @@ Example of the error:
 
 ![imagen](https://github.com/user-attachments/assets/d5e56835-95a8-457a-a45c-cc6a11e56d03)
 
-## Contributing
+## 🤝 Contributing
 Contributions are welcome! Follow these steps to contribute:
 
 - Fork the repository.
@@ -379,10 +384,10 @@ Contributions are welcome! Follow these steps to contribute:
 - Push the changes to your repository (git push origin feature/new-feature).
 - Open a Pull Request on GitHub.
 
-## License
+## 📜 License
 This project is licensed under the GPL-2.0 License. For more details, see the [LICENSE](https://github.com/CesarGarza55/OpenLauncher/blob/main/LICENSE) file.
 
-## Credits
+## 🙏 Credits
 OpenLauncher uses the following libraries and tools:
 
 - cx_Freeze
@@ -394,7 +399,7 @@ OpenLauncher uses the following libraries and tools:
 
 The initial concept of this project was inspired by [this project](https://github.com/Irr22/Minecraft-launcher). However, no original code from that project is used in the current version of OpenLauncher.
 
-## Disclaimer
+## ⚠️ Disclaimer
 
 This project is in no way related to or associated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. All trademarks and intellectual property rights mentioned in this project are the exclusive property of their respective owners. No files belonging to Mojang AB or Microsoft are hosted on servers owned by us.
 
