@@ -350,12 +350,13 @@ My PC Specs:
 - Operating System: Debian 12 (bookworm) x86_64 
 
 Tested Minecraft Version:
+- Launcher version: Beta - 1.5.7
 - RAM Allocated: 2GB (Default JVM Arguments)
-- Minecraft Version: 1.21.1
-- Fabric: 0.16.7
-- Shaders: [MakeUp-UltraFast-9.0.c](https://modrinth.com/shader/makeup-ultra-fast-shaders)
+- Minecraft Version: 1.21.4
+- Fabric: 0.16.10
+- Shaders: [MakeUp-UltraFast-9.1b](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-![imagen](https://github.com/user-attachments/assets/a54aed8f-fe49-499c-8450-f8c5d2e25f99)
+![imagen](https://github.com/user-attachments/assets/cc7a5693-7cbe-41d2-abb2-2e8a74dec321)
 
 ## 🐞 Bugs
 
