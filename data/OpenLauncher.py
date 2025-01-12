@@ -22,6 +22,7 @@ access_token = ""
 ask_update = "yes"
 user_uuid = ""
 show_snapshots = False
+output = ""
 
 # Function to handle exceptions and show a messagebox with the error instead of crashing the application directly
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -31,7 +32,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     # messagebox.showerror("Error", lang(current_language,"error_occurred") + f"\n{exc_type}: {exc_value}")
 
 # Set the exception hook to the handle_exception function
-sys.excepthook = handle_exception
+#sys.excepthook = handle_exception
 
 parser = argparse.ArgumentParser(description='Run the desired Minecraft version whithout using a GUI')
 parser.add_argument('-mc_ver', type=str, help='Minecraft version to run')
@@ -386,13 +387,28 @@ class FunctionWorker(QRunnable):
     @pyqtSlot()
     def run(self):
         try:
+            # Redirect stdout to capture the output
+            original_stdout = sys.stdout
+            sys.stdout = self
+
             result = self.fn(*self.args, **self.kwargs)
             if result is not None:
                 self.signals.output.emit(str(result))
         except Exception as e:
             self.signals.error.emit(str(e))
         finally:
+            # Restore original stdout
+            sys.stdout = original_stdout
             self.signals.finished.emit()
+
+    def write(self, message):
+        # Emit each line separately to avoid extra newlines
+        for line in message.splitlines():
+            if line:
+                self.signals.output.emit(line)
+
+    def flush(self):
+        pass
 
 # Create a class to redirect the standard output to the QTextEdit widget
 class StdoutRedirector:
@@ -625,6 +641,13 @@ class Ui_MainWindow(object):
             QPushButton:disabled {
                 background-color: rgba(128, 128, 128, 0.6);
                 color: #cccccc;
+            }
+            QPushButton:focus {
+                outline: none;
+                border: none;
+            }
+            QPushButton {
+                border: none;
             }
         """
         self.btn_minecraft.setStyleSheet(self.bt_style)
@@ -920,7 +943,9 @@ class Ui_MainWindow(object):
 
     # Function to update the progress bar
     def set_status(self, status: str):
-        print(status)
+        global output
+        output = status
+        print(output)
 
     # Function to set the maximum value of the progress bar
     def set_max(self, new_max: int):
@@ -1300,6 +1325,9 @@ class Ui_MainWindow(object):
 
     # Function to start the installation of the versions in a separate thread with worker
     def start_installation(self, install_function, version, loader=None):
+        # Clear the console output
+        self.console_output.clear()
+        # Create the worker
         worker = FunctionWorker(install_function, version, loader)
         worker.signals.output.connect(self.handle_output)
         worker.signals.error.connect(self.on_installation_error)
@@ -2088,12 +2116,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         position_right = int(screen_geometry.width()/2 - window_width/2)
         position_down = int(screen_geometry.height()/2 - window_height/2)
         self.move(position_right, position_down)
+        # Ensure console_output is a QTextEdit
+        if not isinstance(self.console_output, QTextEdit):
+            raise TypeError("console_output must be a QTextEdit")
+
         # Redirect the standard output to the QTextEdit widget
         sys.stdout = StdoutRedirector(self.console_output)
 
 # Start the application
 if __name__ == "__main__":
     app = QApplication(sys.argv) # Create the application
+    try:
+        app.setStyle("Windows") # Set the application style
+    except:
+        pass
     window = MainWindow() # Create the window
     config_path = os.path.join(app_dir, 'config/config.json').replace('\\', '/')
     if not os.path.exists(config_path):

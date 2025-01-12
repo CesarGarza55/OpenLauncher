@@ -43,7 +43,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
 
 ## 📋 Requirements
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - Java
 - pip (Python package manager)
 
@@ -103,16 +103,7 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     cd OpenLauncher
     ```
     
-2. Install Python3, pip, and Tkinter:
-    ```bash
-    sudo apt update
-    sudo apt upgrade
-    sudo apt install python3
-    sudo apt install python3-pip
-    sudo apt install python3-tk
-    ```
-    
-3. Compile:
+2. Compile:
    1. For Debian / Ubuntu:
     ```bash
     #!/bin/bash
@@ -261,13 +252,13 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     ./compile-linux.sh
     ```
 
-4. You need to install Java to be able to play, by default it should be possible with:
+3. You need to install Java to be able to play, by default it should be possible with:
 
     ```bash
     sudo apt install default-jre
     ```
 
-5. Mark the file as an executable:
+4. Mark the file as an executable (For Generic Linux systems)
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
@@ -277,6 +268,17 @@ Or run:
    chmod +x OpenLauncher.bin
    ```
 
+5. Execute
+
+   1. For Generic Linux systems
+   ```bash
+   ./OpenLauncher.bin
+   ```
+
+   2. For Debian based systems
+   ```bash
+   openlauncher
+   ```
 
 ## 📥 Download options
 
@@ -289,15 +291,15 @@ Or run:
 
 When you open the application, a welcome window greets you. You can disable this feature using a checkbox.
 
-![imagen](https://github.com/user-attachments/assets/5b31cabc-4f53-4264-aa78-478509e68299)
+![imagen](https://github.com/user-attachments/assets/e7ba3a65-a446-4dae-b535-8ee740d75a46)
 
 The main interface shows different sections:
 
-![imagen](https://github.com/user-attachments/assets/6b214dfd-7d65-4eb0-b723-c20bdf7acdf9)
+![imagen](https://github.com/user-attachments/assets/927497ba-6885-4a53-a81e-685a0a0d804a)
 
 To install a version, use the following interface where you select the version and click install:
 
-![imagen](https://github.com/user-attachments/assets/a019e385-7b45-4780-b51c-2f2659ea9527)
+![imagen](https://github.com/user-attachments/assets/f1913ea9-c1e0-427e-8ede-aff783be42d4)
 
 
 By default the following JVM arguments are used:
@@ -308,11 +310,7 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![imagen](https://github.com/user-attachments/assets/cf29f0f0-dbc4-40b5-8fcd-c47617b2dc98)
-
-The new mod manager allows you to manage mods sorted by game version so you can install all the mods you want and then disable the ones you don't want to use:
-
-![imagen](https://github.com/user-attachments/assets/4e059b37-1732-46bc-94db-3a98769891ef)
+![imagen](https://github.com/user-attachments/assets/a8cee494-e248-4dc2-827f-52640e0f0291)
 
 ## 🔑 Sign in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:

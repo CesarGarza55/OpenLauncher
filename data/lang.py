@@ -7,7 +7,7 @@ if sys.platform == 'win32':
 elif sys.platform == 'linux':
     platform = ".bin"
 
-lang_codes = ["en", "es"]
+lang_codes = ["en", "es", "fr"]
 
 # Load the system language
 os.makedirs(f'{variables.app_directory}/config', exist_ok=True)
@@ -35,7 +35,8 @@ languages = {
         "language": "Select Language",
         "available_languages": {
             "en": "English",
-            "es": "Spanish"
+            "es": "Spanish",
+            "fr": "French",
         },
         "launcher_name": "OpenLauncher",
         "launcher_title": "OpenLauncher for Minecraft",
@@ -160,7 +161,8 @@ languages = {
         "language": "Seleccionar Idioma",
         "available_languages": {
             "en": "Inglés",
-            "es": "Español"
+            "es": "Español",
+            "fr": "Francés",
         },
         "launcher_name": "OpenLauncher",
         "launcher_title": "OpenLauncher para Minecraft",
@@ -280,10 +282,138 @@ languages = {
         "invalid_username": "Nombre de usuario inválido, debe tener entre 3 y 16 caracteres y no contener espacios ni caracteres especiales",
         "work_in_progress": "Trabajo en progreso",
         "work_in_progress_info": "Esta función aún no está disponible, pero estará disponible en futuras actualizaciones.",
+    },
+    "fr": {
+        "language": "Sélectionnez la langue",
+        "available_languages": {
+            "en": "Anglais",
+            "es": "Espagnol",
+            "fr": "Français",
+        },
+        "launcher_name": "OpenLauncher",
+        "launcher_title": "OpenLauncher pour Minecraft",
+        "label_username": "Bienvenue sur OpenLauncher\nEntrez votre nom d'utilisateur",
+        "user_placeholder": "Entrez votre nom d'utilisateur (Steve)",
+        "checkbox_snapshots": "Afficher les snapshots",
+        "btn_install_minecraft": "Installer Minecraft",
+        "btn_install_loader": "Installer Fabric",
+        "btn_play": "Jouer",
+        "btn_mod_manager": "Répertoire des Mods",
+        "btn_shorts": "Raccourcis",
+        "get_started": "Commencer",
+        "welcome": "Bienvenue sur OpenLauncher !",
+        "welcome_message": (
+            "OpenLauncher est un lanceur gratuit et open-source pour Minecraft qui vous permet d'installer et de jouer à la version que vous souhaitez, "
+            "créé avec Python et Qt pour l'interface graphique.<br>"
+            "Pour commencer, vous pouvez installer la version de Minecraft que vous souhaitez, installer Fabric ou Forge et jouer au jeu. "
+            "Vous pouvez également gérer vos mods avec le Mod Manager et activer Discord Rich Presence.<br><br>"
+            f"Vous pouvez installer des thèmes pour personnaliser le lanceur, vous pouvez les trouver dans la <a style='color: #00aaff;' href='{variables.website_url}/plugins'>section des thèmes</a> du site web OpenLauncher.<br><br>"
+            f"Visitez le <a style='color: #00aaff;' href='{variables.website_url}'>site web OpenLauncher</a> pour plus d'informations.<br><br>"
+            "OpenLauncher offre quelques fonctionnalités comme :"
+            "<ul>"
+            "<li>Installer des versions de Minecraft</li>"
+            "<li>Installer Fabric et Forge</li>"
+            "<li>Jouer à la version de Minecraft que vous souhaitez</li>"
+            "<li>Activer Discord Rich Presence</li>"
+            "<li>Personnaliser le lanceur avec des thèmes</li>"
+            "<li>Support multilingue</li>"
+            "</ul>"
+        ),
+        "dont_show_again": "Ne plus afficher ce message",
+        "close": "Fermer",
+        "open_themes_website": "Ouvrir le site web des thèmes",
+        "open_launcher_directory": "Ouvrir le répertoire de l'application",
+        "open_minecraft_directory": "Ouvrir le répertoire de Minecraft",
+        "save": "Enregistrer les modifications",
+        "discord_rpc": "Activer Discord Rich Presence",
+        "jvm_tip": "Laissez vide et enregistrez pour réinitialiser aux valeurs par défaut",
+        "label_jvm_args": "Arguments JVM (Paramètres avancés)",
+        "settings": "Paramètres",
+        "install": "Installer",
+        "info_label_minecraft": "Installer la version de Minecraft que vous souhaitez",
+        "info_label_loader": "Installer la dernière version disponible de Fabric pour la version de Minecraft souhaitée",
+        "loader_label": "Sélectionnez la version du loader",
+        "no_internet": "Pas de connexion internet",
+        "no_username": "Veuillez entrer votre nom d'utilisateur",
+        "java_not_installed": "Java n'est pas installé",
+        "java_not_installed_linux": "Veuillez installer Java pour exécuter Minecraft.\n\nPar exemple, sur Ubuntu, vous pouvez l'installer avec la commande 'sudo apt install default-jre'",
+        "java_not_installed_win": "Il est nécessaire d'installer Java pour exécuter Minecraft, veuillez l'installer et redémarrer le lanceur",
+        "ask_install_java": "Java n'est pas installé. Voulez-vous ouvrir la page de téléchargement ?",
+        "no_versions_installed": "Aucune version installée",
+        "forge_installed": "Forge 1.0 a été installé avec succès",
+        "forge_not_found": "Aucune version de Forge trouvée pour cette version de Minecraft",
+        "forge_installation": "Forge pour Minecraft 1.0 sera installé, cela peut prendre quelques minutes en fonction de votre connexion internet, veuillez patienter...",
+        "minecraft_installed": "Minecraft 1.0 a été installé avec succès",
+        "minecraft_installation": "Minecraft 1.0 sera installé, cela peut prendre quelques minutes en fonction de votre connexion internet, veuillez patienter...",
+        "login_microsoft": "Connexion avec Microsoft",
+        "relogin_microsoft": "Réauthentifier avec Microsoft",
+        "logout_microsoft": "Déconnexion",
+        "microsoft_account_not_found": "Minecraft Java Edition introuvable",
+        "microsoft_account_not_found_desc": "Il semble que votre compte n'a pas Minecraft Java Edition. Souhaitez-vous visiter le site web officiel de Minecraft pour l'acheter ?",
+        "token_expired": "Votre session a expiré, vous devez vous reconnecter, voulez-vous vous connecter maintenant ?",
+        "logged_as": "Bienvenue sur OpenLauncher\n\nConnecté en tant que",
+        "theme_ask": "Plusieurs thèmes ont été trouvés, ce qui peut causer des problèmes. Souhaitez-vous ouvrir le répertoire des plugins pour supprimer les thèmes supplémentaires ?",
+        "theme_error": "Le premier thème détecté sera tenté pour le chargement, veuillez supprimer les thèmes supplémentaires pour éviter les problèmes.",
+        "discord_error": "Impossible de se connecter à Discord Rich Presence, assurez-vous que Discord est en cours d'exécution",
+        "mod_manager_info": "Le Mod Manager renomme les mods avec la version du jeu. Ex : 'mod.jar' en 'VERSION_TEXT_mod.jar'. Pour installer, faites glisser le fichier ou cliquez sur 'Installer mod' (.jar et .olpkg). Les fichiers 'olpkg' sont des mods désactivés que vous pouvez activer.",
+        "mod_manager_disabled": "Le Mod Manager est désactivé car aucune version compatible n'est détectée.\nVeuillez sélectionner une version valide (Forge, Fabric, Quilt, NeoForge) dans les paramètres du lanceur.",
+        "active_mods": "Mods Actifs",
+        "inactive_mods": "Mods Inactifs",
+        "mod_already_exists": "Le mod existe déjà dans la liste des mods",
+        "file_exists": "Le fichier existe déjà. Voulez-vous l'écraser ?",
+        "invalid_file_format": "Format de fichier invalide seuls les fichiers .jar et .olpkg sont pris en charge",
+        "btn_activate": "Activer mod",
+        "btn_install": "Installer mod",
+        "btn_deactivate": "Désactiver mod",
+        "btn_open_mods_dir": "Ouvrir le répertoire des mods",
+        "error_no_version": "Installez d'abord une version pour gérer les mods",
+        "auth_window_title": "Authentification Microsoft",
+        "auth_window_label": "Veuillez patienter pendant que nous vous authentifions avec Microsoft...",
+        "auth_success": "Authentification réussie - Vous pouvez fermer cette fenêtre maintenant.",
+        "auth_failure": "Échec de l'authentification - Veuillez réessayer.",
+        "restart_app": "L'application doit redémarrer pour appliquer les modifications, voulez-vous la fermer maintenant ? Vous devrez l'ouvrir manuellement.",
+        "shortcuts": "Raccourcis",
+        "shortcuts_info": (
+            "Vous pouvez créer des raccourcis pour lancer le jeu avec différentes configurations. "
+            "Par exemple, vous pouvez créer un raccourci pour lancer le jeu avec une version spécifique de Minecraft. "
+            f"Utilisez le format suivant : 'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve', où '1.0' est la version de Minecraft et 'Steve' est le nom d'utilisateur. "
+            f"Pour plus d'informations, visitez la <a style='color: #00aaff;' href='{variables.website_url}/guide'>documentation OpenLauncher</a>.<br><br>"
+            "Exemple de raccourci pour lancer le jeu avec la version 1.0 et le nom d'utilisateur Steve :<br>"
+            f"<b>'OpenLauncher{platform} -mc_ver 1.0 -mc_name Steve'</b><br><br>"
+            f"Utilisez <b>'OpenLauncher{platform} -h'</b> pour voir les paramètres disponibles."
+        ),
+        "logout_success": "Vous avez bien été déconnecté",
+        "copy_parameters": "Copier les paramètres",
+        "parameters_copied": "Succès",
+        "parameters_copied_info": "Les paramètres ont été copiés dans le presse-papiers, vous pouvez les ajouter au raccourci du jeu",
+        "offline_mode": "Mode hors ligne",
+        "offline_mode_error": "Si vous souhaitez jouer en mode hors ligne, vous devez entrer un nom d'utilisateur",
+        "no_refresh_token": "Vous devez être connecté pour utiliser le mode en ligne, veuillez exécuter OpenLauncher sans arguments pour ouvrir l'interface graphique et vous connecter",
+        "no_version": "Aucune version n'a été sélectionnée, veuillez exécuter OpenLauncher -mc_ver <version> -mc_name <username> -online <true/false> pour exécuter Minecraft",
+        "mc_fail": "Une erreur s'est produite lors de l'essai d'exécution de Minecraft, veuillez exécuter OpenLauncher sans arguments pour ouvrir l'interface graphique",
+        "ask_update": "Vérifier les mises à jour",
+        "update_available": "Une mise à jour est disponible, voulez-vous la télécharger ?",
+        "downloading": "Téléchargement...",
+        "download_format": "Sélectionner le format de téléchargement",
+        "select_folder": "Veuillez sélectionner l'emplacement du téléchargement.",
+        "download_cancelled": "Téléchargement annulé.",
+        "download_success": "Le téléchargement a été effectué avec succès.",
+        "open_bin": "Vous pouvez ouvrir le fichier .bin en utilisant la commande './dest' ou l'ouvrir en utilisant le gestionnaire de fichiers.",
+        "xterm_not_found": "L'installation automatique du fichier .deb a échoué. Veuillez l'installer manuellement en utilisant la commande 'sudo dpkg -i dest'",
+        "update_complete": "La mise à jour a été installée avec succès.",
+        "error_occurred": "Une erreur s'est produite : ",
+        "microsoft_login_title": "Connexion avec Microsoft",
+        "ask_logout_title": "Déconnexion",
+        "ask_logout_desc": "Êtes-vous sûr de vouloir vous déconnecter ? Si vous vous déconnectez, vous devrez vous reconnecter pour jouer avec votre compte Microsoft.",
+        "invalid_username": "Nom d'utilisateur invalide, doit contenir entre 3 et 16 caractères et ne doit pas contenir d'espaces ou de caractères spéciaux",
+        "work_in_progress": "Travail en cours",
+        "work_in_progress_info": "Cette fonctionnalité n'est pas encore disponible, mais le sera dans les prochaines mises à jour.",
     }
 }
+
+# Function to get the language string
 def lang(lang_code, key):
-    return languages.get(lang_code, "es").get(key, key)
+    return languages.get(lang_code, "en").get(key, key)
 
 def change_language(lang_code="en"):
     global current_language
