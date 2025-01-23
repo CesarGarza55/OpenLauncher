@@ -28,6 +28,14 @@ The installed executable of the launcher has also been scanned with VirusTotal a
 
 ![VirusTotal Scan](https://github.com/user-attachments/assets/7b7aa152-5f54-4457-9273-7c955cf85a4e)
 
+
+## ⚠️ Warning for Linux Users
+
+**Warning**: On Linux, you may need to install all the dependencies first. You can use the script `dependencies.sh` to install them, or run `compile-linux.sh` and select "Install dependencies only" to install them.
+
+If you want to install the dependencies and download the compiled version from the releases, use [this file](https://github.com/CesarGarza55/OpenLauncher/blob/main/dependencies.sh). 
+If you are going to compile it yourself, the process is included in `compile-linux.sh`.
+
 ## 🚀 Features
 
 - **Microsoft Account Login**: Supports logging in with an official Microsoft account.
@@ -66,30 +74,24 @@ The installed executable of the launcher has also been scanned with VirusTotal a
 3. Compile:
    
     1. Run the `compile-windows.bat` script to compile the project.
-   
-    `compile-windows.bat`:
+
     ```bash
-    @echo off
-    py -m pip install -r data/requirements_windows.txt
-    python compile.py build
-    
-    echo OpenLauncher compiled successfully!
-    echo You can create the installer with NSIS by running the compile .nsi file with NSIS.
-    echo Press any key to exit...
-    pause >nul
+    compile-windows.bat
     ```
-    2. Ensure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
-    3. Open NSIS and click on "Compile NSI scripts":
 
-       ![NSIS Compile](https://github.com/user-attachments/assets/daba00d4-e5ee-46e6-9f41-14f60e8e3b7d)
+    2. Make installer (optional)
+        1. Ensure NSIS is installed on your system. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
+        2. Open NSIS and click on "Compile NSI scripts":
 
-    4. Click on "Load Script..." to load the `script/compile.nsi` script file.
+        ![NSIS Compile](https://github.com/user-attachments/assets/daba00d4-e5ee-46e6-9f41-14f60e8e3b7d)
 
-       Alternatively, use the `compile-compress.nsi` script to reduce installer size by ~30 MB, though it will increase build time.
+        3. Click on "Load Script..." to load the `script/compile.nsi` script file.
 
-       ![NSIS Load Script](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
-    
-    5. Once the compilation is successful, open the output file OpenLauncher.exe to begin the installation.
+        Alternatively, use the `compile-compress.nsi` script to reduce installer size by ~30 MB, though it will increase build time.
+
+        ![NSIS Load Script](https://github.com/user-attachments/assets/22c5b691-51f9-4fcf-a25c-563705402200)
+        
+        4. Once the compilation is successful, open the output file OpenLauncher.exe to begin the installation.
 
 4. You need to install Java to be able to play:
 
@@ -104,161 +106,14 @@ The installed executable of the launcher has also been scanned with VirusTotal a
     ```
     
 2. Compile:
-   1. For Debian / Ubuntu:
-    ```bash
-    #!/bin/bash
-    set -e
-
-    # Create the directory structure
-    DEST_DIR="compile-deb/usr/share/openlauncher"
-    mkdir -p "$DEST_DIR"
-
-    # Compile the source code if the binary does not exist
-    if [ ! -f "OpenLauncher.bin" ]; then
-        echo "OpenLauncher.bin is not compiled yet and will be compiled now"
-        chmod +x compile-linux.sh
-        ./compile-linux.sh
-        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
-    else
-        rm OpenLauncher.bin
-        echo "OpenLauncher.bin will be recompiled to ensure the latest version is packaged"
-        chmod +x compile-linux.sh
-        ./compile-linux.sh
-        echo "OpenLauncher.bin is compiled successfully and ready to be packaged"
-    fi
-
-    # Copy the necessary files
-    cp OpenLauncher.bin "$DEST_DIR"
-
-    # Ensure the binary is executable
-    chmod +x "$DEST_DIR/OpenLauncher.bin"
-
-    # Ensure the permissions are set correctly
-    chmod -R 0755 compile-deb
-
-    # Compile the deb package
-    dpkg-deb --build compile-deb "OpenLauncher.deb"
-
-    # Ask the user if they want to install the package
-    read -p "Do you want to install the package? [y/n]: " INSTALL
-    if [ "$INSTALL" == "y" ]; then
-        sudo dpkg -i "OpenLauncher.deb"
-    fi
     
-    # Remove the binary from the destination directory
-    rm "$DEST_DIR/OpenLauncher.bin"
-    ```
-    
-    Next, execute the script to start the compilation process:
-
-    ```bash
-    ./compile-debian.sh
-    ```
-
-   2. For Generic Linux systems:
-    ```bash
-    #!/bin/bash
-    set -e
-
-    # Colors
-    GREEN='\033[0;32m'
-    BLUE='\033[0;34m'
-    RED='\033[0;31m'
-    YELLOW='\033[0;33m'
-    NC='\033[0m' # No Color
-
-    # Create a virtual environment if it doesn't exist
-    if ! command -v python3 &> /dev/null; then
-        echo -e "${YELLOW}python3 is not installed and will be installed now${NC}"
-        sudo apt install -y python3
-    fi
-
-    if ! dpkg -l | grep -q python3-venv; then
-        echo -e "${YELLOW}python3-venv is not installed and will be installed now${NC}"
-        sudo apt install -y python3-venv
-    fi
-
-    VENV_DIR="venv"
-    if [ ! -d "$VENV_DIR" ]; then
-        echo -e "${GREEN}Creating virtual environment...${NC}"
-        python3 -m venv "$VENV_DIR"
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}Failed to create virtual environment${NC}"
-            exit 1
-        fi else
-        echo -e "${GREEN}Virtual environment already exists${NC}"
-    fi
-
-    # Check if the virtual environment was created successfully
-    if [ ! -f "$VENV_DIR/bin/activate" ]; then
-        echo -e "${RED}Virtual environment was not created... Exiting${NC}"
-        exit 1
-    fi
-
-    # Activate the virtual environment
-    echo -e "${GREEN}Activating virtual environment...${NC}"
-    source "$VENV_DIR/bin/activate"
-
-    # Check if pip is installed in the virtual environment
-    if ! command -v pip &> /dev/null; then
-        echo -e "${RED}pip is not installed in the virtual environment... Exiting${NC}"
-        exit 1
-    fi
-
-    # Install dependencies
-    echo -e "${GREEN}Installing dependencies...${NC}"
-    pip install -r data/requirements_linux.txt
-
-    # Install the necessary libraries if not already installed
-    LIBRARIES=("libxcb-xinerama0" "libxcb1" "libx11-xcb1" "libxrender1" "libfontconfig1" "libqt5widgets5" "libqt5gui5" "libqt5core5a")
-
-    for LIB in "${LIBRARIES[@]}"; do
-        if ! dpkg -l | grep -q "$LIB"; then
-            echo -e "${GREEN}Installing $LIB...${NC}"
-            sudo apt install -y "$LIB"
-        else
-            echo -e "${GREEN}$LIB is already installed${NC}"
-        fi
-    done
-
-    # Export the QT_QPA_PLATFORM variable
-    export QT_QPA_PLATFORM=xcb
-
-    # Compile the application
-    echo -e "${GREEN}Compiling the application...${NC}"
-    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
-        --add-data data/img:img/ \
-        --add-data data/updater.py:. \
-        --add-data data/variables.py:. \
-        --add-data data/mod_manager.py:. \
-        --add-data data/microsoft_auth.py:. \
-        --add-data data/lang.py:. \
-        --name OpenLauncher.bin \
-        data/OpenLauncher.py
-
-    # Remove the temporary files
-    echo -e "${GREEN}Cleaning up...${NC}"
-    rm OpenLauncher.bin.spec
-    rm -rf temp
-
-    # Deactivate the virtual environment
-    echo -e "${GREEN}Deactivating virtual environment...${NC}"
-    deactivate
-    ```
-
-    Next, execute the script to start the compilation process:
+    Execute the script to start the compilation process:
 
     ```bash
     ./compile-linux.sh
     ```
 
-3. You need to install Java to be able to play, by default it should be possible with:
-
-    ```bash
-    sudo apt install default-jre
-    ```
-
-4. Mark the file as an executable (For Generic Linux systems)
+3. Mark the file as an executable (For Generic Linux systems)
 
 ![Executable](https://github.com/CesarGarza55/OpenLauncher/assets/168610828/37588648-144d-4b0f-83c8-3dde1d683786)
 
@@ -268,7 +123,7 @@ Or run:
    chmod +x OpenLauncher.bin
    ```
 
-5. Execute
+4. Execute
 
    1. For Generic Linux systems
    ```bash

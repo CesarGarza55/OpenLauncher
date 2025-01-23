@@ -8,82 +8,134 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-# Create a virtual environment if it doesn't exist
-if ! command -v python3 &> /dev/null; then
-    echo -e "${YELLOW}python3 is not installed and will be installed now${NC}"
-    sudo apt install -y python3
-fi
+# Ask for the OS type (Debian or Fedora)
+echo "Select your operating system:"
+echo "1) Debian-based systems"
+echo "2) Fedora-based systems"
+read -p "Enter the number of your choice: " os_choice
 
-if ! dpkg -l | grep -q python3-venv; then
-    echo -e "${YELLOW}python3-venv is not installed and will be installed now${NC}"
-    sudo apt install -y python3-venv
+# Ask what to do (compile or install dependencies)
+echo "Select an option:"
+echo "1) Compile the application"
+echo "2) Only install dependencies"
+if [ "$os_choice" -eq 1 ]; then
+    echo "3) Create .deb package"
 fi
+read -p "Enter the number of your choice: " action_choice
 
-VENV_DIR="venv"
-if [ ! -d "$VENV_DIR" ]; then
+# Function to install dependencies for Debian-based systems
+install_deps_debian() {
+    echo -e "${YELLOW}Installing dependencies for Debian-based systems...${NC}"
+    sudo apt update
+
+    # Install required dependencies
+    sudo apt install -y python3 python3-venv python3-tk default-jre \
+        libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1 \
+        libqt5widgets5 libqt5gui5 libqt5core5a libxcb-cursor0
+
+    # Install python dependencies
+    python3 -m pip install -r data/requirements_linux.txt
+}
+
+# Function to install dependencies for Fedora-based systems
+install_deps_fedora() {
+    echo -e "${YELLOW}Installing dependencies for Fedora-based systems...${NC}"
+
+    # Install required dependencies
+    sudo dnf install -y python3 python3-virtualenv python3-tkinter java-11-openjdk \
+        libxcb libX11-xcb libXrender fontconfig qt5-qtbase-gui qt5-qtbase xcb-util-cursor
+
+    # Install python dependencies
+    python3 -m pip install -r data/requirements_linux.txt
+}
+
+# Create virtual environment and activate it
+create_venv() {
     echo -e "${GREEN}Creating virtual environment...${NC}"
-    python3 -m venv "$VENV_DIR"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to create virtual environment${NC}"
-        exit 1
-    fi
-else
-    echo -e "${GREEN}Virtual environment already exists${NC}"
-fi
-
-# Check if the virtual environment was created successfully
-if [ ! -f "$VENV_DIR/bin/activate" ]; then
-    echo -e "${RED}Virtual environment was not created... Exiting${NC}"
-    exit 1
-fi
-
-# Activate the virtual environment
-echo -e "${GREEN}Activating virtual environment...${NC}"
-source "$VENV_DIR/bin/activate"
-
-# Check if pip is installed in the virtual environment
-if ! command -v pip &> /dev/null; then
-    echo -e "${RED}pip is not installed in the virtual environment... Exiting${NC}"
-    exit 1
-fi
-
-# Install dependencies
-echo -e "${GREEN}Installing dependencies...${NC}"
-python3 -m pip install -r data/requirements_linux.txt
-
-# Install the necessary libraries if not already installed
-LIBRARIES=("libxcb-xinerama0" "libxcb1" "libx11-xcb1" "libxrender1" "libfontconfig1" "libqt5widgets5" "libqt5gui5" "libqt5core5a" "libxcb-cursor0")
-
-for LIB in "${LIBRARIES[@]}"; do
-    if ! dpkg -l | grep -q "$LIB"; then
-        echo -e "${GREEN}Installing $LIB...${NC}"
-        sudo apt install -y "$LIB"
-    else
-        echo -e "${GREEN}$LIB is already installed${NC}"
-    fi
-done
-
-# Export the QT_QPA_PLATFORM variable
-export QT_QPA_PLATFORM=xcb
+    python3 -m venv venv
+    source venv/bin/activate
+    echo -e "${GREEN}Virtual environment activated!${NC}"
+}
 
 # Compile the application
-echo -e "${GREEN}Compiling the application...${NC}"
-pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
-    --add-data data/img:img/ \
-    --add-data data/updater.py:. \
-    --add-data data/variables.py:. \
-    --add-data data/mod_manager.py:. \
-    --add-data data/microsoft_auth.py:. \
-    --add-data data/lang.py:. \
-    --add-data data/run.py:. \
-    --name OpenLauncher.bin \
-    data/OpenLauncher.py
+compile_application() {
+    echo -e "${GREEN}Compiling the application...${NC}"
+    pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
+        --add-data data/img:img/ \
+        --add-data data/updater.py:. \
+        --add-data data/variables.py:. \
+        --add-data data/mod_manager.py:. \
+        --add-data data/microsoft_auth.py:. \
+        --add-data data/lang.py:. \
+        --add-data data/run.py:. \
+        --name OpenLauncher.bin \
+        data/OpenLauncher.py
 
-# Remove the temporary files
-echo -e "${GREEN}Cleaning up...${NC}"
-rm OpenLauncher.bin.spec
-rm -rf temp
+    echo -e "${GREEN}Compilation finished! Cleaning up...${NC}"
+    rm OpenLauncher.bin.spec
+    rm -rf temp
+}
+
+# Create .deb package (only for Debian-based systems)
+create_deb_package() {
+    echo -e "${GREEN}Creating .deb package...${NC}"
+    mkdir -p compile-deb/usr/share/openlauncher
+    cp OpenLauncher.bin compile-deb/usr/share/openlauncher/
+    chmod +x compile-deb/usr/share/openlauncher/OpenLauncher.bin
+    chmod -R 0755 compile-deb
+
+    dpkg-deb --build compile-deb "OpenLauncher.deb"
+    echo -e "${GREEN}Deb package created!${NC}"
+
+    # Ask to install the package
+    read -p "Do you want to install the package? [y/n]: " install_choice
+    if [ "$install_choice" == "y" ]; then
+        sudo dpkg -i "OpenLauncher.deb"
+    fi
+
+    rm compile-deb/usr/share/openlauncher/OpenLauncher.bin
+}
+
+# Main script logic
+case $os_choice in
+    1)
+        echo -e "${GREEN}You selected Debian-based systems.${NC}"
+        if [ "$action_choice" -eq 1 ]; then
+            install_deps_debian
+            create_venv
+            compile_application
+            read -p "Do you want to create a .deb package? [y/n]: " deb_choice
+            if [ "$deb_choice" == "y" ]; then
+                create_deb_package
+            fi
+        elif [ "$action_choice" -eq 2 ]; then
+            install_deps_debian
+        elif [ "$action_choice" -eq 3 ]; then
+            create_deb_package
+        else
+            echo -e "${RED}Invalid choice. Exiting...${NC}"
+            exit 1
+        fi
+        ;;
+    2)
+        echo -e "${GREEN}You selected Fedora-based systems.${NC}"
+        if [ "$action_choice" -eq 1 ]; then
+            install_deps_fedora
+            create_venv
+            compile_application
+        elif [ "$action_choice" -eq 2 ]; then
+            install_deps_fedora
+        else
+            echo -e "${RED}Invalid choice. Exiting...${NC}"
+            exit 1
+        fi
+        ;;
+    *)
+        echo -e "${RED}Invalid operating system choice. Exiting...${NC}"
+        exit 1
+        ;;
+esac
 
 # Deactivate the virtual environment
-echo -e "${GREEN}Deactivating virtual environment...${NC}"
 deactivate
+echo -e "${GREEN}Virtual environment deactivated!${NC}"
