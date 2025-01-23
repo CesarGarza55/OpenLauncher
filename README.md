@@ -229,6 +229,12 @@ Example of the error:
 
 ![imagen](https://github.com/user-attachments/assets/d5e56835-95a8-457a-a45c-cc6a11e56d03)
 
+Also, you can get this error:
+
+![imagen](https://github.com/user-attachments/assets/c67d8fc3-c61b-4ec9-b084-c98d2ab1bc39)
+
+**It's recommended to compile the launcher on your own to avoid issues.**
+
 ## 🤝 Contributing
 Contributions are welcome! Follow these steps to contribute:
 
