@@ -229,13 +229,13 @@ Keeping the software bug-free is challenging since it’s designed to work with 
 
 In some distributions, errors may occur due to the wide variety of systems available. If the executable does not open or fails to display anything when you run it, this may be due to an incompatibility or missing dependencies. To help identify the error and provide a possible solution in the future, you can run the application directly from the terminal using './OpenLauncher.bin' or 'openlauncher' if you installed the .deb package.
 
-For example, in Debian 12, when you try to open the application, no error message may appear, but the application does not launch. This issue is caused by the version of Python being used. The easiest way to resolve this is by compiling the package yourself.
+For example, in Debian 12, when you try to open the application, no error message may appear, but the application does not launch. This issue is caused by the version of Python being used. The easiest way to resolve this is by compiling the package yourself. See [compilation on Linux](#linux).
 
 Example of the error:
 
 ![imagen](https://github.com/user-attachments/assets/d5e56835-95a8-457a-a45c-cc6a11e56d03)
 
-Also, you can get this error:
+Also, for example on fedora, you can get this error:
 
 ![imagen](https://github.com/user-attachments/assets/c67d8fc3-c61b-4ec9-b084-c98d2ab1bc39)
 
@@ -268,5 +268,11 @@ The initial concept of this project was inspired by [this project](https://githu
 ## ⚠️ Disclaimer
 
 This project is in no way related to or associated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. All trademarks and intellectual property rights mentioned in this project are the exclusive property of their respective owners. No files belonging to Mojang AB or Microsoft are hosted on servers owned by us.
+
+You can review the Terms and Conditions and the Privacy Policy regarding the use of the application at the following link:
+
+- [Terms and Conditions and Privacy Policy](https://openlauncher.codevbox.com/terms_app)
+
+By using OpenLauncher, you agree to comply with these terms and acknowledge that you have read and understood my privacy practices. I am committed to protecting your personal information and ensuring transparency in how I handle your data. For any questions or concerns, please contact me at [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Terms%20of%20Service).
 
 Thank you for using OpenLauncher!
