@@ -150,7 +150,7 @@ When you open the application, a welcome window greets you. You can disable this
 
 The main interface shows different sections:
 
-![imagen](https://github.com/user-attachments/assets/927497ba-6885-4a53-a81e-685a0a0d804a)
+![imagen](https://github.com/user-attachments/assets/f4f33292-6cae-4b15-835e-1f92992c2922)
 
 To install a version, use the following interface where you select the version and click install:
 
@@ -195,6 +195,12 @@ If you want to create a custom theme, use the theme creator tool available on [h
 ### Guide
 
 For a detailed guide on how to install themes, visit [https://openlauncher.codevbox.com/guide](https://openlauncher.codevbox.com/guide).
+
+## Mod Manager
+
+You can install, activate and deactivate mods with the new mod manager:
+
+![imagen](https://github.com/user-attachments/assets/d24ed07a-85da-4d91-a081-2f43597d4eae)
 
 
 ## 🧪 Testing
