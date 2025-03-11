@@ -72,7 +72,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.5.7"
+version = "1.5.8"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -82,20 +82,21 @@ user_uuid = ""
 script_dir = os.path.dirname(__file__)
 
 # Set the paths for the images
-bg_path = os.path.join(script_dir, 'img/bg.png').replace("\\", "/")
-icon = os.path.join(script_dir, 'img/icon.png').replace("\\", "/")
+bg_path = os.path.join(script_dir, 'img/bg.webp').replace("\\", "/")
+icon = os.path.join(script_dir, 'img/icon.webp').replace("\\", "/")
 bg_blur = 10
-minecraft_icon = os.path.join(script_dir, 'img/minecraft.png').replace("\\", "/")
-fabric_icon = os.path.join(script_dir, 'img/fabric.png').replace("\\", "/")
-forge_icon = os.path.join(script_dir, 'img/forge.png').replace("\\", "/")
-mod_icon = os.path.join(script_dir, 'img/command_block.png').replace("\\", "/")
-settings_icon = os.path.join(script_dir, 'img/settings.png').replace("\\", "/")
-play_icon = os.path.join(script_dir, 'img/play.png').replace("\\", "/")
-shortcut_icon = os.path.join(script_dir, 'img/shortcut.png').replace("\\", "/")
-logout_icon = os.path.join(script_dir, 'img/logout.png').replace("\\", "/")
-login_icon = os.path.join(script_dir, 'img/login.png').replace("\\", "/")
-steve_icon = os.path.join(script_dir, 'img/steve.png').replace("\\", "/")
-warning_icon = os.path.join(script_dir, 'img/warning.png').replace("\\", "/")
+minecraft_icon = os.path.join(script_dir, 'img/minecraft.webp').replace("\\", "/")
+fabric_icon = os.path.join(script_dir, 'img/fabric.webp').replace("\\", "/")
+forge_icon = os.path.join(script_dir, 'img/forge.webp').replace("\\", "/")
+mod_icon = os.path.join(script_dir, 'img/command_block.webp').replace("\\", "/")
+settings_icon = os.path.join(script_dir, 'img/settings.webp').replace("\\", "/")
+play_icon = os.path.join(script_dir, 'img/play.webp').replace("\\", "/")
+shortcut_icon = os.path.join(script_dir, 'img/shortcut.webp').replace("\\", "/")
+logout_icon = os.path.join(script_dir, 'img/logout.webp').replace("\\", "/")
+login_icon = os.path.join(script_dir, 'img/login.webp').replace("\\", "/")
+steve_icon = os.path.join(script_dir, 'img/steve.webp').replace("\\", "/")
+warning_icon = os.path.join(script_dir, 'img/warning.webp').replace("\\", "/")
+splash_screen = os.path.join(script_dir, 'img/splash.webp').replace("\\", "/")
 
 # Set the variable theme
 bg_color = "17, 33, 115"

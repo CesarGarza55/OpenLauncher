@@ -1,8 +1,8 @@
 import re, time, subprocess, random, atexit, minecraft_launcher_lib
 import json, os, sys, uuid, webbrowser, requests, argparse
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox, QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QPushButton, QGroupBox, QVBoxLayout, QLineEdit, QLabel, QComboBox, QHBoxLayout, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction, QApplication, QMessageBox, QDialog, QGraphicsBlurEffect, QSplashScreen
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QRunnable, pyqtSlot, pyqtSignal, QThreadPool, QObject, QThread
 from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from tkinter import messagebox
 from pypresence import Presence
@@ -12,7 +12,7 @@ from updater import update
 from mod_manager import show_mod_manager
 from microsoft_auth import login, login_qt
 from lang import lang, change_language, current_language
-from run import mc_run
+from mc_run import run_minecraft
 
 jvm_arguments = ""
 maximize = False
@@ -23,6 +23,7 @@ ask_update = "yes"
 user_uuid = ""
 show_snapshots = False
 output = ""
+profile = ""
 
 # Function to handle exceptions and show a messagebox with the error instead of crashing the application directly
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -58,7 +59,7 @@ if args.mc_ver or args.mc_name or args.jvm_args or args.online or args.mc_dir:
         except Exception as e:
             messagebox.showerror("Error", f"Could not authenticate: {e}")
             sys.exit()
-    mc = mc_run(args.mc_ver, args.mc_name, args.jvm_args, args.online, args.mc_dir)
+    mc = run_minecraft(args.mc_ver, args.mc_name, args.jvm_args, args.online, args.mc_dir)
     if mc == "No version":
         messagebox.showerror("Error", lang(current_language,"no_version"))
     if mc == "MC_FAIL":
@@ -68,8 +69,9 @@ if args.mc_ver or args.mc_name or args.jvm_args or args.online or args.mc_dir:
 # When qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in "" error appears on Linux use this
 # This is a workaround to use x11 instead of Wayland to avoid the error and make the application work properly
 # When the error appears, the application works, but i'ts better to avoid it to prevent future problems
-if sys.platform == "linux" and "wayland" in os.environ.get("XDG_SESSION_TYPE", "").lower():
-    os.environ["QT_QPA_PLATFORM"] = "x11"
+# It's only necessary to uncomment the code below when the error appears, in the most cases it's not necessary
+#if sys.platform == "linux" and "wayland" in os.environ.get("XDG_SESSION_TYPE", "").lower():
+#    os.environ["QT_QPA_PLATFORM"] = "x11"
 
 # Load the system language
 system_lang = current_language
@@ -171,8 +173,8 @@ app_dir = variables.app_directory
 plugin_dir = variables.plugins_directory
 
 # Function to open the plugins website
-def open_plugins_website():
-    webbrowser.open(os.path.join(variables.website_url, "plugins"))
+def open_website():
+    webbrowser.open(variables.website_url)
 
 # Function to open the launcher directory
 # For some reason, the function to open the directory on Linux suddenly stopped working
@@ -457,7 +459,7 @@ class Ui_MainWindow(object):
         self.discord_e = QLabel(self.centralwidget)
         self.discord_e.setObjectName(u"discord_e")
         self.discord_e.setText(discord_error)
-        self.discord_e.setStyleSheet("color: #ff0000; background-color: transparent; font-size: 12px;")
+        self.discord_e.setStyleSheet("color: #ffffff; background-color: transparent; font-size: 14px; font: bold;")
         self.discord_e.setAlignment(Qt.AlignCenter)
         self.top_group_layout.addWidget(self.discord_e)
 
@@ -597,18 +599,6 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer_5)
 
-        self.btn_shortcuts = QPushButton(self.centralwidget)
-        self.btn_shortcuts.setObjectName(u"btn_shortcuts")
-        self.btn_shortcuts.setMinimumSize(QSize(200, 30))
-        self.btn_shortcuts.setMaximumSize(QSize(500, 30))
-        self.btn_shortcuts.setSizePolicy(sizePolicy3)
-
-        self.horizontalLayout_4.addWidget(self.btn_shortcuts)
-
-        self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.horizontalLayout_4.addItem(self.horizontalSpacer_4)
-
         self.btn_play = QPushButton(self.centralwidget)
         self.btn_play.setObjectName(u"btn_play")
         self.btn_play.setMinimumSize(QSize(200, 30))
@@ -657,7 +647,6 @@ class Ui_MainWindow(object):
         self.btn_play.setStyleSheet(self.bt_style)
         self.btn_mod_manger.setStyleSheet(self.bt_style)
         self.btn_account.setStyleSheet(self.bt_style)
-        self.btn_shortcuts.setStyleSheet(self.bt_style)
         
         self.console_output.setStyleSheet("background-color: rgba("f'{bg_color}'", 0.5); color: #ffffff; border: none; border-radius: 5px; font-size: 12px;")
         self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
@@ -707,7 +696,6 @@ class Ui_MainWindow(object):
         self.btn_settings.clicked.connect(self.settings_window)
         self.btn_play.clicked.connect(self.run_minecraft)
         self.btn_mod_manger.clicked.connect(self.open_mod_manager)
-        self.btn_shortcuts.clicked.connect(self.shortcuts_window)
 
         self.update_list_versions()
         global jvm_arguments
@@ -727,7 +715,6 @@ class Ui_MainWindow(object):
             if profile == "No connection":
                 self.lineEdit.setVisible(True)
                 self.label.setText(lang(system_lang,"label_username"))
-                
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
                 self.btn_account.setText(lang(system_lang,"no_internet"))
                 self.btn_account.setStyleSheet(self.bt_style)
@@ -747,7 +734,6 @@ class Ui_MainWindow(object):
             else:
                 self.lineEdit.setVisible(True)
                 self.label.setText(lang(system_lang,"label_username"))
-                
                 self.label.setStyleSheet(f"background-color: rgba({bg_color}, 0.5); color: #ffffff; font-size: 14px; border-radius: 5px;")
                 self.btn_account.setText(lang(system_lang,"login_microsoft"))
                 self.btn_account.clicked.disconnect()
@@ -832,7 +818,6 @@ class Ui_MainWindow(object):
         self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
         self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
         self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"login_microsoft"), None))
-        self.btn_shortcuts.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
 
         # Set the icons for the buttons
         self.btn_minecraft.setIcon(QIcon(variables.minecraft_icon))
@@ -849,8 +834,6 @@ class Ui_MainWindow(object):
         self.btn_mod_manger.setIconSize(QSize(20, 20))
         self.btn_account.setIcon(QIcon(variables.login_icon))
         self.btn_account.setIconSize(QSize(20, 20))
-        self.btn_shortcuts.setIcon(QIcon(variables.shortcut_icon))
-        self.btn_shortcuts.setIconSize(QSize(20, 20))
         
         # Create an action with an icon
         icon_action = QAction(QIcon(variables.steve_icon), "", self.lineEdit)
@@ -1626,7 +1609,6 @@ class Ui_MainWindow(object):
         self.btn_settings.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"settings"), None))
         self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_play"), None))
         self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_mod_manager"), None))
-        self.btn_shortcuts.setText(QCoreApplication.translate("MainWindow", lang(system_lang,"btn_shorts"), None))
         
 
     def settings_window(self):
@@ -1826,7 +1808,7 @@ class Ui_MainWindow(object):
             bt_save.setText(lang(new_lang, "save"))
             bt_open_minecraft.setText(lang(new_lang, "open_minecraft_directory"))
             bt_open_launcher.setText(lang(new_lang, "open_launcher_directory"))
-            bt_open_themes.setText(lang(new_lang, "open_themes_website"))
+            bt_open_themes.setText(lang(new_lang, "open_website"))
             
             # Temporarily disconnect the signal to avoid recursion
             lang_combobox.blockSignals(True)
@@ -1876,10 +1858,10 @@ class Ui_MainWindow(object):
         bt_open_launcher.clicked.connect(open_launcher_dir)
         layout.addWidget(bt_open_launcher)
 
-        bt_open_themes = QPushButton(lang(system_lang, "open_themes_website"))
+        bt_open_themes = QPushButton(lang(system_lang, "open_website"))
         bt_open_themes.setFixedSize(480, 30)
         bt_open_themes.setStyleSheet(self.bt_style)
-        bt_open_themes.clicked.connect(open_plugins_website)
+        bt_open_themes.clicked.connect(open_website)
         layout.addWidget(bt_open_themes)
 
         # Configure the layout
@@ -1888,96 +1870,7 @@ class Ui_MainWindow(object):
     
     # Function to open the mod manager (currently disabled and replaced by opening the mods directory)
     def open_mod_manager(self):
-        # Open mods directory
-        mods_dir = os.path.join(minecraft_directory, "mods")
-        if not os.path.exists(mods_dir):
-            os.makedirs(mods_dir, exist_ok=True)
-        if sys.platform == "win32":
-            subprocess.Popen(['explorer', mods_dir])
-        elif sys.platform == "linux":
-            try:
-                subprocess.Popen(['gio', 'open',  mods_dir])
-            except Exception as e:
-                subprocess.Popen(['xdg-open',  mods_dir])
-        #show_mod_manager(bg_color, icon, self.comboBox.currentText(), bg_path, bg_blur, system_lang)
-
-    def shortcuts_window(self):
-        global access_token, jvm_arguments
-        # Create the window
-        window_shortcuts = QDialog()
-        window_shortcuts.setWindowTitle(lang(system_lang,"shortcuts"))
-        window_shortcuts.setFixedSize(400, 350)
-        window_shortcuts.setWindowFlags(window_shortcuts.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        window_shortcuts.setWindowIcon(QIcon(icon))
-        window_shortcuts.setStyleSheet("background-color: rgb(45, 55, 65);")
-
-        # Center the window on the screen
-        screen_geometry = QApplication.primaryScreen().availableGeometry()
-        window_width = window_shortcuts.width()
-        window_height = window_shortcuts.height()
-        position_right = int(screen_geometry.width()/2 - window_width/2)
-        position_down = int(screen_geometry.height()/2 - window_height/2)
-        window_shortcuts.move(position_right, position_down)
-
-        # Create the layout
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignHCenter)  # Center the elements
-        layout.setSpacing(15)  # Add spacing between the elements
-
-        # Create the background label
-        bg_label = QLabel(window_shortcuts)
-        bg_label.setPixmap(QPixmap(f'{bg_path}').scaled(window_shortcuts.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-        bg_label.setGeometry(0, 0, window_width, window_height)
-
-        bg_label_2 = QLabel(window_shortcuts)
-        bg_label_2.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
-        bg_label_2.setGeometry(0, 0, window_width, window_height)
-
-        # Apply blur effect to the background label
-        blur_effect = QGraphicsBlurEffect()
-        blur_effect.setBlurRadius(bg_blur)
-        bg_label.setGraphicsEffect(blur_effect)
-
-        # Create the label for the shortcuts
-        label_shortcuts = QLabel(lang(system_lang,"shortcuts_info"))
-        label_shortcuts.setStyleSheet("color: white; font-size: 14px; background-color: transparent;")
-        label_shortcuts.setAlignment(Qt.AlignJustify)
-        label_shortcuts.setFixedWidth(380)
-        label_shortcuts.setWordWrap(True)
-        label_shortcuts.setOpenExternalLinks(False)
-        label_shortcuts.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        layout.addWidget(label_shortcuts)
-
-        label_shortcuts.linkActivated.connect(lambda link: webbrowser.open(link))
-
-        def copy_parameters():
-            # Convert the list of JVM arguments to a string
-            jvm = " ".join(jvm_arguments)
-            # Copy the parameters to the clipboard
-            clipboard = QApplication.clipboard()
-            if access_token != "":
-                command = f"-mc_ver {self.comboBox.currentText()} -online true"
-            else:
-                command = f"-mc_name {self.lineEdit.text()} -mc_ver {self.comboBox.currentText()}"
-
-            if jvm_arguments != variables.defaultJVM:
-                command += f" -jvm_args \"{jvm}\""
-
-            clipboard.setText(command)
-            # Show a message box
-            messagebox.showinfo(lang(system_lang,"parameters_copied"), lang(system_lang,"parameters_copied_info"))
-
-            window_shortcuts.accept()
-
-        # Create the button to copy the current parameters
-        bt_copy = QPushButton(lang(system_lang,"copy_parameters"))
-        bt_copy.setFixedSize(380, 30)
-        bt_copy.setStyleSheet(self.bt_style)
-        bt_copy.clicked.connect(lambda: copy_parameters())
-        layout.addWidget(bt_copy)
-
-        window_shortcuts.setLayout(layout)
-        window_shortcuts.exec_()
+        show_mod_manager(bg_color, icon, bg_path, bg_blur, system_lang)
 
     def get_started(self):
         # Create the window
@@ -2051,22 +1944,22 @@ class Ui_MainWindow(object):
             }}
             QCheckBox::indicator:unchecked {{
                 border-radius: 5px;
-                border: 2px solid rgb(255, 255, 255);
-                background-color: transparent;
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                background-color: rgba({bg_color}, 0.5);
             }}
             QCheckBox::indicator:checked {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color}, 0.5);
-                background-color: rgba({bg_color}, 0.5);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 1);
             }}
             QCheckBox::indicator:unchecked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgb({bg_color});
+                border: 2px solid rgb(255, 255, 255);
             }}
             QCheckBox::indicator:checked:hover {{
                 border-radius: 5px;
-                border: 2px solid rgba({bg_color}, 0.8);
-                background-color: rgba({bg_color}, 0.8);
+                border: 2px solid rgba(255, 255, 255, 1);
+                background-color: rgba(255, 255, 255, 0.5);
             }}
             QCheckBox:disabled {{
                 color: #cccccc;
@@ -2113,8 +2006,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         window_width = self.width()
         window_height = self.height()
-        position_right = int(screen_geometry.width()/2 - window_width/2)
-        position_down = int(screen_geometry.height()/2 - window_height/2)
+        position_right = int(screen_geometry.width() / 2 - window_width / 2)
+        position_down = int(screen_geometry.height() / 2 - window_height / 2)
         self.move(position_right, position_down)
         # Ensure console_output is a QTextEdit
         if not isinstance(self.console_output, QTextEdit):
@@ -2122,15 +2015,60 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Redirect the standard output to the QTextEdit widget
         sys.stdout = StdoutRedirector(self.console_output)
+        self.update_error_discord()
 
-# Start the application
+class LoadingScreen(QSplashScreen):
+    def __init__(self):
+        super().__init__(QPixmap(variables.splash_screen))
+        self.setWindowFlag(Qt.FramelessWindowHint)
+
+        # Center the splash screen on the screen
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        self.move(
+            int(screen_geometry.width() / 2 - self.width() / 2),
+            int(screen_geometry.height() / 2 - self.height() / 2)
+        )
+
+class MainWindowLoader(QThread):
+    finished = pyqtSignal()
+
+    def run(self):
+        self.finished.emit() # Emit the finished signal
+
+def initialize_main_window(loading_screen):
+    # Create the main window
+    window = MainWindow()
+    loading_screen.loader_thread = MainWindowLoader() # Save the loader thread as an attribute
+    loading_screen.loader_thread.finished.connect(lambda: show_main_window(loading_screen, window)) # Connect the finished signal to show_main_window
+    loading_screen.loader_thread.start() # Start the loader thread
+    return window
+
+def show_main_window(loading_screen, window):
+    if sys.platform == "linux":
+        time.sleep(2)  # Add delay to ensure splash screen is visible on Linux
+    loading_screen.close() # Close the splash screen
+    window.show() # Show the main window
+
 if __name__ == "__main__":
-    app = QApplication(sys.argv) # Create the application
+    app = QApplication(sys.argv)
+
     try:
-        app.setStyle("Windows") # Set the application style
+        app.setStyle("Windows")
     except:
         pass
-    window = MainWindow() # Create the window
+
+    # Create the loading screen and show it
+    loading_screen = LoadingScreen()
+    loading_screen.show()
+
+    # Initialize the main window in a separate thread
+    window = initialize_main_window(loading_screen)
+
+    # Ensure the loading screen is visible while the main window is being initialized
+    while loading_screen.isVisible():
+        app.processEvents() # Process events to keep the application responsive
+
+    # Load configuration and show the main window
     config_path = os.path.join(app_dir, 'config/config.json').replace('\\', '/')
     if not os.path.exists(config_path):
         os.makedirs(os.path.dirname(config_path), exist_ok=True)

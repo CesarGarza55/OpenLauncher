@@ -18,7 +18,7 @@ additional_files = [
     ("data/mod_manager.py", "lib/mod_manager.py"),
     ("data/microsoft_auth.py", "lib/microsoft_auth.py"),
     ("data/lang.py", "lib/lang.py"),
-    ("data/run.py", "lib/run.py")
+    ("data/mc_run.py", "lib/mc_run.py")
 ] + include_files("data/img", "lib/img/")
 
 executables = [

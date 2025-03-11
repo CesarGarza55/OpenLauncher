@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
-
+# Clear the terminal
+clear
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -14,7 +15,16 @@ echo "1) Debian-based systems"
 echo "2) Fedora-based systems"
 read -p "Enter the number of your choice: " os_choice
 
+# Clear the terminal
+clear
+
 # Ask what to do (compile or install dependencies)
+if [ "$os_choice" -eq 1 ]; then
+    echo -e "${BLUE}You selected Debian-based systems.${NC}"
+elif [ "$os_choice" -eq 2 ]; then
+    echo -e "${BLUE}You selected Fedora-based systems.${NC}"
+fi
+
 echo "Select an option:"
 echo "1) Compile the application"
 echo "2) Only install dependencies"
@@ -22,6 +32,17 @@ if [ "$os_choice" -eq 1 ]; then
     echo "3) Create .deb package"
 fi
 read -p "Enter the number of your choice: " action_choice
+
+# Clear the terminal
+clear
+
+if [ "$action_choice" -eq 1 ]; then
+    echo -e "${BLUE}You selected to compile the application.${NC}"
+elif [ "$action_choice" -eq 2 ]; then
+    echo -e "${BLUE}You selected to install dependencies.${NC}"
+elif [ "$action_choice" -eq 3 ]; then
+    echo -e "${BLUE}You selected to create a .deb package.${NC}"
+fi
 
 # Function to install dependencies for Debian-based systems
 install_deps_debian() {
@@ -67,7 +88,7 @@ compile_application() {
         --add-data data/mod_manager.py:. \
         --add-data data/microsoft_auth.py:. \
         --add-data data/lang.py:. \
-        --add-data data/run.py:. \
+        --add-data data/mc_run.py:. \
         --name OpenLauncher.bin \
         data/OpenLauncher.py
 
@@ -99,7 +120,6 @@ create_deb_package() {
 # Main script logic
 case $os_choice in
     1)
-        echo -e "${GREEN}You selected Debian-based systems.${NC}"
         if [ "$action_choice" -eq 1 ]; then
             install_deps_debian
             create_venv
@@ -111,14 +131,18 @@ case $os_choice in
         elif [ "$action_choice" -eq 2 ]; then
             install_deps_debian
         elif [ "$action_choice" -eq 3 ]; then
-            create_deb_package
+            if [ "$os_choice" -eq 1 ]; then
+                install_deps_debian
+            else
+                echo -e "${RED}Invalid choice. Exiting...${NC}"
+                exit 1
+            fi
         else
             echo -e "${RED}Invalid choice. Exiting...${NC}"
             exit 1
         fi
         ;;
     2)
-        echo -e "${GREEN}You selected Fedora-based systems.${NC}"
         if [ "$action_choice" -eq 1 ]; then
             install_deps_fedora
             create_venv
