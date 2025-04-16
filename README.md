@@ -182,11 +182,7 @@ To log in with your official Microsoft account, follow these steps:
 OpenLauncher allows you to customize the appearance of the launcher with themes. You can choose from official and community themes, as well as create your own.
 
 ### Official themes
-Official themes are provided by me, and you can find them at [https://openlauncher.codevbox.com/plugins](https://openlauncher.codevbox.com/plugins).
-
-### Community Themes
-
-Users can create and share their own themes on the official OpenLauncher website. Visit [https://openlauncher.codevbox.com/community](https://openlauncher.codevbox.com/community) to explore and download community themes.
+Official themes are provided by me, and you can find them at [https://openlauncher.codevbox.com/themes](https://openlauncher.codevbox.com/themes).
 
 ### Theme Creator
 
@@ -194,7 +190,7 @@ If you want to create a custom theme, use the theme creator tool available on [h
 
 ### Guide
 
-For a detailed guide on how to install themes, visit [https://openlauncher.codevbox.com/guide](https://openlauncher.codevbox.com/guide).
+For a detailed guide on how to install themes, visit [https://openlauncher.codevbox.com/docs](https://openlauncher.codevbox.com/docs).
 
 ## Mod Manager
 
