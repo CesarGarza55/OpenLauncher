@@ -45,7 +45,6 @@ If you are going to compile it yourself, the process is included in `compile-lin
 - **Open Source**: Easily extendable and modifiable by the community.
 - **Multiplatform**: Available for Windows and Linux operating systems.
 - **Official Themes**: Download and install themes to personalize your launcher.
-- **Community Themes**: Create and share custom themes with other users on the [website](https://openlauncher.codevbox.com/).
 - **Theme Creator**: Design your own themes using the [theme creator tool](https://openlauncher.codevbox.com/create).
 - **Multilanguage Support**: Supports multiple languages for a better user experience.
 
