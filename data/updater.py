@@ -1,7 +1,6 @@
-import json, os, sys, requests, pathlib, minecraft_launcher_lib, shutil
+import os, sys, requests, shutil
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
-from pathlib import Path
 from lang import lang, current_language
 from variables import check_network
 import variables

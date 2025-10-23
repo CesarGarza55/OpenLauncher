@@ -12,7 +12,6 @@ import json
 import argparse
 import minecraft_launcher_lib
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
 from tkinter import messagebox
 
 import variables

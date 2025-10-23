@@ -1,9 +1,8 @@
-import os, subprocess, sys, shutil
+import os, shutil
 from tkinter import messagebox
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect, QAbstractItemView, QWidget, QListWidget, QSplitter, QFrame
+from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect, QAbstractItemView, QWidget, QListWidget, QSplitter
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QBrush, QColor, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap
 import variables
 from lang import lang
 from material_design import MaterialCard, AnimatedButton, MaterialColors

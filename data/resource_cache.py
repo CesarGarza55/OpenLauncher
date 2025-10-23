@@ -4,8 +4,6 @@ Caches loaded images and pixmaps to improve performance
 """
 
 from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtCore import QSize
-
 
 class ResourceCache:
     """Cache for loaded resources to avoid repeated file I/O"""

@@ -6,17 +6,14 @@ Contains installation dialogs and settings window
 import json
 import requests
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QPushButton, QVBoxLayout, QWidget, QGroupBox, 
-                             QLineEdit, QLabel, QComboBox, QHBoxLayout, QSizePolicy, 
+from PyQt5.QtWidgets import (QPushButton, QVBoxLayout, QLabel, QComboBox, QHBoxLayout, 
                              QCheckBox, QApplication, QDialog, QGraphicsBlurEffect)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication
-from PyQt5.QtGui import QIcon, QPixmap
-from tkinter import messagebox
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 import variables
-from lang import lang, change_language
-from utils import open_website, open_launcher_dir, open_minecraft_dir
+from lang import lang
 from resource_cache import get_cached_pixmap, get_cached_icon
-from material_design import MaterialCard, AnimatedButton, MaterialColors, FadeInWidget
+from material_design import MaterialCard, AnimatedButton, MaterialColors
 
 
 def create_version_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,

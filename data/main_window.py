@@ -5,8 +5,7 @@ Combines all UI components and methods
 
 import sys
 from PyQt5.QtWidgets import QMainWindow, QTextEdit
-from PyQt5.QtCore import Qt, QCoreApplication
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt
 
 from workers import StdoutRedirector
 from ui_components import Ui_MainWindow

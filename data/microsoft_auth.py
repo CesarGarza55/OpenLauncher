@@ -1,21 +1,23 @@
-from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QMessageBox, QWidget
-from PyQt5.QtCore import QLocale, Qt, pyqtSignal, QThread
-from PyQt5.QtGui import QIcon, QPixmap
-from tkinter import messagebox
+import sys
+from PyQt5.QtCore import pyqtSignal, QThread
 from variables import write_log
-from lang import lang, current_language
+from lang import lang
 import minecraft_launcher_lib
 import json
-import sys
 import os
 import variables
 import webbrowser
 import http.server
 import threading
 import urllib.parse
-from material_design import AnimatedButton
 
 config_dir = os.path.join(variables.app_directory, "config")
+
+# Redirect sys.stderr and sys.stdout to a log file in the compiled environment
+if getattr(sys, 'frozen', False):  # Check if running in a frozen/compiled state
+    log_file = os.path.join(config_dir, 'server.log')
+    sys.stdout = open(log_file, 'a', encoding='utf-8')
+    sys.stderr = open(log_file, 'a', encoding='utf-8')
 
 # Constants
 CLIENT_ID = "3f59fbe7-2c4b-4343-9a61-c03104ddaedf"

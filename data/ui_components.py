@@ -3,21 +3,14 @@ UI Components for OpenLauncher
 Contains main window UI, dialogs, and styling
 """
 
-import re
 import os
-import sys
 import json
-import time
-import webbrowser
 import minecraft_launcher_lib
-import requests
-from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QGroupBox, 
-                             QLineEdit, QLabel, QComboBox, QHBoxLayout, QGridLayout, 
-                             QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction, 
-                             QApplication, QMessageBox, QDialog, QGraphicsBlurEffect, QSplashScreen,
-                             QTabWidget)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QThreadPool, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
+from PyQt5.QtWidgets import (QVBoxLayout, QWidget, QLineEdit, QLabel, 
+                             QComboBox, QHBoxLayout, QGridLayout, QSpacerItem, 
+                             QSizePolicy, QCheckBox, QTextEdit, QMessageBox, QTabWidget)
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QTimer
+from PyQt5.QtGui import QIcon, QPainter, QColor
 from tkinter import messagebox
 
 import variables

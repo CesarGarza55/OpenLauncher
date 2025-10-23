@@ -3,11 +3,11 @@ Clean Modern Design System for OpenLauncher
 Minimalist, professional design with subtle animations
 """
 
-from PyQt5.QtWidgets import (QWidget, QPushButton, QLabel, QGraphicsDropShadowEffect, 
+from PyQt5.QtWidgets import (QWidget, QPushButton, QGraphicsDropShadowEffect, 
                              QGraphicsOpacityEffect, QFrame)
-from PyQt5.QtCore import (QPropertyAnimation, QEasingCurve, Qt, QPoint, QRect, 
-                          QSequentialAnimationGroup, QParallelAnimationGroup, pyqtProperty)
-from PyQt5.QtGui import QColor, QPainter, QPainterPath, QLinearGradient, QBrush
+from PyQt5.QtCore import (QPropertyAnimation, QEasingCurve, Qt, QPoint, 
+                          QParallelAnimationGroup, pyqtProperty)
+from PyQt5.QtGui import QColor, QPainter, QLinearGradient, QBrush
 
 
 # Modern Dark Color Palette

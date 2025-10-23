@@ -33,7 +33,10 @@ setup(
     description="",
     options={
         "build_exe": {
-            "packages": ["tkinter", "minecraft_launcher_lib", "pypresence", "requests", "PyQt5.QtCore", "PyQt5.QtGui", "PyQt5.QtWidgets","PyQt5.QtWebEngineWidgets"],
+            "packages": [
+                "tkinter", "minecraft_launcher_lib", "pypresence", "requests", "PyQt5.QtCore", "PyQt5.QtGui", "PyQt5.QtWidgets", "PyQt5.QtWebEngineWidgets", "webbrowser",
+                "pathlib", "time", "json", "os", "sys", "threading", "http.server", "urllib.parse", "subprocess", "shutil"
+            ],
             "include_files": additional_files,
             "build_exe": "output-build"
         }

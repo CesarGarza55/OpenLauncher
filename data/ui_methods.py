@@ -5,17 +5,12 @@ Contains remaining UI methods for installation and window management
 
 import re
 import sys
-import json
 import webbrowser
 import minecraft_launcher_lib
-import requests
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QGroupBox, 
-                             QLineEdit, QLabel, QComboBox, QHBoxLayout, QSizePolicy, 
-                             QCheckBox, QTextEdit, QApplication, QDialog, 
-                             QGraphicsBlurEffect, QSplashScreen, QMessageBox, QAction)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QThreadPool, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import (QApplication,QSplashScreen)
+from PyQt5.QtCore import Qt, QThreadPool, QThread, pyqtSignal
+from PyQt5.QtGui import QPixmap
 from tkinter import messagebox
 
 import variables
