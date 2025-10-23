@@ -26,7 +26,7 @@ def create_version_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     window = QDialog()
     window.setWindowTitle(title)
     window.setFixedSize(400, 220)
-    window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+    window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowMaximizeButtonHint)
     window.setWindowIcon(QIcon(icon))
     window.setStyleSheet(f"background-color: {MaterialColors.BACKGROUND};")
     
@@ -90,7 +90,7 @@ def create_fabric_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     window = QDialog()
     window.setWindowTitle(f"{lang(system_lang, 'install')} Fabric")
     window.setFixedSize(420, 280)
-    window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+    window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowMaximizeButtonHint)
     window.setWindowIcon(QIcon(icon))
     window.setStyleSheet(f"background-color: {MaterialColors.BACKGROUND};")
     
@@ -154,11 +154,11 @@ def create_fabric_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     return window
 
 
-def create_get_started_dialog(system_lang, bg_color, bg_path, bg_blur, icon, app_dir, bt_style):
+def create_get_started_dialog(system_lang, bg_color, bg_path, bg_blur, icon, app_dir):
     """Create get started dialog for first time users"""
     window_get_started = QDialog()
     window_get_started.setWindowTitle(lang(system_lang, "get_started"))
-    window_get_started.setFixedSize(800, 600)
+    window_get_started.setFixedSize(800, 500)
     window_get_started.setWindowFlags(window_get_started.windowFlags() & ~Qt.WindowContextHelpButtonHint)
     window_get_started.setWindowIcon(QIcon(icon))
     window_get_started.setStyleSheet("background-color: rgb(45, 55, 65);")
@@ -264,7 +264,6 @@ def create_get_started_dialog(system_lang, bg_color, bg_path, bg_blur, icon, app
     # Close button
     bt_close = QPushButton(lang(system_lang, "close"))
     bt_close.setFixedSize(100, 30)
-    bt_close.setStyleSheet(bt_style)
     bt_close.clicked.connect(close_window)
     
     bottom_layout.addWidget(gs_checkbox)

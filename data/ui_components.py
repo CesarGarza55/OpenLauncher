@@ -16,18 +16,19 @@ from PyQt5.QtWidgets import (QMainWindow, QPushButton, QVBoxLayout, QWidget, QGr
                              QSpacerItem, QSizePolicy, QCheckBox, QTextEdit, QAction, 
                              QApplication, QMessageBox, QDialog, QGraphicsBlurEffect, QSplashScreen,
                              QTabWidget)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QThreadPool, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QThreadPool, QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from tkinter import messagebox
 
 import variables
 from variables import write_log
 from lang import lang, change_language
 from mod_manager import show_mod_manager
-from microsoft_auth import login
+from microsoft_auth import login, LoginThread
 from workers import CommandWorker, FunctionWorker, StdoutRedirector
 from version_installer import VersionInstaller
 from auth_manager import authenticate, logout
+from material_design import MATERIAL_STYLESHEET
 from utils import open_website, open_launcher_dir, open_minecraft_dir, is_java_installed
 from resource_cache import get_cached_pixmap, get_cached_icon
 from material_design import (MaterialCard, AnimatedButton, FadeInWidget, 
@@ -76,6 +77,9 @@ class Ui_MainWindow(object):
         MainWindow.setMinimumSize(QSize(1200, 700))
         MainWindow.setWindowIcon(QIcon(icon))
         
+        # Prevent the app from being maximized
+        MainWindow.setWindowFlags(MainWindow.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+        
         # Clean central widget
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -95,9 +99,6 @@ class Ui_MainWindow(object):
             QTabWidget::pane {{
                 border: none;
                 background-color: {MaterialColors.BACKGROUND};
-            }}
-            QTabBar::tab {{
-                display: none;
             }}
         """)
         # Hide tab bar completely
@@ -274,6 +275,10 @@ class Ui_MainWindow(object):
         self.mod_manager_tab = self.create_mod_manager_tab()
         self.tab_widget.addTab(self.mod_manager_tab, lang(self.system_lang, "btn_mod_manager"))
         
+        # Authentication tab
+        self.auth_tab = self.create_auth_tab()
+        self.tab_widget.addTab(self.auth_tab, lang(self.system_lang, "authentication"))
+        
         # Add tab widget to main layout
         self.main_layout.addWidget(self.tab_widget)
 
@@ -361,12 +366,8 @@ class Ui_MainWindow(object):
         self.options_title = QLabel(lang(self.system_lang, "options"))
         self.options_title.setProperty("class", "subtitle")
         options_layout.addWidget(self.options_title)
-        
-        self.maximize_checkbox = QCheckBox(lang(self.system_lang, "maximize"))
-        self.maximize_checkbox.setChecked(self.maximize)
-        options_layout.addWidget(self.maximize_checkbox)
-        
-        self.snapshots_checkbox = QCheckBox(lang(self.system_lang, "show_snapshots"))
+
+        self.snapshots_checkbox = QCheckBox(lang(self.system_lang, "checkbox_snapshots"))
         self.snapshots_checkbox.setChecked(self.show_snapshots)
         options_layout.addWidget(self.snapshots_checkbox)
         
@@ -401,18 +402,13 @@ class Ui_MainWindow(object):
         
         links_layout.addLayout(links_hlayout)
         
-        github_btn = AnimatedButton("GitHub", settings_widget, "text")
-        github_btn.setMinimumHeight(40)
-        github_btn.clicked.connect(lambda: open_website("https://github.com/CesarGarza55/OpenLauncher"))
-        links_layout.addWidget(github_btn)
-        
         settings_layout.addWidget(links_card)
         
         # Spacer at bottom
         settings_layout.addStretch()
         
         # Save button
-        self.save_btn = AnimatedButton(lang(self.system_lang, "save"), settings_widget, "primary")
+        self.save_btn = AnimatedButton(lang(self.system_lang, "save"), settings_widget, "outlined")
         self.save_btn.setMinimumHeight(48)
         self.save_btn.clicked.connect(self.save_settings)
         settings_layout.addWidget(self.save_btn)
@@ -437,14 +433,13 @@ class Ui_MainWindow(object):
             self.update_all_translations()
         
         # Save options
-        self.maximize = self.maximize_checkbox.isChecked()
         self.show_snapshots = self.snapshots_checkbox.isChecked()
         
         # Discord RPC
         discord_enabled = self.discord_checkbox.isChecked()
         if discord_enabled != self.discord_manager.enabled:
             if discord_enabled:
-                self.discord_manager.connect()
+                self.discord_manager.connect(self.system_lang)
             else:
                 self.discord_manager.disconnect()
         
@@ -467,6 +462,139 @@ class Ui_MainWindow(object):
         
         mod_manager_widget = ModManagerWidget(self.system_lang)
         return mod_manager_widget
+    
+    def create_auth_tab(self):
+        """Create authentication tab with modern styling."""
+        auth_widget = QWidget()
+        auth_layout = QVBoxLayout(auth_widget)
+        auth_layout.setSpacing(20)
+        auth_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Title label
+        self.auth_title = QLabel(lang(self.system_lang, "microsoft_login_title"))
+        self.auth_title.setProperty("class", "subtitle")
+        self.auth_title.setAlignment(Qt.AlignCenter)
+        auth_layout.addWidget(self.auth_title)
+
+        # Description label
+        self.auth_description = QLabel(lang(self.system_lang, "microsoft_login_desc"))
+        self.auth_description.setWordWrap(True)
+        self.auth_description.setAlignment(Qt.AlignCenter)
+        auth_layout.addWidget(self.auth_description)
+
+        # Loading spinner (programmatic, no external files)
+        class LoadingSpinner(QWidget):
+            def __init__(self, parent=None, size=80, line_width=6, color=QColor(0, 170, 255)):
+                super().__init__(parent)
+                self._angle = 0
+                self._timer = QTimer(self)
+                self._timer.timeout.connect(self.rotate)
+                self._timer.start(16)  # ~60 FPS
+                self._size = size
+                self._line_width = line_width
+                self._color = color
+                self.setFixedSize(self._size, self._size)
+
+            def rotate(self):
+                self._angle = (self._angle + 6) % 360
+                self.update()
+
+            def paintEvent(self, event):
+                painter = QPainter(self)
+                painter.setRenderHint(QPainter.Antialiasing)
+                rect = self.rect().adjusted(self._line_width, self._line_width, -self._line_width, -self._line_width)
+                center = rect.center()
+                painter.translate(center.x(), center.y())
+                painter.rotate(self._angle)
+                painter.translate(-center.x(), -center.y())
+
+                pen = painter.pen()
+                pen.setWidth(self._line_width)
+                for i in range(12):
+                    alpha = int(255 * (i + 1) / 12)
+                    pen.setColor(QColor(self._color.red(), self._color.green(), self._color.blue(), alpha))
+                    painter.setPen(pen)
+                    start_angle = (i * 30) * 16
+                    span = 20 * 16
+                    painter.drawArc(rect.adjusted(self._line_width, self._line_width, -self._line_width, -self._line_width), start_angle, span)
+
+        spinner = LoadingSpinner(self, size=100, line_width=8, color=QColor(0, 170, 255))
+        spinner.setObjectName("auth_spinner")
+        auth_layout.addWidget(spinner, alignment=Qt.AlignCenter)
+
+        # Cancel button
+        self.auth_cancel_btn = AnimatedButton(lang(self.system_lang, "cancel"), auth_widget, "text")
+        self.auth_cancel_btn.clicked.connect(lambda: self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.game_tab)))
+        auth_layout.addWidget(self.auth_cancel_btn)
+
+        # Status label
+        self.auth_status = QLabel("")
+        self.auth_status.setAlignment(Qt.AlignCenter)
+        self.auth_status.setProperty("class", "caption")
+        auth_layout.addWidget(self.auth_status)
+
+        return auth_widget
+    
+    def start_auth_flow(self):
+        """Start the Microsoft authentication flow."""
+        self.auth_status.setText(lang(self.system_lang, "microsoft_login_waiting"))
+
+        # Start the login thread
+        self.login_thread = LoginThread(self)
+        self.login_thread.finished.connect(self.on_auth_finished)
+        self.login_thread.error.connect(self.on_auth_error)
+        self.login_thread.start()
+
+    def on_auth_finished(self, account_info):
+        """Handle successful authentication"""
+        if account_info:
+            self.access_token = account_info.get('access_token', '')
+            self.user_uuid = account_info.get('id', '')
+            self.user_name = account_info.get('name', '')
+            self.auth_status.setText(lang(self.system_lang, "login_success"))
+            self.update_account_display()
+            # Return to the game tab after successful login
+            self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.game_tab))
+        else:
+            self.auth_status.setText(lang(self.system_lang, "login_failed"))
+
+    def on_auth_error(self, error):
+        """Handle authentication error"""
+        self.auth_status.setText(lang(self.system_lang, "login_error"))
+    
+    def login_microsoft(self):
+        """Handle Microsoft login button click."""
+        # Redirect to the authentication tab
+        self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.auth_tab))
+
+        # Update the status label with localized text
+        waiting_text = lang(self.system_lang, "microsoft_login_waiting")
+        self.auth_status.setText(waiting_text)
+
+        # Start the authentication flow
+        self.start_auth_flow()
+
+    def update_account_display(self):
+        """Update the account button and related UI elements"""
+        try:
+            self.btn_account.clicked.disconnect()
+        except TypeError:
+            pass  # No connections to disconnect
+        
+        if self.access_token and self.user_name:
+            # User is logged in
+            self.lineEdit.setVisible(False)
+            self.label.setText(f"{lang(self.system_lang, 'logged_as')} {self.user_name}")
+            self.btn_account.setText(lang(self.system_lang, "logout_microsoft"))
+            self.btn_account.setIcon(QIcon(variables.logout_icon))
+            self.btn_account.clicked.connect(self.logout_microsoft)
+        else:
+            # User is not logged in
+            self.lineEdit.setVisible(True)
+            self.label.setText(lang(self.system_lang, "label_username"))
+            self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
+            self.btn_account.setIcon(QIcon(variables.login_icon))
+            self.btn_account.clicked.connect(self.login_microsoft)
     
     def update_all_translations(self):
         """Update all UI translations after language change"""
@@ -501,6 +629,11 @@ class Ui_MainWindow(object):
         # Update mod manager tab
         if hasattr(self, 'mod_manager_tab') and hasattr(self.mod_manager_tab, 'update_translations'):
             self.mod_manager_tab.update_translations(self.system_lang)
+        
+        # Update translations for authentication tab
+        self.auth_title.setText(lang(self.system_lang, "microsoft_login_title"))
+        self.auth_description.setText(lang(self.system_lang, "microsoft_login_desc"))
+        self.auth_status.setText("")  # Clear status text on language change
     
     def update_settings_translations(self):
         """Update settings tab translations"""
@@ -524,12 +657,9 @@ class Ui_MainWindow(object):
             self.links_title.setText(lang(self.system_lang, "links"))
         
         # Update checkboxes
-        if hasattr(self, 'maximize_checkbox'):
-            self.maximize_checkbox.setText(lang(self.system_lang, "maximize"))
-            
         if hasattr(self, 'snapshots_checkbox'):
-            self.snapshots_checkbox.setText(lang(self.system_lang, "show_snapshots"))
-            
+            self.snapshots_checkbox.setParent(None)
+        
         if hasattr(self, 'discord_checkbox'):
             self.discord_checkbox.setText(lang(self.system_lang, "discord_rpc"))
         
@@ -575,7 +705,15 @@ class Ui_MainWindow(object):
         # Check for Microsoft account authentication
         if os.path.exists(variables.refresh_token_file):
             try:
-                profile = login(self.system_lang, self.icon)
+                # Try to refresh the token directly without UI
+                with open(variables.refresh_token_file, "r", encoding="utf-8") as f:
+                    refresh_token = json.load(f)
+                profile = minecraft_launcher_lib.microsoft_account.complete_refresh(
+                    "3f59fbe7-2c4b-4343-9a61-c03104ddaedf", 
+                    None, 
+                    "http://localhost:8080/callback", 
+                    refresh_token
+                )
             except Exception as e:
                 profile = None
             
@@ -592,18 +730,9 @@ class Ui_MainWindow(object):
                 self.access_token = profile['access_token']
                 self.user_name = profile['name']
                 self.user_uuid = profile['id']
-                self.lineEdit.setVisible(False)
-                self.label.setText(f"{lang(self.system_lang, 'logged_as')} {profile['name']}")
-                self.btn_account.setText(lang(self.system_lang, "logout_microsoft"))
-                self.btn_account.setIcon(QIcon(variables.logout_icon))
-                self.btn_account.clicked.disconnect()
-                self.btn_account.clicked.connect(self.logout_microsoft)
+                self.update_account_display()
             else:
-                self.lineEdit.setVisible(True)
-                self.label.setText(lang(self.system_lang, "label_username"))
-                self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
-                self.btn_account.clicked.disconnect()
-                self.btn_account.clicked.connect(self.login_microsoft)
+                self.update_account_display()
         
         # Load user data
         user_data = self.config_manager.load_user_data()
@@ -650,6 +779,8 @@ class Ui_MainWindow(object):
         # Update tab names
         self.tab_widget.setTabText(0, QCoreApplication.translate("MainWindow", lang(self.system_lang, "game"), None))
         self.tab_widget.setTabText(1, QCoreApplication.translate("MainWindow", lang(self.system_lang, "settings"), None))
+        self.tab_widget.setTabText(2, QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_mod_manager"), None))
+        self.tab_widget.setTabText(3, QCoreApplication.translate("MainWindow", lang(self.system_lang, "authentication"), None))
 
         # Set icons (using cached icons for better performance)
         self.btn_minecraft.setIcon(get_cached_icon(variables.minecraft_icon))
@@ -665,42 +796,6 @@ class Ui_MainWindow(object):
         self.btn_account.setIcon(get_cached_icon(variables.login_icon))
         self.btn_account.setIconSize(QSize(20, 20))
 
-    def login_microsoft(self):
-        """Handle Microsoft account login"""
-        try:
-            profile = authenticate(self.system_lang, self.icon)
-            if profile and 'id' in profile and 'name' in profile:
-                self.access_token = profile['access_token']
-                self.user_name = profile['name']
-                self.lineEdit.setText(profile['name'])
-                self.lineEdit.setVisible(False)
-                self.label.setText(f"{lang(self.system_lang, 'logged_as')} {profile['name']}")
-                self.btn_account.setText(lang(self.system_lang, "logout_microsoft"))
-                self.btn_account.setIcon(QIcon(variables.logout_icon))
-                self.btn_account.clicked.disconnect()
-                self.btn_account.clicked.connect(self.logout_microsoft)
-                self.config_manager.save_user_uuid(profile['id'])
-                self.save_data()
-            else:
-                if 'error' in profile and profile['error'] == 'NOT_FOUND':
-                    if messagebox.askyesno(
-                        lang(self.system_lang, "microsoft_account_not_found"),
-                        lang(self.system_lang, "microsoft_account_not_found_desc")
-                    ):
-                        webbrowser.open("https://www.minecraft.net/")
-                
-                self.lineEdit.setVisible(True)
-                self.label.setText(lang(self.system_lang, "label_username"))
-                self.lineEdit.setText("")
-                self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
-                self.btn_account.clicked.disconnect()
-                self.btn_account.clicked.connect(self.login_microsoft)
-                self.config_manager.save_user_uuid("")
-                self.access_token = ""
-                self.save_data()
-        except Exception as e:
-            write_log(e, "microsoft_auth")
-
     def logout_microsoft(self):
         """Handle Microsoft account logout"""
         if not messagebox.askyesno(
@@ -712,15 +807,15 @@ class Ui_MainWindow(object):
         try:
             logout()
             self.access_token = ""
+            self.user_uuid = ""
+            self.user_name = ""
             self.config_manager.save_user_uuid("")
             
-            self.lineEdit.setVisible(True)
-            self.label.setText(lang(self.system_lang, "label_username"))
-            self.lineEdit.setText("")
-            self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
-            self.btn_account.setIcon(QIcon(variables.login_icon))
-            self.btn_account.clicked.disconnect()
-            self.btn_account.clicked.connect(self.login_microsoft)
+            # Update UI
+            self.update_account_display()
+            self.save_data()
+        except Exception as e:
+            write_log(e, "microsoft_logout")
             self.save_data()
         except Exception as e:
             write_log(e, "microsoft_logout")

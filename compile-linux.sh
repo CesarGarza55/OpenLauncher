@@ -90,7 +90,7 @@ compile_application() {
         --add-data data/lang.py:. \
         --add-data data/mc_run.py:. \
         --name OpenLauncher.bin \
-        data/OpenLauncher.py
+        data/main.py
 
     echo -e "${GREEN}Compilation finished! Cleaning up...${NC}"
     rm OpenLauncher.bin.spec

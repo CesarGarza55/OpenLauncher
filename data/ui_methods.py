@@ -340,7 +340,7 @@ class LoadingScreen(QSplashScreen):
     
     def __init__(self):
         super().__init__(QPixmap(variables.splash_screen))
-        self.setWindowFlag(Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         
         # Center the splash screen
         screen_geometry = QApplication.primaryScreen().availableGeometry()

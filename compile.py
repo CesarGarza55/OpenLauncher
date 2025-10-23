@@ -12,18 +12,15 @@ def include_files(source_folder, target_folder):
             files.append((source_path, target_path))
     return files
 
-additional_files = [
-    ("data/updater.py", "lib/updater.py"),
-    ("data/variables.py", "lib/variables.py"),
-    ("data/mod_manager.py", "lib/mod_manager.py"),
-    ("data/microsoft_auth.py", "lib/microsoft_auth.py"),
-    ("data/lang.py", "lib/lang.py"),
-    ("data/mc_run.py", "lib/mc_run.py")
-] + include_files("data/img", "lib/img/")
+additional_files = []
+for file in os.listdir("data"):
+    if file.endswith(".py") and file != "main.py":
+        additional_files.append((f"data/{file}", f"lib/{file}"))
+additional_files += include_files("data/img", "lib/img/")
 
 executables = [
     Executable(
-        script="data/OpenLauncher.py",
+        script="data/main.py",
         base="Win32GUI",
         target_name="OpenLauncher.exe",
         icon="data/img/creeper.ico"

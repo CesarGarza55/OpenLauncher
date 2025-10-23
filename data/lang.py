@@ -160,11 +160,17 @@ languages = {
         "update_complete": "The update has been installed successfully.",
         "error_occurred": "An error occurred: ",
         "microsoft_login_title": "Login with Microsoft",
+        "microsoft_login_waiting": "Please complete the login in your default web browser.\nThis window will close automatically once login is successful.",
+        "microsoft_login_success_title": "Login successful",
+        "microsoft_login_success_message": "Login completed successfully.",
+        "microsoft_login_close_button": "Close",
+        "cancel": "Cancel",
         "ask_logout_title": "Logout",
         "ask_logout_desc": "Are you sure you want to log out? If you log out, you will need to log in again to play with your Microsoft account.",
         "invalid_username": "Invalid username, must be between 3 and 16 characters and not contain spaces or special characters",
         "work_in_progress": "Work in progress",
         "work_in_progress_info": "This feature is not yet available, but will be available in future updates.",
+        "microsoft_login_desc": "Log in with your Microsoft account to access Minecraft Java Edition.",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -295,11 +301,17 @@ languages = {
         "update_complete": "La actualización se ha instalado correctamente.",
         "error_occurred": "Ocurrió un error: ",
         "microsoft_login_title": "Iniciar sesión con Microsoft",
+        "microsoft_login_waiting": "Completa el inicio de sesión en tu navegador predeterminado.\nEsta ventana se cerrará automáticamente una vez que el inicio de sesión sea exitoso.",
+        "microsoft_login_success_title": "Inicio de sesión exitoso",
+        "microsoft_login_success_message": "El inicio de sesión se completó correctamente.",
+        "microsoft_login_close_button": "Cerrar",
+        "cancel": "Cancelar",
         "ask_logout_title": "Cerrar sesión",
         "ask_logout_desc": "¿Estás seguro de que deseas cerrar sesión? Si cierras sesión, tendrás que iniciar sesión de nuevo para jugar con tu cuenta de Microsoft.",
         "invalid_username": "Nombre de usuario inválido, debe tener entre 3 y 16 caracteres y no contener espacios ni caracteres especiales",
         "work_in_progress": "Trabajo en progreso",
         "work_in_progress_info": "Esta función aún no está disponible, pero estará disponible en futuras actualizaciones.",
+        "microsoft_login_desc": "Inicia sesión con tu cuenta de Microsoft para acceder a Minecraft Java Edition.",
     },
     "fr": {
         "language": "Sélectionnez la langue",
@@ -435,6 +447,7 @@ languages = {
         "invalid_username": "Nom d'utilisateur invalide, doit contenir entre 3 et 16 caractères et ne doit pas contenir d'espaces ou de caractères spéciaux",
         "work_in_progress": "Travail en cours",
         "work_in_progress_info": "Cette fonctionnalité n'est pas encore disponible, mais le sera dans les prochaines mises à jour.",
+        "microsoft_login_desc": "Inicia sesión con tu cuenta de Microsoft para acceder a Minecraft Java Edition.",
     }
 }
 

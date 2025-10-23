@@ -182,7 +182,7 @@ class WindowMethods:
         window_settings = QDialog()
         window_settings.setWindowTitle(lang(self.system_lang, "settings"))
         window_settings.setFixedSize(500, 450)
-        window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        window_settings.setWindowFlags(window_settings.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowMaximizeButtonHint)
         window_settings.setWindowIcon(QIcon(self.icon))
         window_settings.setStyleSheet("background-color: rgb(45, 55, 65); border-radius: 10px;")
         
@@ -421,8 +421,7 @@ class WindowMethods:
             self.bg_path,
             self.bg_blur,
             self.icon,
-            self.app_dir,
-            self.bt_style
+            self.app_dir
         )
         window.exec_()
 

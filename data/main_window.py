@@ -30,6 +30,8 @@ class MainWindow(QMainWindow, Ui_MainWindow, UiMethods, WindowMethods):
                  discord_manager, config_manager, app):
         super().__init__()
         
+        self.app = app
+        
         # Setup UI
         self.setupUi(
             self, 

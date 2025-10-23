@@ -61,6 +61,7 @@ class ConfigManager:
         """Save main configuration to file"""
         with open(self.config_path, 'w') as f:
             json.dump(config, f, indent=4)
+        print(f"Config saved to {self.config_path}")
     
     def generate_uuid(self, name):
         """Generate a UUID for the user"""

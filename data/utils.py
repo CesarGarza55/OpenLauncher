@@ -12,9 +12,11 @@ import variables
 from tkinter import messagebox
 
 
-def open_website():
-    """Open the plugins website"""
-    webbrowser.open(variables.website_url)
+def open_website(url=None):
+    """Open a specified website or the default plugins website"""
+    if url is None:
+        url = variables.website_url
+    webbrowser.open(url)
 
 
 def open_launcher_dir():

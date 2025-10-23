@@ -72,7 +72,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.5.8"
+version = "1.6.0"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -103,15 +103,15 @@ bg_color = "17, 33, 115"
 
 # Set app directory
 if sys.platform == "win32":
-    appdata = os.environ["APPDATA"]
-    app_directory = os.path.join(appdata, "OpenLauncher")
+    app_directory = os.path.join(os.path.expanduser("~"), "OpenLauncher")
+    os.makedirs(app_directory, exist_ok=True)
 elif sys.platform == "linux":
     app_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher")
+    os.makedirs(app_directory, exist_ok=True)
 
 # Set plugins directory
 if sys.platform == "win32":
-    appdata = os.environ["APPDATA"]
-    plugins_directory = os.path.join(appdata, "OpenLauncher", "plugins")
+    plugins_directory = os.path.join(os.path.expanduser("~"), "OpenLauncher", "plugins")
     os.makedirs(plugins_directory, exist_ok=True)
 elif sys.platform == "linux":
     plugins_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher", "plugins")
@@ -123,8 +123,7 @@ refresh_token_file = os.path.join(config_dir, "refresh_token.json")
 if debug_mode:
     # Define a custom Minecraft directory for testing
     if sys.platform == "win32":
-        appdata = os.environ["APPDATA"]
-        minecraft_directory = os.path.join(appdata, ".launcher")
+        minecraft_directory = os.path.join(os.path.expanduser("~"), ".launcher")
     elif sys.platform == "linux":
         minecraft_directory = os.path.join(str(pathlib.Path.home()), ".launcher")
 else:
