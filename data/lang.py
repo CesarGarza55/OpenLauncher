@@ -55,7 +55,6 @@ languages = {
             "created with Python and Qt for the GUI.<br>"
             "To get started, you can install the Minecraft version you want, install Fabric or Forge, and play the game. "
             "You can also manage your mods with the Mod Manager and enable Discord Rich Presence.<br><br>"
-            f"You can install themes to customize the launcher, you can find them in the <a style='color: #00aaff;' href='{variables.website_url}/plugins'>themes section</a> of the OpenLauncher website.<br><br>"
             f"Visit the <a style='color: #00aaff;' href='{variables.website_url}'>OpenLauncher website</a> for more information.<br><br>"
             "OpenLauncher offers some features like:"
             "<ul>"
@@ -63,7 +62,6 @@ languages = {
             "<li>Install Fabric and Forge</li>"
             "<li>Play the Minecraft version you want</li>"
             "<li>Enable Discord Rich Presence</li>"
-            "<li>Customize the launcher with themes</li>"
             "<li>Multilanguage support</li>"
             "</ul>"
         ),
@@ -112,7 +110,7 @@ languages = {
         "theme_error": "The first detected theme will be attempted for loading, please remove additional themes to prevent issues.",
         "discord_error": "Could not connect to Discord Rich Presence, ensure that Discord is running",
         "mod_manager_title": "Mod Manager",
-        "mod_manager_info": "The Mod Manager renames mods with the game version. Ex: 'mod.jar' to 'VERSION_TEXT_mod.jar'. To install, drag the file or click 'Install mod' (.jar and .olpkg). 'olpkg' files are disabled mods that you can activate.",
+        "mod_manager_info": "The Mod Manager renames mods with the game version. Ex: 'mod.jar' to 'fabric-loader-0.17.3-1.21.4_mod.jar'. To install, drag the file or click 'Install mod' (.jar and .olpkg). 'olpkg' files are disabled mods that you can activate.",
         "mod_manager_disabled": "The Mod Manager is disabled because no compatible version is detected.\nPlease select a valid (Forge, Fabric, Quilt, NeoForge) version in the launcher settings.",
         "active_mods": "Active Mods",
         "inactive_mods": "Inactive Mods",
@@ -196,7 +194,6 @@ languages = {
             "creado con Python y Qt para la interfaz gráfica.<br>"
             "Para comenzar, puedes instalar la versión de Minecraft que desees, instalar Fabric o Forge y jugar al juego. "
             "También puedes gestionar tus mods con el Mod Manager y habilitar Discord Rich Presence.<br><br>"
-            f"Puedes instalar temas para personalizar el lanzador, puedes encontrarlos en la <a style='color: #00aaff;' href='{variables.website_url}/plugins'>sección de temas</a> del sitio web de OpenLauncher.<br><br>"
             f"Visita el <a style='color: #00aaff;' href='{variables.website_url}'>sitio web de OpenLauncher</a> para obtener más información.<br><br>"
             "OpenLauncher ofrece algunas características como:"
             "<ul>"
@@ -204,7 +201,6 @@ languages = {
             "<li>Instalar Fabric y Forge</li>"
             "<li>Jugar la versión de Minecraft que desees</li>"
             "<li>Habilitar Discord Rich Presence</li>"
-            "<li>Personalizar el lanzador con temas</li>"
             "<li>Soporte multilenguaje</li>"
             "</ul>"
         ),
@@ -253,7 +249,7 @@ languages = {
         "theme_error": "Se intentará cargar el primer tema detectado, por favor elimine temas adicionales para evitar problemas.",
         "discord_error": "No se pudo conectar a Discord Rich Presence, asegúrese de que Discord esté en ejecución",
         "mod_manager_title": "Gestor de Mods",
-        "mod_manager_info": "El Gestor de Mods renombra los mods con la versión del juego. Ej: 'mod.jar' a 'VERSION_TEXT_mod.jar'. Para instalar, arrastra el archivo o haz clic en 'Instalar mod' (.jar y .olpkg). Los archivos 'olpkg' son mods desactivados que puedes activar.",
+        "mod_manager_info": "El Gestor de Mods renombra los mods con la versión del juego. Ej: 'mod.jar' a 'fabric-loader-0.17.3-1.21.4_mod.jar'. Para instalar, arrastra el archivo o haz clic en 'Instalar mod' (.jar y .olpkg). Los archivos 'olpkg' son mods desactivados que puedes activar.",
         "mod_manager_disabled": "El Gestor de Mods está desactivado porque no se detecta ninguna versión compatible.\nPor favor, selecciona una versión válida (Forge, Fabric, Quilt, NeoForge) en la configuración del lanzador.",
         "active_mods": "Mods Activos",
         "inactive_mods": "Mods Inactivos",
@@ -337,7 +333,6 @@ languages = {
             "créé avec Python et Qt pour l'interface graphique.<br>"
             "Pour commencer, vous pouvez installer la version de Minecraft que vous souhaitez, installer Fabric ou Forge et jouer au jeu. "
             "Vous pouvez également gérer vos mods avec le Mod Manager et activer Discord Rich Presence.<br><br>"
-            f"Vous pouvez installer des thèmes pour personnaliser le lanceur, vous pouvez les trouver dans la <a style='color: #00aaff;' href='{variables.website_url}/plugins'>section des thèmes</a> du site web OpenLauncher.<br><br>"
             f"Visitez le <a style='color: #00aaff;' href='{variables.website_url}'>site web OpenLauncher</a> pour plus d'informations.<br><br>"
             "OpenLauncher offre quelques fonctionnalités comme :"
             "<ul>"
@@ -345,7 +340,6 @@ languages = {
             "<li>Installer Fabric et Forge</li>"
             "<li>Jouer à la version de Minecraft que vous souhaitez</li>"
             "<li>Activer Discord Rich Presence</li>"
-            "<li>Personnaliser le lanceur avec des thèmes</li>"
             "<li>Support multilingue</li>"
             "</ul>"
         ),
@@ -394,7 +388,7 @@ languages = {
         "theme_error": "Le premier thème détecté sera tenté pour le chargement, veuillez supprimer les thèmes supplémentaires pour éviter les problèmes.",
         "discord_error": "Impossible de se connecter à Discord Rich Presence, assurez-vous que Discord est en cours d'exécution",
         "mod_manager_title": "Gestionnaire de Mods",
-        "mod_manager_info": "Le Mod Manager renomme les mods avec la version du jeu. Ex : 'mod.jar' en 'VERSION_TEXT_mod.jar'. Pour installer, faites glisser le fichier ou cliquez sur 'Installer mod' (.jar et .olpkg). Les fichiers 'olpkg' sont des mods désactivés que vous pouvez activer.",
+        "mod_manager_info": "Le Mod Manager renomme les mods avec la version du jeu. Ex : 'mod.jar' en 'fabric-loader-0.17.3-1.21.4_mod.jar'. Pour installer, faites glisser le fichier ou cliquez sur 'Installer mod' (.jar et .olpkg). Les fichiers 'olpkg' sont des mods désactivés que vous pouvez activer.",
         "mod_manager_disabled": "Le Mod Manager est désactivé car aucune version compatible n'est détectée.\nVeuillez sélectionner une version valide (Forge, Fabric, Quilt, NeoForge) dans les paramètres du lanceur.",
         "active_mods": "Mods Actifs",
         "inactive_mods": "Mods Inactifs",
@@ -442,6 +436,11 @@ languages = {
         "update_complete": "La mise à jour a été installée avec succès.",
         "error_occurred": "Une erreur s'est produite : ",
         "microsoft_login_title": "Connexion avec Microsoft",
+        "microsoft_login_waiting": "Complétez le processus de connexion dans votre navigateur web par défaut.\nCette fenêtre se fermera automatiquement une fois la connexion réussie.",
+        "microsoft_login_success_title": "Connexion réussie",
+        "microsoft_login_success_message": "Le processus de connexion est terminé avec succès.",
+        "microsoft_login_close_button": "Fermer",
+        "cancel": "Annuler",
         "ask_logout_title": "Déconnexion",
         "ask_logout_desc": "Êtes-vous sûr de vouloir vous déconnecter ? Si vous vous déconnectez, vous devrez vous reconnecter pour jouer avec votre compte Microsoft.",
         "invalid_username": "Nom d'utilisateur invalide, doit contenir entre 3 et 16 caractères et ne doit pas contenir d'espaces ou de caractères spéciaux",

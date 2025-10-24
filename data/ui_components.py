@@ -66,8 +66,8 @@ class Ui_MainWindow(object):
         
         if not MainWindow.objectName():
             MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1200, 700)
-        MainWindow.setMinimumSize(QSize(1200, 700))
+        MainWindow.resize(1000, 600)
+        MainWindow.setMinimumSize(QSize(1000, 600))
         MainWindow.setWindowIcon(QIcon(icon))
         
         # Prevent the app from being maximized
@@ -405,6 +405,23 @@ class Ui_MainWindow(object):
         self.save_btn.setMinimumHeight(48)
         self.save_btn.clicked.connect(self.save_settings)
         settings_layout.addWidget(self.save_btn)
+        
+        # Adjust margins and spacing for better fit in smaller windows
+        settings_layout.setSpacing(10)
+        settings_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Reduce margins in cards
+        jvm_layout.setContentsMargins(10, 10, 10, 10)
+        lang_layout.setContentsMargins(10, 10, 10, 10)
+        options_layout.setContentsMargins(10, 10, 10, 10)
+        links_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Ensure widgets adapt to smaller sizes
+        self.entry_jvm_arguments.setMinimumHeight(30)
+        self.lang_combobox.setMinimumHeight(30)
+        self.btn_launcher_dir.setMinimumHeight(30)
+        self.btn_minecraft_dir.setMinimumHeight(30)
+        self.save_btn.setMinimumHeight(40)
         
         return settings_widget
     
@@ -843,5 +860,3 @@ class Ui_MainWindow(object):
     def set_progress(self, progress_value: int):
         """Update progress value"""
         pass
-
-    # Continue in next part due to length...

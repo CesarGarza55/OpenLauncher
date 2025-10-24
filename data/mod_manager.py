@@ -244,7 +244,7 @@ class ModManagerWidget(QWidget):
         # Header with back button
         header_layout = QHBoxLayout()
         self.back_btn = AnimatedButton("← " + lang(self.current_lang, "back"), self, "text")
-        self.back_btn.clicked.connect(self.go_back)
+        self.back_btn.clicked.connect(lambda: self.parent().setCurrentIndex(0))
         header_layout.addWidget(self.back_btn)
         header_layout.addStretch()
         layout.addLayout(header_layout)
@@ -437,15 +437,6 @@ class ModManagerWidget(QWidget):
             shutil.copy(file_name, dest_path)
             self.list_mods()
             self.load_mods_to_list()
-    
-    def go_back(self):
-        """Go back to main tab"""
-        # Find the parent tab widget and go to index 0
-        parent = self.parent()
-        while parent and not hasattr(parent, 'setCurrentIndex'):
-            parent = parent.parent()
-        if parent:
-            parent.setCurrentIndex(0)
     
     def update_translations(self, new_lang):
         """Update translations when language changes"""

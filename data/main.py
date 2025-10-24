@@ -191,13 +191,12 @@ if __name__ == "__main__":
     while loading_screen.isVisible():
         app.processEvents()
     
-    # Show get started dialog if first time
+    # Show "Get Started" tab if first time
     if config.get("first_time", True):
-        window.get_started()
-        config["first_time"] = False
+        window.add_get_started_tab()
+        config["first_time"] = True  # Mark that first time setup has been completed
         config["lang"] = system_lang  # Save the detected language
         config_manager.save_config(config)
-        print("First time setup completed and config saved")
     
     # Show window and update Discord error display
     window.show()
