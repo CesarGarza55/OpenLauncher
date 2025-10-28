@@ -101,11 +101,8 @@ forge_icon = os.path.join(script_dir, 'img/forge.webp').replace("\\", "/")
 mod_icon = os.path.join(script_dir, 'img/command_block.webp').replace("\\", "/")
 settings_icon = os.path.join(script_dir, 'img/settings.webp').replace("\\", "/")
 play_icon = os.path.join(script_dir, 'img/play.webp').replace("\\", "/")
-shortcut_icon = os.path.join(script_dir, 'img/shortcut.webp').replace("\\", "/")
 logout_icon = os.path.join(script_dir, 'img/logout.webp').replace("\\", "/")
 login_icon = os.path.join(script_dir, 'img/login.webp').replace("\\", "/")
-steve_icon = os.path.join(script_dir, 'img/steve.webp').replace("\\", "/")
-warning_icon = os.path.join(script_dir, 'img/warning.webp').replace("\\", "/")
 splash_screen = os.path.join(script_dir, 'img/splash.webp').replace("\\", "/")
 
 # Set app directory

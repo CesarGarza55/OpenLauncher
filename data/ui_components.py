@@ -20,7 +20,6 @@ from mod_manager import show_mod_manager
 from microsoft_auth import login, LoginThread
 from workers import CommandWorker, FunctionWorker, StdoutRedirector
 from version_installer import VersionInstaller
-from auth_manager import authenticate, logout
 from material_design import MATERIAL_STYLESHEET
 from utils import open_website, open_launcher_dir, open_minecraft_dir, is_java_installed
 from resource_cache import get_cached_pixmap, get_cached_icon
@@ -836,7 +835,7 @@ class Ui_MainWindow(object):
             return
         
         try:
-            logout()
+            variables.delete_refresh_token()
             self.access_token = ""
             self.user_uuid = ""
             self.user_name = ""
