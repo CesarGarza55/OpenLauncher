@@ -51,11 +51,7 @@ class WindowMethods:
             versions_list = releases
         
         window = create_version_dialog(
-            self,
             self.system_lang,
-            self.bg_color,
-            self.bg_path,
-            self.bg_blur,
             self.icon,
             f"{lang(self.system_lang, 'install')} Minecraft",
             lang(self.system_lang, "info_label_minecraft"),
@@ -96,16 +92,13 @@ class WindowMethods:
             versions_list = fabric_releases
         
         window = create_fabric_dialog(
-            self,
             self.system_lang,
-            self.bg_color,
-            self.bg_path,
-            self.bg_blur,
             self.icon,
             versions_list,
             fabric_loader,
             vers,
-            lambda version, loader: self.start_installation(self.install_fabric, version, loader)
+            lambda version, loader: self.start_installation(self.install_fabric, version, loader),
+            "fabric"
         )
         window.exec_()
     
@@ -139,11 +132,7 @@ class WindowMethods:
             vers = forge_all[0]
         
         window = create_version_dialog(
-            self,
             self.system_lang,
-            self.bg_color,
-            self.bg_path,
-            self.bg_blur,
             self.icon,
             f"{lang(self.system_lang, 'install')} Forge",
             lang(self.system_lang, "info_label_loader").replace("Fabric", "Forge"),
@@ -165,12 +154,12 @@ class WindowMethods:
             self.label.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "label_username"), None))
             self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "login_microsoft"), None))
         
-        self.lineEdit.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
+        self.username_input.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
         self.btn_minecraft.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_install_minecraft"), None))
         self.btn_fabric.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_install_loader"), None))
         self.btn_forge.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_install_loader").replace("Fabric", "Forge"), None))
         self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_play"), None))
-        self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_mod_manager"), None))
+        self.btn_mod_manager.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_mod_manager"), None))
         
         # Update tab names
         if hasattr(self, 'tab_widget'):
@@ -198,16 +187,7 @@ class WindowMethods:
         layout.setAlignment(Qt.AlignHCenter)
         layout.setSpacing(10)
         layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Background
-        bg_label = QLabel(window_settings)
-        bg_label.setPixmap(get_cached_pixmap(self.bg_path, window_width, window_height, True))
-        bg_label.setGeometry(0, 0, window_width, window_height)
-        
-        blur_effect = QGraphicsBlurEffect()
-        blur_effect.setBlurRadius(self.bg_blur)
-        bg_label.setGraphicsEffect(blur_effect)
-        
+                
         # JVM settings group
         jvm_group = QGroupBox()
         jvm_group.setStyleSheet("background-color: rgba(0, 0, 0, 0.3); border-radius: 10px;")
@@ -411,19 +391,3 @@ class WindowMethods:
         
         window_settings.setLayout(layout)
         window_settings.exec_()
-    
-    def get_started(self):
-        """Show get started dialog"""
-        from ui_dialogs import create_get_started_dialog
-        window = create_get_started_dialog(
-            self.system_lang,
-            self.bg_color,
-            self.bg_path,
-            self.bg_blur,
-            self.icon,
-            self.app_dir
-        )
-        window.exec_()
-
-
-

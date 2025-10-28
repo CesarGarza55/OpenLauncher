@@ -10,12 +10,9 @@ from material_design import MaterialCard, AnimatedButton, MaterialColors
 # Class to manage mods in the launcher (install, activate, deactivate)
 class ModManager(QDialog):
     # Constructor
-    def __init__(self, bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", bg_path=variables.bg_path, bg_blur=variables.bg_blur, current_lang="en"):
+    def __init__(self, icon=f"{variables.icon}", current_lang="en"):
         super().__init__()
-        self.bg_color = bg_color
         self.icon = icon
-        self.bg_path = bg_path
-        self.bg_blur = bg_blur
         self.current_lang = current_lang
         self.init_ui()
 
@@ -40,17 +37,6 @@ class ModManager(QDialog):
         self.setStyleSheet(f"background-color: rgb({self.bg_color});")
 
         layout = QVBoxLayout()
-
-        # Background image and blur effect
-        if self.bg_path:
-            self.background = QLabel(self)
-            self.background.setGeometry(0, 0, 850, 500)
-            self.background.setPixmap(QPixmap(self.bg_path).scaled(850, 500, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-
-            self.blur_effect = QGraphicsBlurEffect()
-            self.blur_effect.setBlurRadius(self.bg_blur)
-            self.background.setGraphicsEffect(self.blur_effect)
-            self.background.lower()
 
         # Label for the title
         title_label = QLabel(lang(self.current_lang, 'mod_manager_title'))
@@ -209,8 +195,8 @@ class ModManager(QDialog):
             self.load_mods_to_list()
 
 # Function to show the mod manager dialog
-def show_mod_manager(bg_color=f"{variables.bg_color}", icon=f"{variables.icon}", bg_path=variables.bg_path, bg_blur=variables.bg_blur, current_lang="en"):
-    mod_manager = ModManager(bg_color, icon, bg_path, bg_blur, current_lang)
+def show_mod_manager(icon=f"{variables.icon}", current_lang="en"):
+    mod_manager = ModManager(icon, current_lang)
     mod_manager.exec_()
 
 

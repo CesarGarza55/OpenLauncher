@@ -103,10 +103,7 @@ if config_manager.get_ask_update() == "yes":
 discord_manager = DiscordManager()
 
 # Use modern Material Design theme (no plugin system)
-bg_path = variables.bg_path  # Keep as fallback
 icon = variables.icon
-bg_color = variables.bg_color  # Not used in Material Design
-bg_blur = 0  # No blur in modern design
 
 # Initialize empty version lists (will be loaded in background)
 versions = list()
@@ -133,12 +130,9 @@ def initialize_main_window(loading_screen, app, version_loader):
     """Initialize the main window"""
     # Wait for versions to load
     version_loader.wait()
-    
+
     window = MainWindow(
-        bg_path,
-        bg_color,
         icon,
-        bg_blur,
         system_lang,
         versions,
         forge_versions,
@@ -148,11 +142,11 @@ def initialize_main_window(loading_screen, app, version_loader):
         config_manager,
         app
     )
-    
+
     loading_screen.loader_thread = MainWindowLoader()
     loading_screen.loader_thread.finished.connect(lambda: show_main_window(loading_screen, window))
     loading_screen.loader_thread.start()
-    
+
     return window
 
 def show_main_window(loading_screen, window):

@@ -14,15 +14,15 @@ from resource_cache import get_cached_pixmap, get_cached_icon
 from material_design import MaterialCard, AnimatedButton, MaterialColors
 
 
-def create_version_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
+def create_version_dialog(system_lang, icon,
                           title, info_text, versions_list, default_version, 
-                          install_callback, icon_type="minecraft"):
+                          install_callback, version_type):
     """Create a modern Material Design version selection dialog"""
     window = QDialog()
     window.setWindowTitle(title)
     window.setFixedSize(400, 220)
     window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowMaximizeButtonHint)
-    window.setWindowIcon(QIcon(icon))
+    window.setWindowIcon(QIcon(variables.minecraft_icon))
     window.setStyleSheet(f"background-color: {MaterialColors.BACKGROUND};")
     
     # Center window
@@ -55,14 +55,8 @@ def create_version_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     versions_drop = QComboBox()
     versions_drop.setMinimumHeight(48)
     
-    icon_map = {
-        "minecraft": variables.minecraft_icon,
-        "fabric": variables.fabric_icon,
-        "forge": variables.forge_icon
-    }
-    
     for version in versions_list:
-        versions_drop.addItem(get_cached_icon(icon_map.get(icon_type, variables.minecraft_icon)), version)
+        versions_drop.addItem(get_cached_icon(version_type == "minecraft" and variables.minecraft_icon or variables.forge_icon), version)
     
     versions_drop.setCurrentText(default_version)
     versions_drop.setMaxVisibleItems(10)
@@ -78,15 +72,15 @@ def create_version_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     return window
 
 
-def create_fabric_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
+def create_fabric_dialog(system_lang, icon,
                          versions_list, loaders_list, default_version, 
-                         install_callback):
+                         install_callback, version_type):
     """Create modern Material Design Fabric installation dialog"""
     window = QDialog()
     window.setWindowTitle(f"{lang(system_lang, 'install')} Fabric")
     window.setFixedSize(420, 280)
     window.setWindowFlags(window.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowMaximizeButtonHint)
-    window.setWindowIcon(QIcon(icon))
+    window.setWindowIcon(QIcon(variables.fabric_icon))
     window.setStyleSheet(f"background-color: {MaterialColors.BACKGROUND};")
     
     # Center window
@@ -119,7 +113,7 @@ def create_fabric_dialog(parent, system_lang, bg_color, bg_path, bg_blur, icon,
     versions_drop = QComboBox()
     versions_drop.setMinimumHeight(48)
     for version in versions_list:
-        versions_drop.addItem(get_cached_icon(variables.minecraft_icon), version)
+        versions_drop.addItem(get_cached_icon(variables.fabric_icon), version)
     versions_drop.setCurrentText(default_version)
     versions_drop.setMaxVisibleItems(10)
     card_layout.addWidget(versions_drop)

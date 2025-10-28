@@ -170,7 +170,7 @@ class UiMethods:
         arg = self.jvm_arguments if self.jvm_arguments != "" else variables.defaultJVM
         
         data = {
-            'name': self.lineEdit.text(),
+            'name': self.username_input.text(),
             'toggle_snapshots': self.show_snapshots,
             'jvm_arguments': arg,
             'last_version': self.comboBox.currentText(),
@@ -220,7 +220,7 @@ class UiMethods:
             return
         
         if self.access_token == "" or self.access_token is None:
-            mine_user = self.lineEdit.text()
+            mine_user = self.username_input.text()
         else:
             mine_user = self.user_name
         
@@ -301,8 +301,8 @@ class UiMethods:
         self.btn_forge.setEnabled(True)
         self.btn_play.setEnabled(True)
         self.btn_account.setEnabled(True)
-        self.btn_mod_manger.setEnabled(True)
-        self.lineEdit.setEnabled(True)
+        self.btn_mod_manager.setEnabled(True)
+        self.username_input.setEnabled(True)
         self.comboBox.setEnabled(True)
 
     def disable_buttons(self):
@@ -312,8 +312,8 @@ class UiMethods:
         self.btn_forge.setEnabled(False)
         self.btn_play.setEnabled(False)
         self.btn_account.setEnabled(False)
-        self.btn_mod_manger.setEnabled(False)
-        self.lineEdit.setEnabled(False)
+        self.btn_mod_manager.setEnabled(False)
+        self.username_input.setEnabled(False)
         self.comboBox.setEnabled(False)
 
     def start_installation(self, install_function, version, loader=None):

@@ -11,6 +11,8 @@ website_url = "https://openlauncher.codevbox.com"
 # Set the default JVM arguments
 # Separate the arguments with a comma ("arg1", "arg2", "arg3")
 defaultJVM = ["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"]
+# Default JVM arguments as a string
+defaultJVM_string = " ".join(defaultJVM).strip()[:60] + "..."
 jvm_arguments = ""
 
 # Define the client ID for the Discord Rich Presence
@@ -82,9 +84,7 @@ user_uuid = ""
 script_dir = os.path.dirname(__file__)
 
 # Set the paths for the images
-bg_path = os.path.join(script_dir, 'img/bg.webp').replace("\\", "/")
 icon = os.path.join(script_dir, 'img/icon.webp').replace("\\", "/")
-bg_blur = 10
 minecraft_icon = os.path.join(script_dir, 'img/minecraft.webp').replace("\\", "/")
 fabric_icon = os.path.join(script_dir, 'img/fabric.webp').replace("\\", "/")
 forge_icon = os.path.join(script_dir, 'img/forge.webp').replace("\\", "/")

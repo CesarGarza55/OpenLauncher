@@ -6,7 +6,7 @@ Contains main window UI, dialogs, and styling
 import os
 import json
 import minecraft_launcher_lib
-from PyQt5.QtWidgets import (QVBoxLayout, QWidget, QLineEdit, QLabel, 
+from PyQt5.QtWidgets import (QVBoxLayout, QWidget, QLineEdit, QLabel, QAction,
                              QComboBox, QHBoxLayout, QGridLayout, QSpacerItem, 
                              QSizePolicy, QCheckBox, QTextEdit, QMessageBox, QTabWidget)
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QTimer
@@ -30,17 +30,14 @@ from material_design import (MaterialCard, AnimatedButton, FadeInWidget,
 
 class Ui_MainWindow(object):
     """Main window UI setup and configuration"""
-    
-    def setupUi(self, MainWindow, bg_path, bg_color, icon, bg_blur, system_lang, 
+
+    def setupUi(self, MainWindow, icon, system_lang, 
                 versions, forge_versions, fabric_versions, fabric_loaders,
                 discord_manager, config_manager):
         
         # Store references
         self.system_lang = system_lang
-        self.bg_color = bg_color
-        self.bg_path = bg_path
         self.icon = icon
-        self.bg_blur = bg_blur
         self.discord_manager = discord_manager
         self.config_manager = config_manager
         self.minecraft_directory = variables.minecraft_directory
@@ -49,7 +46,7 @@ class Ui_MainWindow(object):
         # Initialize version installer
         self.version_installer = VersionInstaller(self.minecraft_directory)
         
-        # Store version data
+        # Store version data-
         self.versions = versions
         self.forge_versions = forge_versions
         self.fabric_versions = fabric_versions
@@ -139,14 +136,15 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addWidget(self.label)
         
         # Modern text input
-        self.lineEdit = QLineEdit(self.game_tab)
-        self.lineEdit.setObjectName("lineEdit")
-        self.lineEdit.setMinimumSize(QSize(350, 48))
-        self.lineEdit.setMaximumSize(QSize(400, 48))
-        self.lineEdit.setPlaceholderText(lang(system_lang, "user_placeholder"))
-        self.lineEdit.setAlignment(Qt.AlignCenter)
-        self.lineEdit.setFocusPolicy(Qt.ClickFocus)
-        self.verticalLayout_2.addWidget(self.lineEdit)
+        self.username_input = QLineEdit(self.game_tab)
+        self.username_input.setObjectName("lineEdit")
+        self.username_input.setMinimumSize(QSize(350, 48))
+        self.username_input.setMaximumSize(QSize(400, 48))
+        self.username_input.setPlaceholderText(lang(system_lang, "user_placeholder"))
+        self.username_input.setAlignment(Qt.AlignCenter)
+        self.username_input.setFocusPolicy(Qt.ClickFocus)
+        self.username_input.textChanged.connect(self.on_username_changed)
+        self.verticalLayout_2.addWidget(self.username_input)
 
         # Modern animated account button
         self.btn_account = AnimatedButton("", self.game_tab, "primary")
@@ -185,18 +183,18 @@ class Ui_MainWindow(object):
         self.btn_forge.setMaximumSize(QSize(400, 48))
         self.verticalLayout.addWidget(self.btn_forge)
 
-        self.btn_mod_manger = AnimatedButton("", self.game_tab, "outlined")
-        self.btn_mod_manger.setObjectName("btn_mod_manger")
-        self.btn_mod_manger.setMinimumSize(QSize(350, 48))
-        self.btn_mod_manger.setMaximumSize(QSize(400, 48))
-        self.verticalLayout.addWidget(self.btn_mod_manger)
+        self.btn_mod_manager = AnimatedButton("", self.game_tab, "outlined")
+        self.btn_mod_manager.setObjectName("btn_mod_manager")
+        self.btn_mod_manager.setMinimumSize(QSize(350, 48))
+        self.btn_mod_manager.setMaximumSize(QSize(400, 48))
+        self.verticalLayout.addWidget(self.btn_mod_manager)
 
         # Settings button - outlined style
         self.btn_settings_nav = AnimatedButton("", self.game_tab, "outlined")
         self.btn_settings_nav.setObjectName("btn_settings_nav")
         self.btn_settings_nav.setMinimumSize(QSize(350, 48))
         self.btn_settings_nav.setMaximumSize(QSize(400, 48))
-        self.btn_settings_nav.clicked.connect(lambda: self.tab_widget.setCurrentIndex(1))
+        self.btn_settings_nav.clicked.connect(self.open_settings_tab)
         self.verticalLayout.addWidget(self.btn_settings_nav)
 
         self.horizontalLayout.addLayout(self.verticalLayout)
@@ -288,6 +286,15 @@ class Ui_MainWindow(object):
         
         # Initialize UI state
         self.initialize_ui_state(MainWindow)
+
+    def on_username_changed(self, text):
+        """Detect changes in the username input"""
+        # Delete the blank spaces
+        text = text.strip()
+        if text == "" and not self.access_token:
+            self.btn_play.setDisabled(True)
+        else:
+            self.btn_play.setDisabled(False)
     
     def create_settings_tab(self):
         """Create settings tab with modern dark styling"""
@@ -424,7 +431,17 @@ class Ui_MainWindow(object):
         self.save_btn.setMinimumHeight(40)
         
         return settings_widget
-    
+
+    def open_settings_tab(self):
+        """Open the settings tab"""
+        self.tab_widget.setCurrentIndex(1)
+        # Restore of the method remains unchanged
+        if self.jvm_arguments != "" and self.jvm_arguments != variables.defaultJVM:
+            self.entry_jvm_arguments.setText(" ".join(self.jvm_arguments))
+        self.lang_combobox.setCurrentIndex(self.lang_combobox.findData(self.system_lang))
+        self.snapshots_checkbox.setChecked(self.show_snapshots)
+        self.discord_checkbox.setChecked(self.discord_manager.enabled)
+
     def save_settings(self):
         """Save settings from the settings tab"""
         # Save JVM arguments
@@ -458,11 +475,7 @@ class Ui_MainWindow(object):
         
         # Update versions list if snapshots changed
         self.update_list_versions()
-        
-        # Show confirmation
-        QMessageBox.information(None, lang(self.system_lang, "success"), 
-                               lang(self.system_lang, "settings_saved"))
-        
+                
         # Switch back to game tab
         self.tab_widget.setCurrentIndex(0)
     
@@ -565,6 +578,7 @@ class Ui_MainWindow(object):
             self.update_account_display()
             # Return to the game tab after successful login
             self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.game_tab))
+            self.btn_play.setDisabled(False)
         else:
             self.auth_status.setText(lang(self.system_lang, "login_failed"))
 
@@ -593,14 +607,14 @@ class Ui_MainWindow(object):
         
         if self.access_token and self.user_name:
             # User is logged in
-            self.lineEdit.setVisible(False)
+            self.username_input.setVisible(False)
             self.label.setText(f"{lang(self.system_lang, 'logged_as')} {self.user_name}")
             self.btn_account.setText(lang(self.system_lang, "logout_microsoft"))
             self.btn_account.setIcon(QIcon(variables.logout_icon))
             self.btn_account.clicked.connect(self.logout_microsoft)
         else:
             # User is not logged in
-            self.lineEdit.setVisible(True)
+            self.username_input.setVisible(True)
             self.label.setText(lang(self.system_lang, "label_username"))
             self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
             self.btn_account.setIcon(QIcon(variables.login_icon))
@@ -616,7 +630,7 @@ class Ui_MainWindow(object):
         self.btn_fabric.setText(lang(self.system_lang, "btn_install_loader"))
         self.btn_forge.setText(lang(self.system_lang, "btn_install_loader").replace("Fabric", "Forge"))
         self.btn_play.setText(lang(self.system_lang, "btn_play"))
-        self.btn_mod_manger.setText(lang(self.system_lang, "btn_mod_manager"))
+        self.btn_mod_manager.setText(lang(self.system_lang, "btn_mod_manager"))
         self.btn_settings_nav.setText(lang(self.system_lang, "settings"))
         
         # Update account button
@@ -631,7 +645,7 @@ class Ui_MainWindow(object):
             self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
         
         # Update placeholder
-        self.lineEdit.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
+        self.username_input.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
         
         # Update settings tab
         self.update_settings_translations()
@@ -668,7 +682,7 @@ class Ui_MainWindow(object):
         
         # Update checkboxes
         if hasattr(self, 'snapshots_checkbox'):
-            self.snapshots_checkbox.setParent(None)
+            self.snapshots_checkbox.setText(lang(self.system_lang, "checkbox_snapshots"))
         
         if hasattr(self, 'discord_checkbox'):
             self.discord_checkbox.setText(lang(self.system_lang, "discord_rpc"))
@@ -692,7 +706,7 @@ class Ui_MainWindow(object):
             current_index = self.lang_combobox.findData(self.system_lang)
             if current_index >= 0:
                 self.lang_combobox.setCurrentIndex(current_index)
-        self.lineEdit.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
+        self.username_input.setPlaceholderText(lang(self.system_lang, "user_placeholder"))
 
     def apply_styles(self, MainWindow):
         """Apply Material Design styling - most styling handled by material_design.py"""
@@ -705,7 +719,7 @@ class Ui_MainWindow(object):
         self.btn_fabric.clicked.connect(self.install_fabric_versions)
         self.btn_forge.clicked.connect(self.install_forge_versions)
         self.btn_play.clicked.connect(self.run_minecraft)
-        self.btn_mod_manger.clicked.connect(self.open_mod_manager)
+        self.btn_mod_manager.clicked.connect(self.open_mod_manager)
         self.btn_account.clicked.connect(self.login_microsoft)
 
     def initialize_ui_state(self, MainWindow):
@@ -731,7 +745,7 @@ class Ui_MainWindow(object):
                 profile = "No connection"
             
             if profile == "No connection":
-                self.lineEdit.setVisible(True)
+                self.username_input.setVisible(True)
                 self.label.setText(lang(self.system_lang, "label_username"))
                 self.btn_account.setText(lang(self.system_lang, "no_internet"))
                 self.btn_account.clicked.disconnect()
@@ -756,7 +770,7 @@ class Ui_MainWindow(object):
             self.maximize = user_data.get('maximized', False)
             
             if self.user_name:
-                self.lineEdit.setText(self.user_name)
+                self.username_input.setText(self.user_name)
             if last_version:
                 index = self.comboBox.findText(last_version, Qt.MatchFixedString)
                 if index >= 0:
@@ -764,7 +778,12 @@ class Ui_MainWindow(object):
             
             if discord_rpc and not self.discord_manager.is_enabled():
                 self.discord_manager.connect(self.system_lang)
-        
+
+        if self.user_name == "" and not self.access_token:
+            self.btn_play.setDisabled(True)
+        else:
+            self.btn_play.setDisabled(False)
+
         # Load UUID
         self.user_uuid = self.config_manager.load_user_uuid()
 
@@ -782,7 +801,7 @@ class Ui_MainWindow(object):
         self.btn_fabric.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_install_loader"), None))
         self.btn_forge.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_install_loader").replace("Fabric", "Forge"), None))
         self.btn_play.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_play"), None))
-        self.btn_mod_manger.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_mod_manager"), None))
+        self.btn_mod_manager.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "btn_mod_manager"), None))
         self.btn_account.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "login_microsoft"), None))
         self.btn_settings_nav.setText(QCoreApplication.translate("MainWindow", lang(self.system_lang, "settings"), None))
         
@@ -801,8 +820,10 @@ class Ui_MainWindow(object):
         self.btn_forge.setIconSize(QSize(30, 30))
         self.btn_play.setIcon(get_cached_icon(variables.play_icon))
         self.btn_play.setIconSize(QSize(20, 20))
-        self.btn_mod_manger.setIcon(get_cached_icon(variables.mod_icon))
-        self.btn_mod_manger.setIconSize(QSize(20, 20))
+        self.btn_mod_manager.setIcon(get_cached_icon(variables.mod_icon))
+        self.btn_mod_manager.setIconSize(QSize(20, 20))
+        self.btn_settings_nav.setIcon(get_cached_icon(variables.settings_icon))
+        self.btn_settings_nav.setIconSize(QSize(20, 20))
         self.btn_account.setIcon(get_cached_icon(variables.login_icon))
         self.btn_account.setIconSize(QSize(20, 20))
 
@@ -824,6 +845,8 @@ class Ui_MainWindow(object):
             # Update UI
             self.update_account_display()
             self.save_data()
+            if self.username_input.text().strip() == "":
+                self.btn_play.setDisabled(True)
         except Exception as e:
             write_log(e, "microsoft_logout")
             self.save_data()

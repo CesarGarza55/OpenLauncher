@@ -73,68 +73,6 @@ def load_theme_plugins(plugin_dir):
                             print(f"Could not load theme from {config_path}: {e}")
     return themes
 
-
-def apply_theme(theme, plugin_dir):
-    """
-    Apply a theme and return theme values
-    Returns: tuple (bg_path, bg_color, icon, bg_blur)
-    """
-    # Dictionary with the default paths
-    default_paths = {
-        'bg_path': variables.bg_path,
-        'icon': variables.icon,
-        'bg_color': variables.bg_color,
-        'bg_blur': variables.bg_blur
-    }
-    
-    result = {}
-    
-    # Update the paths
-    for key in default_paths:
-        if key in theme:
-            if key == 'bg_color':
-                # Validate bg_color format
-                if isinstance(theme[key], str) and all(0 <= int(c) <= 255 for c in theme[key].split(',')):
-                    result[key] = theme[key]
-                else:
-                    messagebox.showerror(
-                        "Error", 
-                        f"The theme {theme['folder']} has an invalid bg_color value "
-                        f"(must be in the format 'R, G, B') for example '25, 45, 75' "
-                        f"the values must be between 0 and 255.\nThe default color will be used"
-                    )
-                    result[key] = default_paths[key]
-            elif key == 'bg_blur':
-                # Validate bg_blur range
-                if isinstance(theme[key], int) and 0 <= theme[key] <= 64:
-                    result[key] = theme[key]
-                else:
-                    messagebox.showerror(
-                        "Error", 
-                        f"The theme {theme['folder']} has an invalid bg_blur value "
-                        f"(must be an number between 0 and 64).\nThe default value will be used"
-                    )
-                    result[key] = default_paths[key]
-            elif key == 'folder':
-                pass
-            else:
-                # Validate image path
-                image_path = os.path.join(plugin_dir, theme['folder'], theme[key]).replace("\\", "/")
-                if os.path.isfile(image_path):
-                    result[key] = image_path
-                else:
-                    messagebox.showerror(
-                        "Error", 
-                        f"The theme {theme['folder']} has an invalid {key} path.\n"
-                        f"The default path will be used"
-                    )
-                    result[key] = default_paths[key]
-        else:
-            result[key] = default_paths[key]
-    
-    return result['bg_path'], result['bg_color'], result['icon'], result['bg_blur']
-
-
 def is_java_installed():
     """Check if Java is installed on the system"""
     try:

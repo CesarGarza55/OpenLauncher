@@ -31,7 +31,7 @@ class MainWindow(QMainWindow, Ui_MainWindow, UiMethods, WindowMethods):
     - WindowMethods: Methods for installation and settings windows
     """
     
-    def __init__(self, bg_path, bg_color, icon, bg_blur, system_lang, 
+    def __init__(self, icon, system_lang, 
                  versions, forge_versions, fabric_versions, fabric_loaders,
                  discord_manager, config_manager, app):
         super().__init__()
@@ -40,11 +40,8 @@ class MainWindow(QMainWindow, Ui_MainWindow, UiMethods, WindowMethods):
         
         # Setup UI
         self.setupUi(
-            self, 
-            bg_path, 
-            bg_color, 
-            icon, 
-            bg_blur, 
+            self,
+            icon,
             system_lang,
             versions, 
             forge_versions, 
