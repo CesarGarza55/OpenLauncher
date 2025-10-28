@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="100px" src="data/img/creeper.ico" align="center" alt="OpenLauncher" />
+  <img width="100px" src="data/img/icon.webp" align="center" alt="OpenLauncher" />
   <h2 align="center">OpenLauncher</h2>
   <p align="center">An open-source Minecraft launcher for Windows and Linux.</p>
 </p>
@@ -143,16 +143,15 @@ Or run:
 
 When you open the application, a welcome window greets you. You can disable this feature using a checkbox.
 
-![imagen](https://github.com/user-attachments/assets/e7ba3a65-a446-4dae-b535-8ee740d75a46)
+<img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/8c22dd45-2b25-45c3-8968-a35ddcb21002" />
 
 The main interface shows different sections:
 
-![imagen](https://github.com/user-attachments/assets/f4f33292-6cae-4b15-835e-1f92992c2922)
+<img width="994" height="600" alt="main" src="https://github.com/user-attachments/assets/b24609e8-7d7e-48f5-8642-ecd4cf258c10" />
 
 To install a version, use the following interface where you select the version and click install:
 
-![imagen](https://github.com/user-attachments/assets/f1913ea9-c1e0-427e-8ede-aff783be42d4)
-
+<img width="994" height="600" alt="install" src="https://github.com/user-attachments/assets/6310e4b3-0b6c-4c7b-94d3-f5169d0b68ed" />
 
 By default the following JVM arguments are used:
 
@@ -162,7 +161,7 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-![imagen](https://github.com/user-attachments/assets/a8cee494-e248-4dc2-827f-52640e0f0291)
+<img width="994" height="600" alt="settings" src="https://github.com/user-attachments/assets/61e6ce6f-c22e-4c71-9e9d-58fec48f36b6" />
 
 ## 🔑 Sign in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
@@ -172,30 +171,31 @@ To log in with your official Microsoft account, follow these steps:
 3. Enter your Microsoft account with Minecraft purchased
 4. Once the authentication process is complete, you will see your account appear in the launcher
 
-![imagen](https://github.com/user-attachments/assets/c7d15cf5-a397-4004-aa2a-0380dd39b35b)
+<img width="994" height="600" alt="login" src="https://github.com/user-attachments/assets/d882cbfb-ced4-4e5a-89d3-71b991506a83" />
 
 ## Mod Manager
 
-You can install, activate and deactivate mods with the new mod manager:
+You can install, activate and deactivate mods with the mod manager:
 
-![imagen](https://github.com/user-attachments/assets/d24ed07a-85da-4d91-a081-2f43597d4eae)
-
+<img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
 
 ## 🧪 Testing
 My PC Specs:
-- CPU: AMD Ryzen 5 3450U 4-Core 2.1GHz
-- GPU: Radeon Vega 8 Graphics
-- RAM: 16GB DDR4 SODIMM 2400MHz
-- Operating System: Debian 12 (bookworm) x86_64 
+- CPU: AMD Ryzen 5 5600g (3.90 GHz)
+- GPU: Radeon Vega 7 Graphics
+- RAM: 32GB DDR4 DIMM 3200MT/s
+- Operating System: Windows 11 24H2 (26100.6584)
 
 Tested Minecraft Version:
-- Launcher version: Beta - 1.5.7
+- Playing on a private server
+- FPS: 200+
+- Launcher version: Beta - 1.6.0
 - RAM Allocated: 2GB (Default JVM Arguments)
 - Minecraft Version: 1.21.4
-- Fabric: 0.16.10
+- Fabric: 0.16.14
 - Shaders: [MakeUp-UltraFast-9.1b](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-![imagen](https://github.com/user-attachments/assets/cc7a5693-7cbe-41d2-abb2-2e8a74dec321)
+<img width="996" height="594" alt="image" src="https://github.com/user-attachments/assets/0c281667-7871-414f-b50c-922f91fb88b4" />
 
 ## 🐞 Bugs
 
@@ -240,6 +240,7 @@ OpenLauncher uses the following libraries and tools:
 - Tkinter
 - pypresence
 - requests
+- keyring
 
 The initial concept of this project was inspired by [this project](https://github.com/Irr22/Minecraft-launcher). However, no original code from that project is used in the current version of OpenLauncher.
 
@@ -254,3 +255,4 @@ You can review the Terms and Conditions and the Privacy Policy regarding the use
 By using OpenLauncher, you agree to comply with these terms and acknowledge that you have read and understood my privacy practices. I am committed to protecting your personal information and ensuring transparency in how I handle your data. For any questions or concerns, please contact me at [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Terms%20of%20Service).
 
 Thank you for using OpenLauncher!
+
