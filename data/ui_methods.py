@@ -170,7 +170,7 @@ class UiMethods:
         arg = self.jvm_arguments if self.jvm_arguments != "" else variables.defaultJVM
         
         data = {
-            'name': self.username_input.text(),
+            'name': self.user_name,
             'toggle_snapshots': self.show_snapshots,
             'jvm_arguments': arg,
             'last_version': self.comboBox.currentText(),
@@ -327,7 +327,7 @@ class UiMethods:
 
     def open_mod_manager(self):
         """Switch to mod manager tab"""
-        self.tab_widget.setCurrentIndex(2)  # Index 2 is the mod manager tab
+        self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.mod_manager_tab))
 
 
 class LoadingScreen(QSplashScreen):

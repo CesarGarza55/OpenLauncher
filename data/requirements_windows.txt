@@ -4,3 +4,4 @@ PyQt5
 PyQtWebEngine
 pypresence
 requests
+keyring

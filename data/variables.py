@@ -4,6 +4,16 @@ import sys
 import time
 import requests
 import minecraft_launcher_lib
+import json
+import stat
+
+# Optional secure storage for refresh tokens via keyring
+try:
+    import keyring
+    KEYRING_AVAILABLE = True
+except Exception:
+    keyring = None
+    KEYRING_AVAILABLE = False
 
 # Website URL
 website_url = "https://openlauncher.codevbox.com"
@@ -109,6 +119,79 @@ elif sys.platform == "linux":
 # Set config directory and refresh token file path
 config_dir = os.path.join(app_directory, "config")
 refresh_token_file = os.path.join(config_dir, "refresh_token.json")
+
+
+SERVICE_NAME = "OpenLauncher"
+
+
+def save_refresh_token(token):
+    """Save refresh token using keyring if available, otherwise to a protected file."""
+    try:
+        s = token if isinstance(token, str) else json.dumps(token)
+    except Exception:
+        s = str(token)
+
+    if KEYRING_AVAILABLE:
+        try:
+            keyring.set_password(SERVICE_NAME, 'refresh_token', s)
+            return
+        except Exception:
+            pass
+
+    # Fallback to file
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        path = refresh_token_file
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(s)
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def load_refresh_token():
+    """Load refresh token from keyring or fallback file. Returns None if not found."""
+    if KEYRING_AVAILABLE:
+        try:
+            s = keyring.get_password(SERVICE_NAME, 'refresh_token')
+            if s:
+                try:
+                    return json.loads(s)
+                except Exception:
+                    return s
+        except Exception:
+            pass
+
+    path = refresh_token_file
+    if os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                s = f.read()
+            try:
+                return json.loads(s)
+            except Exception:
+                return s
+        except Exception:
+            return None
+
+    return None
+
+
+def delete_refresh_token():
+    """Remove stored refresh token from keyring and fallback file."""
+    if KEYRING_AVAILABLE:
+        try:
+            keyring.delete_password(SERVICE_NAME, 'refresh_token')
+        except Exception:
+            pass
+    try:
+        if os.path.exists(refresh_token_file):
+            os.remove(refresh_token_file)
+    except Exception:
+        pass
 
 # Set Minecraft directory
 if debug_mode:

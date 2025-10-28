@@ -11,11 +11,9 @@ import http.server
 import threading
 import urllib.parse
 
-config_dir = os.path.join(variables.app_directory, "config")
-
 # Redirect sys.stderr and sys.stdout to a log file in the compiled environment
 if getattr(sys, 'frozen', False):  # Check if running in a frozen/compiled state
-    log_file = os.path.join(config_dir, 'server.log')
+    log_file = os.path.join(variables.config_dir, 'server.log')
     sys.stdout = open(log_file, 'a', encoding='utf-8')
     sys.stderr = open(log_file, 'a', encoding='utf-8')
 
@@ -32,6 +30,9 @@ class AuthCallback:
 
 auth_callback = AuthCallback()
 
+
+# Use centralized token storage helpers from variables.py (keyring + safe file fallback)
+
 class LoginThread(QThread):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
@@ -44,17 +45,18 @@ class LoginThread(QThread):
         self.do_login()
 
     def do_login(self):
-        refresh_token_file = os.path.join(config_dir, "refresh_token.json")
+        # Try loading a stored refresh token (keyring first, fallback file)
+        refresh_token = variables.load_refresh_token()
 
-        if os.path.isfile(refresh_token_file):
-            with open(refresh_token_file, "r", encoding="utf-8") as f:
-                refresh_token = json.load(f)
-                try:
-                    account_info = minecraft_launcher_lib.microsoft_account.complete_refresh(CLIENT_ID, None, REDIRECT_URL, refresh_token)
-                    self.finished.emit(account_info)
-                    return
-                except minecraft_launcher_lib.exceptions.InvalidRefreshToken:
-                    pass  # Ignore invalid refresh token and proceed to login
+        if refresh_token:
+            try:
+                account_info = minecraft_launcher_lib.microsoft_account.complete_refresh(CLIENT_ID, None, REDIRECT_URL, refresh_token)
+                self.finished.emit(account_info)
+                return
+            except minecraft_launcher_lib.exceptions.InvalidRefreshToken:
+                # Stored token is invalid, remove it and continue to interactive login
+                variables.delete_refresh_token()
+                pass
 
         # Need to login
         global auth_callback
@@ -79,8 +81,8 @@ class LoginThread(QThread):
                 try:
                     account_info = minecraft_launcher_lib.microsoft_account.complete_login(CLIENT_ID, None, REDIRECT_URL, auth_callback.auth_code, code_verifier)
                     if "refresh_token" in account_info:
-                        with open(refresh_token_file, "w", encoding="utf-8") as f:
-                            json.dump(account_info["refresh_token"], f, ensure_ascii=False, indent=4)
+                        # Save refresh token securely (keyring or protected file)
+                        variables.save_refresh_token(account_info["refresh_token"])
                     self.finished.emit(account_info)
                 except Exception:
                     self.error.emit(lang(self.parent.system_lang, "login_error"))
@@ -96,7 +98,6 @@ class LoginThread(QThread):
 class CallbackHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         global auth_callback
-        write_log(f"Callback received: {self.path}", "latest")  # Log the callback path
         if self.path == '/favicon.ico':
             self.send_response(204)  # No Content
             self.end_headers()
@@ -108,7 +109,6 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
             code = params.get('code', [None])[0]
             state = params.get('state', [None])[0]
             error = params.get('error', [None])[0]
-            write_log(f"Parsed params - code: {code}, state: {state}, error: {error}", "latest")  # Log parsed parameters
             if error:
                 auth_callback.error = error
             else:

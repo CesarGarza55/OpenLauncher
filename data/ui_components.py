@@ -579,6 +579,8 @@ class Ui_MainWindow(object):
             # Return to the game tab after successful login
             self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.game_tab))
             self.btn_play.setDisabled(False)
+            # Save authentication data
+            self.save_data()
         else:
             self.auth_status.setText(lang(self.system_lang, "login_failed"))
 
@@ -727,36 +729,34 @@ class Ui_MainWindow(object):
         self.update_list_versions()
         
         # Check for Microsoft account authentication
-        if os.path.exists(variables.refresh_token_file):
-            try:
-                # Try to refresh the token directly without UI
-                with open(variables.refresh_token_file, "r", encoding="utf-8") as f:
-                    refresh_token = json.load(f)
-                profile = minecraft_launcher_lib.microsoft_account.complete_refresh(
-                    "3f59fbe7-2c4b-4343-9a61-c03104ddaedf", 
-                    None, 
-                    "http://localhost:8080/callback", 
-                    refresh_token
-                )
-            except Exception as e:
-                profile = None
-            
-            if not variables.check_network():
-                profile = "No connection"
-            
-            if profile == "No connection":
-                self.username_input.setVisible(True)
-                self.label.setText(lang(self.system_lang, "label_username"))
-                self.btn_account.setText(lang(self.system_lang, "no_internet"))
-                self.btn_account.clicked.disconnect()
-                self.btn_account.setDisabled(True)
-            elif profile and 'id' in profile and 'name' in profile:
-                self.access_token = profile['access_token']
-                self.user_name = profile['name']
-                self.user_uuid = profile['id']
-                self.update_account_display()
-            else:
-                self.update_account_display()
+        try:
+            # Try to refresh the token directly without UI
+            refresh_token = variables.load_refresh_token()
+            profile = minecraft_launcher_lib.microsoft_account.complete_refresh(
+                "3f59fbe7-2c4b-4343-9a61-c03104ddaedf", 
+                None, 
+                "http://localhost:8080/callback", 
+                refresh_token
+            )
+        except Exception as e:
+            profile = None
+        
+        if not variables.check_network():
+            profile = "No connection"
+        
+        if profile == "No connection":
+            self.username_input.setVisible(True)
+            self.label.setText(lang(self.system_lang, "label_username"))
+            self.btn_account.setText(lang(self.system_lang, "no_internet"))
+            self.btn_account.clicked.disconnect()
+            self.btn_account.setDisabled(True)
+        elif profile and 'id' in profile and 'name' in profile:
+            self.access_token = profile['access_token']
+            self.user_name = profile['name']
+            self.user_uuid = profile['id']
+            self.update_account_display()
+        else:
+            self.update_account_display()
         
         # Load user data
         user_data = self.config_manager.load_user_data()

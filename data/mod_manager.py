@@ -1,6 +1,6 @@
 import os, shutil
 from tkinter import messagebox
-from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect, QAbstractItemView, QWidget, QListWidget, QSplitter
+from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect, QAbstractItemView, QWidget, QListWidget, QSplitter, QTabWidget
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QPixmap
 import variables
@@ -190,7 +190,43 @@ class ModManager(QDialog):
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(self, lang(self.current_lang, "select_mod"), "", "Mod Files (*.jar);;All Files (*)", options=options)
         if file_name:
-            shutil.copy(file_name, self.mod_directory)
+            base_name = os.path.basename(file_name)
+            dest_path = os.path.join(self.mod_directory, base_name)
+
+            # Normalize paths for comparison to avoid SameFileError when paths differ only by separators
+            try:
+                src_norm = os.path.normcase(os.path.abspath(file_name))
+                dst_norm = os.path.normcase(os.path.abspath(dest_path))
+            except Exception:
+                src_norm = file_name
+                dst_norm = dest_path
+
+            # If source and destination are the same file, inform the user and do nothing
+            if src_norm == dst_norm:
+                try:
+                    messagebox.showinfo(lang(self.current_lang, "file_exists"), lang(self.current_lang, "file_exists"))
+                except Exception:
+                    pass
+                return
+
+            # If destination exists (different file), ask before overwriting
+            if os.path.exists(dest_path):
+                if not messagebox.askyesno(lang(self.current_lang, "file_exists"), lang(self.current_lang, "file_exists")):
+                    return
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+
+            try:
+                shutil.copy(file_name, dest_path)
+            except shutil.SameFileError:
+                # Already handled above, but catch defensively
+                return
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not install mod: {e}")
+                return
+
             self.list_mods()
             self.load_mods_to_list()
 
@@ -230,7 +266,8 @@ class ModManagerWidget(QWidget):
         # Header with back button
         header_layout = QHBoxLayout()
         self.back_btn = AnimatedButton("← " + lang(self.current_lang, "back"), self, "text")
-        self.back_btn.clicked.connect(lambda: self.parent().setCurrentIndex(0))
+        # Use a safe go-back handler that finds the QTabWidget ancestor instead of relying on parent()
+        self.back_btn.clicked.connect(self.go_back_to_home)
         header_layout.addWidget(self.back_btn)
         header_layout.addStretch()
         layout.addLayout(header_layout)
@@ -339,6 +376,28 @@ class ModManagerWidget(QWidget):
         # Load mods to lists
         self.load_mods_to_list()
 
+    def go_back_to_home(self):
+        """Find the nearest QTabWidget ancestor and switch to the first tab (home/game)."""
+        parent = self.parent()
+        # Walk up the parent chain to find the QTabWidget
+        while parent is not None and not isinstance(parent, QTabWidget):
+            try:
+                parent = parent.parent()
+            except Exception:
+                parent = None
+
+        if isinstance(parent, QTabWidget):
+            try:
+                parent.setCurrentIndex(0)
+            except Exception:
+                pass
+        else:
+            # Fallback: try to close/hide if used as a dialog
+            try:
+                self.hide()
+            except Exception:
+                pass
+
     def list_mods(self):
         """List all mods in the mods directory"""
         self.active_mods = {}
@@ -415,12 +474,40 @@ class ModManagerWidget(QWidget):
         if file_name:
             base_name = os.path.basename(file_name)
             dest_path = os.path.join(self.mod_directory, base_name)
-            
+
+            # Normalize paths for comparison to avoid SameFileError when paths differ only by separators
+            try:
+                src_norm = os.path.normcase(os.path.abspath(file_name))
+                dst_norm = os.path.normcase(os.path.abspath(dest_path))
+            except Exception:
+                src_norm = file_name
+                dst_norm = dest_path
+
+            # If source and destination are the same file, inform the user and do nothing
+            if src_norm == dst_norm:
+                try:
+                    messagebox.showinfo(lang(self.current_lang, "same_file_title"), lang(self.current_lang, "same_file"))
+                except Exception:
+                    pass
+                return
+
+            # If destination exists (different file), ask before overwriting
             if os.path.exists(dest_path):
                 if not messagebox.askyesno(lang(self.current_lang, "file_exists"), lang(self.current_lang, "file_exists")):
                     return
-                    
-            shutil.copy(file_name, dest_path)
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+
+            try:
+                shutil.copy(file_name, dest_path)
+            except shutil.SameFileError:
+                return
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not install mod: {e}")
+                return
+
             self.list_mods()
             self.load_mods_to_list()
     
