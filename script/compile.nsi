@@ -3,7 +3,7 @@ Name "OpenLauncher"
 
 ; Definitions
 !define FILE_DIR "..\output-build"
-Icon "logo.ico"
+Icon "icon.ico"
 OutFile "..\OpenLauncher.exe"
 
 ; Include files
@@ -14,7 +14,7 @@ OutFile "..\OpenLauncher.exe"
 !define APPNAME "OpenLauncher"
 !define DESCRIPTION "OpenLauncher is an open-source Minecraft launcher developed in Python using PyQt5 and the minecraft_launcher_lib library."
 !define DEVELOPER "CesarGarza55"
-!define LOGO_ICON_FILE "logo.ico"
+!define LOGO_ICON_FILE "icon.ico"
 !define LICENSE_TEXT_FILE "LICENSE.txt"
 !define HEADER_IMG_FILE "header.bmp"
 !define VERSIONMAJOR 1
@@ -35,7 +35,7 @@ RequestExecutionLevel admin
 Var StartMenuFolder
 
 ; GUI
-!define MUI_ICON "logo.ico"
+!define MUI_ICON "icon.ico"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_BITMAP "${HEADER_IMG_FILE}"
 !define MUI_ABORTWARNING
@@ -122,7 +122,7 @@ Section "uninstall"
   delete "$DESKTOP\${APPNAME}.lnk"
   rmDir "$SMPROGRAMS\${APPNAME}"
   delete $INSTDIR\OpenLauncher.exe
-  delete $INSTDIR\logo.ico
+  delete $INSTDIR\icon.ico
   delete $INSTDIR\uninstall.exe
   rmDir /r $INSTDIR\_internal
   rmDir $INSTDIR
