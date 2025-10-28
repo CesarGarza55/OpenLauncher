@@ -83,12 +83,24 @@ compile_application() {
     echo -e "${GREEN}Compiling the application...${NC}"
     pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
         --add-data data/img:img/ \
-        --add-data data/updater.py:. \
-        --add-data data/variables.py:. \
-        --add-data data/mod_manager.py:. \
-        --add-data data/microsoft_auth.py:. \
+        --add-data data/config_manager.py:. \
+        --add-data data/discord_manager.py:. \
         --add-data data/lang.py:. \
+        --add-data data/main_window.py:. \
+        --add-data data/material_design.py:. \
         --add-data data/mc_run.py:. \
+        --add-data data/microsoft_auth.py:. \
+        --add-data data/mod_manager.py:. \
+        --add-data data/resource_cache.py:. \
+        --add-data data/ui_components.py:. \
+        --add-data data/ui_dialogs.py:. \
+        --add-data data/ui_menu.py:. \
+        --add-data data/ui_windows.py:. \
+        --add-data data/updater.py:. \
+        --add-data data/utils.py:. \
+        --add-data data/variables.py:. \
+        --add-data data/version_installer.py:. \
+        --add-data data/workers.py:. \
         --name OpenLauncher.bin \
         data/main.py
 

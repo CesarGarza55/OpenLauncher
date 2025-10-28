@@ -23,7 +23,7 @@ executables = [
         script="data/main.py",
         base="Win32GUI",
         target_name="OpenLauncher.exe",
-        icon="data/img/creeper.ico"
+        icon="data/img/icon.ico"
     )
 ]
 
