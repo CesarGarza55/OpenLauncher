@@ -1,11 +1,10 @@
 """
 Utility functions for OpenLauncher
-Includes directory operations, theme loading, and general helper functions
+Includes directory operations and general helper functions
 """
 
 import os
 import sys
-import json
 import subprocess
 import webbrowser
 import variables
@@ -13,7 +12,7 @@ from tkinter import messagebox
 
 
 def open_website(url=None):
-    """Open a specified website or the default plugins website"""
+    """Open a specified website or the default website"""
     if url is None:
         url = variables.website_url
     webbrowser.open(url)
@@ -53,25 +52,6 @@ def open_minecraft_dir():
                 subprocess.Popen(['xdg-open', minecraft_directory])
     else:
         print(f"Directory {minecraft_directory} does not exist")
-
-
-def load_theme_plugins(plugin_dir):
-    """Load theme plugins from the plugins directory"""
-    themes = []
-    if os.path.exists(plugin_dir):
-        for folder in os.listdir(plugin_dir):
-            folder_path = os.path.join(plugin_dir, folder)
-            if os.path.isdir(folder_path):
-                config_path = os.path.join(folder_path, 'theme.json')
-                if os.path.isfile(config_path):
-                    with open(config_path, 'r') as f:
-                        try:
-                            theme = json.load(f)
-                            theme['folder'] = folder  # Add the folder name to the theme
-                            themes.append(theme)
-                        except Exception as e:
-                            print(f"Could not load theme from {config_path}: {e}")
-    return themes
 
 def is_java_installed():
     """Check if Java is installed on the system"""

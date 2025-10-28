@@ -44,8 +44,6 @@ If you are going to compile it yourself, the process is included in `compile-lin
 - **Minecraft Compatibility**: Manages Minecraft versions using the `minecraft_launcher_lib` library.
 - **Open Source**: Easily extendable and modifiable by the community.
 - **Multiplatform**: Available for Windows and Linux operating systems.
-- **Official Themes**: Download and install themes to personalize your launcher.
-- **Theme Creator**: Design your own themes using the [theme creator tool](https://openlauncher.codevbox.com/create).
 - **Multilanguage Support**: Supports multiple languages for a better user experience.
 
 ## 📋 Requirements
@@ -175,21 +173,6 @@ To log in with your official Microsoft account, follow these steps:
 4. Once the authentication process is complete, you will see your account appear in the launcher
 
 ![imagen](https://github.com/user-attachments/assets/c7d15cf5-a397-4004-aa2a-0380dd39b35b)
-
-## 🎨 Themes
-
-OpenLauncher allows you to customize the appearance of the launcher with themes. You can choose from official and community themes, as well as create your own.
-
-### Official themes
-Official themes are provided by me, and you can find them at [https://openlauncher.codevbox.com/themes](https://openlauncher.codevbox.com/themes).
-
-### Theme Creator
-
-If you want to create a custom theme, use the theme creator tool available on [https://openlauncher.codevbox.com/create](https://openlauncher.codevbox.com/create).
-
-### Guide
-
-For a detailed guide on how to install themes, visit [https://openlauncher.codevbox.com/docs](https://openlauncher.codevbox.com/docs).
 
 ## Mod Manager
 

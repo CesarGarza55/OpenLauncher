@@ -115,13 +115,47 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
                 auth_callback.auth_code = code
                 auth_callback.state = state
             auth_callback.event.set()
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
+            # Redirect the user's browser to the provided URL on success.
             if error:
-                self.wfile.write(b'<html><body><h1>Login Failed</h1><p>You can close this window.</p></body></html>')
+                # Keep showing a simple failure page when there's an error
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                try:
+                    redirect_url = 'https://openlauncher.codevbox.com/login-failed'  # Desired redirect URL after failed login
+                    # Send a 302 redirect to the desired location
+                    self.send_response(302)
+                    self.send_header('Location', redirect_url)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    # Also include a small HTML page with a link in case automatic redirects are blocked
+                    body = (f"<html><head><meta http-equiv=\"refresh\" content=\"0;url={redirect_url}\" />"
+                            f"</head><body>If you are not redirected automatically, <a href=\"{redirect_url}\">click here</a>.</body></html>")
+                    self.wfile.write(body.encode('utf-8'))
+                except Exception:
+                    # Fallback to a simple failure page if redirect fails
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write(b'<html><body><h1>Login Failed</h1><p>You can close this window.</p></body></html>')
             else:
-                self.wfile.write(b'<html><body><h1>Login Successful</h1><p>You can close this window.</p></body></html>')
+                try:
+                    redirect_url = 'https://openlauncher.codevbox.com/login-success'  # Desired redirect URL after successful login
+                    # Send a 302 redirect to the desired location
+                    self.send_response(302)
+                    self.send_header('Location', redirect_url)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    # Also include a small HTML page with a link in case automatic redirects are blocked
+                    body = (f"<html><head><meta http-equiv=\"refresh\" content=\"0;url={redirect_url}\" />"
+                            f"</head><body>If you are not redirected automatically, <a href=\"{redirect_url}\">click here</a>.</body></html>")
+                    self.wfile.write(body.encode('utf-8'))
+                except Exception:
+                    # Fallback to a simple success page if redirect fails
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write(b'<html><body><h1>Login Successful</h1><p>You can close this window.</p></body></html>')
         else:
             write_log("Invalid callback path", "latest")  # Log invalid callback
             self.send_response(404)

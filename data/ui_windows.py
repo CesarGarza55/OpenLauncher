@@ -336,7 +336,6 @@ class WindowMethods:
             bt_save.setText(lang(new_lang, "save"))
             bt_open_minecraft.setText(lang(new_lang, "open_minecraft_directory"))
             bt_open_launcher.setText(lang(new_lang, "open_launcher_directory"))
-            bt_open_themes.setText(lang(new_lang, "open_website"))
             
             # Update combo box
             lang_combobox.blockSignals(True)
@@ -382,12 +381,6 @@ class WindowMethods:
         bt_open_launcher
         bt_open_launcher.clicked.connect(open_launcher_dir)
         layout.addWidget(bt_open_launcher)
-        
-        bt_open_themes = QPushButton(lang(self.system_lang, "open_website"))
-        bt_open_themes.setFixedSize(480, 30)
-        bt_open_themes
-        bt_open_themes.clicked.connect(open_website)
-        layout.addWidget(bt_open_themes)
         
         window_settings.setLayout(layout)
         window_settings.exec_()

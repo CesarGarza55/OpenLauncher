@@ -98,9 +98,6 @@ steve_icon = os.path.join(script_dir, 'img/steve.webp').replace("\\", "/")
 warning_icon = os.path.join(script_dir, 'img/warning.webp').replace("\\", "/")
 splash_screen = os.path.join(script_dir, 'img/splash.webp').replace("\\", "/")
 
-# Set the variable theme
-bg_color = "17, 33, 115"
-
 # Set app directory
 if sys.platform == "win32":
     app_directory = os.path.join(os.path.expanduser("~"), "OpenLauncher")
@@ -109,13 +106,7 @@ elif sys.platform == "linux":
     app_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher")
     os.makedirs(app_directory, exist_ok=True)
 
-# Set plugins directory
-if sys.platform == "win32":
-    plugins_directory = os.path.join(os.path.expanduser("~"), "OpenLauncher", "plugins")
-    os.makedirs(plugins_directory, exist_ok=True)
-elif sys.platform == "linux":
-    plugins_directory = os.path.join(str(pathlib.Path.home()), "OpenLauncher", "plugins")
-
+# Set config directory and refresh token file path
 config_dir = os.path.join(app_directory, "config")
 refresh_token_file = os.path.join(config_dir, "refresh_token.json")
 
