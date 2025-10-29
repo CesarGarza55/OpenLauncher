@@ -89,6 +89,22 @@ create_venv() {
     echo -e "${GREEN}Virtual environment activated!${NC}"
 }
 
+# Ask user to confirm compilation
+confirm_compile() {
+    read -p "Do you want to compile the application now? [Y/n]: " compile_confirm
+    # default to Y if empty
+    compile_confirm=${compile_confirm:-Y}
+    case "$compile_confirm" in
+        [Yy]|[Yy][Ee][Ss])
+            return 0
+            ;;
+        *)
+            echo -e "${YELLOW}Compilation cancelled by user.${NC}"
+            return 1
+            ;;
+    esac
+}
+
 # Compile the application
 compile_application() {
     echo -e "${GREEN}Compiling the application...${NC}"
@@ -124,6 +140,37 @@ compile_application() {
 create_deb_package() {
     echo -e "${GREEN}Creating .deb package...${NC}"
     mkdir -p compile-deb/usr/share/openlauncher
+
+    # If the binary already exists, ask whether to use it or recreate
+    if [ -f "OpenLauncher.bin" ]; then
+        read -p "OpenLauncher.bin already exists. Use existing binary? [Y/n]: " use_existing
+        # default to yes if empty, and make case-insensitive
+        use_existing=${use_existing:-Y}
+        use_existing=$(echo "$use_existing" | tr '[:upper:]' '[:lower:]')
+        if [ "$use_existing" != "y" ]; then
+            echo -e "${YELLOW}Recreating OpenLauncher.bin...${NC}"
+            # Ensure virtualenv is active (create_venv is idempotent)
+            create_venv
+            if confirm_compile; then
+                compile_application
+            else
+                echo -e "${RED}Aborting .deb creation because compilation was cancelled.${NC}"
+                return 1
+            fi
+        else
+            echo -e "${GREEN}Using existing OpenLauncher.bin${NC}"
+        fi
+    else
+        echo -e "${YELLOW}No existing OpenLauncher.bin found. Compiling...${NC}"
+        create_venv
+        if confirm_compile; then
+            compile_application
+        else
+            echo -e "${RED}Aborting .deb creation because compilation was cancelled.${NC}"
+            return 1
+        fi
+    fi
+
     cp OpenLauncher.bin compile-deb/usr/share/openlauncher/
     chmod +x compile-deb/usr/share/openlauncher/OpenLauncher.bin
     chmod -R 0755 compile-deb
@@ -149,7 +196,12 @@ case $os_choice in
         if [ "$action_choice" -eq 1 ]; then
             install_deps_debian
             create_venv
-            compile_application
+            if confirm_compile; then
+                compile_application
+            else
+                echo -e "${RED}Compilation cancelled. Exiting.${NC}"
+                exit 0
+            fi
             read -p "Do you want to create a .deb package? [y/n]: " deb_choice
             if [ "$deb_choice" == "y" ]; then
                 create_deb_package
@@ -158,11 +210,10 @@ case $os_choice in
             install_deps_debian
         elif [ "$action_choice" -eq 3 ]; then
             if [ "$os_choice" -eq 1 ]; then
-                # For Debian: install dependencies, create/activate venv, compile and build .deb
-                install_deps_debian
-                create_venv
-                compile_application
-                create_deb_package
+                    # For Debian: install dependencies and then build .deb (create_deb_package
+                    # will ask whether to reuse or recreate the binary)
+                    install_deps_debian
+                    create_deb_package
             else
                 echo -e "${RED}Invalid choice. Exiting...${NC}"
                 exit 1
@@ -176,7 +227,12 @@ case $os_choice in
         if [ "$action_choice" -eq 1 ]; then
             install_deps_fedora
             create_venv
-            compile_application
+            if confirm_compile; then
+                compile_application
+            else
+                echo -e "${RED}Compilation cancelled. Exiting.${NC}"
+                exit 0
+            fi
         elif [ "$action_choice" -eq 2 ]; then
             install_deps_fedora
         else
