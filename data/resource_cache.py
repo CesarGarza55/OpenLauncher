@@ -4,6 +4,7 @@ Caches loaded images and pixmaps to improve performance
 """
 
 from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtCore import Qt
 
 class ResourceCache:
     """Cache for loaded resources to avoid repeated file I/O"""
@@ -34,13 +35,32 @@ class ResourceCache:
         return self._cache[cache_key]
     
     def get_icon(self, path, size=None):
-        """Get a cached icon or load it if not in cache"""
-        cache_key = f"icon_{path}_{size}"
-        
+        """Get a cached icon or load it if not in cache.
+
+        If size is provided (int or tuple), the icon pixmap will be scaled to that size
+        before creating the QIcon. This prevents Qt from creating excessively large
+        pixmaps that can exceed XCB request limits.
+        """
+        if isinstance(size, tuple) or isinstance(size, list):
+            width, height = size
+        else:
+            width = height = size
+
+        cache_key = f"icon_{path}_{width}x{height}"
+
         if cache_key not in self._cache:
-            icon = QIcon(path)
+            # Load original pixmap
+            pixmap = QPixmap(path)
+            if not pixmap.isNull() and width and height:
+                # Scale keeping aspect ratio to avoid oversized pixmaps
+                pixmap = pixmap.scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                icon = QIcon(pixmap)
+            else:
+                # Fallback to creating icon directly from path
+                icon = QIcon(path)
+
             self._cache[cache_key] = icon
-        
+
         return self._cache[cache_key]
     
     def clear_cache(self):

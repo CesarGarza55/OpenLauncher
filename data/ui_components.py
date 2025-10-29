@@ -64,7 +64,8 @@ class Ui_MainWindow(object):
             MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1000, 600)
         MainWindow.setMinimumSize(QSize(1000, 600))
-        MainWindow.setWindowIcon(QIcon(icon))
+        # Use cached icon with a reasonable size to avoid sending oversized pixmaps to X
+        MainWindow.setWindowIcon(get_cached_icon(icon, size=256))
         
         # Prevent the app from being maximized
         MainWindow.setWindowFlags(MainWindow.windowFlags() & ~Qt.WindowMaximizeButtonHint)
@@ -611,14 +612,14 @@ class Ui_MainWindow(object):
             self.username_input.setVisible(False)
             self.label.setText(f"{lang(self.system_lang, 'logged_as')} {self.user_name}")
             self.btn_account.setText(lang(self.system_lang, "logout_microsoft"))
-            self.btn_account.setIcon(QIcon(variables.logout_icon))
+            self.btn_account.setIcon(get_cached_icon(variables.logout_icon, size=24))
             self.btn_account.clicked.connect(self.logout_microsoft)
         else:
             # User is not logged in
             self.username_input.setVisible(True)
             self.label.setText(lang(self.system_lang, "label_username"))
             self.btn_account.setText(lang(self.system_lang, "login_microsoft"))
-            self.btn_account.setIcon(QIcon(variables.login_icon))
+            self.btn_account.setIcon(get_cached_icon(variables.login_icon, size=24))
             self.btn_account.clicked.connect(self.login_microsoft)
     
     def update_all_translations(self):

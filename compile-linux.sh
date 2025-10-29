@@ -50,11 +50,12 @@ install_deps_debian() {
     sudo apt update
 
     # Install required dependencies
-    sudo apt install -y python3 python3-venv python3-tk default-jre \
+    sudo apt install -y python3 python3-venv python3-tk python3-pip python3-full default-jre \
         libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1 \
         libqt5widgets5 libqt5gui5 libqt5core5a libxcb-cursor0
-
-    # Install python dependencies
+    # Create (or reuse) virtual environment and install python dependencies there
+    create_venv
+    python3 -m pip install --upgrade pip setuptools wheel
     python3 -m pip install -r data/requirements_linux.txt
 }
 
@@ -63,17 +64,27 @@ install_deps_fedora() {
     echo -e "${YELLOW}Installing dependencies for Fedora-based systems...${NC}"
 
     # Install required dependencies
-    sudo dnf install -y python3 python3-virtualenv python3-tkinter java-11-openjdk \
+    sudo dnf install -y python3 python3-pip python3-virtualenv python3-tkinter java-11-openjdk \
         libxcb libX11-xcb libXrender fontconfig qt5-qtbase-gui qt5-qtbase xcb-util-cursor
-
-    # Install python dependencies
+    # Create (or reuse) virtual environment and install python dependencies there
+    create_venv
+    python3 -m pip install --upgrade pip setuptools wheel
     python3 -m pip install -r data/requirements_linux.txt
 }
 
 # Create virtual environment and activate it
 create_venv() {
     echo -e "${GREEN}Creating virtual environment...${NC}"
-    python3 -m venv venv
+    # If venv already exists, just activate it. This makes the function idempotent.
+    if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
+        echo -e "${YELLOW}Virtual environment already exists. Activating...${NC}"
+    else
+        python3 -m venv venv
+        echo -e "${GREEN}Virtual environment created.${NC}"
+    fi
+
+    # Activate the virtualenv
+    # shellcheck disable=SC1091
     source venv/bin/activate
     echo -e "${GREEN}Virtual environment activated!${NC}"
 }
@@ -94,7 +105,7 @@ compile_application() {
         --add-data data/resource_cache.py:. \
         --add-data data/ui_components.py:. \
         --add-data data/ui_dialogs.py:. \
-        --add-data data/ui_menu.py:. \
+        --add-data data/ui_methods.py:. \
         --add-data data/ui_windows.py:. \
         --add-data data/updater.py:. \
         --add-data data/utils.py:. \
@@ -117,13 +128,16 @@ create_deb_package() {
     chmod +x compile-deb/usr/share/openlauncher/OpenLauncher.bin
     chmod -R 0755 compile-deb
 
-    dpkg-deb --build compile-deb "OpenLauncher.deb"
+    # Build .deb; use --root-owner-group to avoid owner/group warnings when running as root
+    dpkg-deb --build --root-owner-group compile-deb "OpenLauncher.deb"
     echo -e "${GREEN}Deb package created!${NC}"
 
     # Ask to install the package
     read -p "Do you want to install the package? [y/n]: " install_choice
     if [ "$install_choice" == "y" ]; then
-        sudo dpkg -i "OpenLauncher.deb"
+        # Use apt to install the local .deb so dependencies declared in control are resolved
+        sudo apt update
+        sudo apt install -y ./OpenLauncher.deb
     fi
 
     rm compile-deb/usr/share/openlauncher/OpenLauncher.bin
@@ -144,7 +158,11 @@ case $os_choice in
             install_deps_debian
         elif [ "$action_choice" -eq 3 ]; then
             if [ "$os_choice" -eq 1 ]; then
+                # For Debian: install dependencies, create/activate venv, compile and build .deb
                 install_deps_debian
+                create_venv
+                compile_application
+                create_deb_package
             else
                 echo -e "${RED}Invalid choice. Exiting...${NC}"
                 exit 1
