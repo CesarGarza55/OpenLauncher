@@ -16,3 +16,6 @@ config
 OpenLauncher
 output-build
 OpenLauncher-Portable-Windows.zip
+build_secret.py
+.env
+/admin

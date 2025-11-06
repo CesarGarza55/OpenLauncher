@@ -151,6 +151,10 @@ class Ui_MainWindow(object):
         self.btn_account.setObjectName("btn_account")
         self.btn_account.setMinimumSize(QSize(350, 48))
         self.btn_account.setMaximumSize(QSize(400, 48))
+
+        if not variables.get_auth_headers():
+            self.btn_account.setDisabled(True)
+
         self.verticalLayout_2.addWidget(self.btn_account)
 
         self.horizontalLayout.addLayout(self.verticalLayout_2)
@@ -554,6 +558,13 @@ class Ui_MainWindow(object):
         self.auth_status = QLabel("")
         self.auth_status.setAlignment(Qt.AlignCenter)
         self.auth_status.setProperty("class", "caption")
+        # Allow rich text and make links clickable (open in external browser)
+        try:
+            self.auth_status.setTextFormat(Qt.RichText)
+            self.auth_status.setOpenExternalLinks(True)
+        except Exception:
+            # Some PyQt builds may not support these methods; ignore if unavailable
+            pass
         auth_layout.addWidget(self.auth_status)
 
         return auth_widget
@@ -586,7 +597,7 @@ class Ui_MainWindow(object):
 
     def on_auth_error(self, error):
         """Handle authentication error"""
-        self.auth_status.setText(lang(self.system_lang, "login_error"))
+        self.auth_status.setText(lang(self.system_lang, "login_error") + f": {error}")
     
     def login_microsoft(self):
         """Handle Microsoft login button click."""

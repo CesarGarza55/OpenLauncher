@@ -2,6 +2,23 @@
 set -e
 # Clear the terminal
 clear
+    # Generate build_secret.py if .env contains SIGN_KEY
+    if [ -f ".env" ]; then
+        SIGN_KEY=$(grep '^SIGN_KEY=' .env | cut -d '=' -f2-)
+        if [ -n "$SIGN_KEY" ]; then
+            BUILD_ID=$(date +%Y%m%d_%H%M%S)
+            BUILD_SIGNATURE=$(python3 - <<PYCODE
+import hmac, hashlib, sys
+sign=b"$SIGN_KEY"
+bid=b"$BUILD_ID"
+print(hmac.new(sign, bid, hashlib.sha256).hexdigest())
+PYCODE
+)
+            echo "BUILD_ID = \"$BUILD_ID\"" > data/build_secret.py
+            echo "BUILD_SIGNATURE = \"$BUILD_SIGNATURE\"" >> data/build_secret.py
+            echo -e "Build firmado como $BUILD_ID ✅"
+        fi
+    fi
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -110,6 +127,7 @@ compile_application() {
     echo -e "${GREEN}Compiling the application...${NC}"
     pyinstaller --clean --workpath ./temp --noconfirm --onefile --windowed --distpath ./ \
         --add-data data/img:img/ \
+        --add-data data/build_secret.py:. \
         --add-data data/config_manager.py:. \
         --add-data data/discord_manager.py:. \
         --add-data data/lang.py:. \

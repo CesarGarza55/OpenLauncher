@@ -84,7 +84,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.6.0"
+version = "1.6.1"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -217,3 +217,44 @@ def check_network():
         return False
     except requests.Timeout:
         return False
+
+
+def get_auth_headers():
+    """Return launcher build headers used to authenticate with the auth API.
+
+    If data/build_secret.py is missing, returns an empty dict.
+    """
+    if not getattr(sys, 'frozen', False):
+        return {}
+
+    # Running in a frozen build — attempt to load build_secret values.
+    try:
+        from data import build_secret  # type: ignore
+        bid = getattr(build_secret, 'BUILD_ID', '')
+        bsign = getattr(build_secret, 'BUILD_SIGNATURE', '')
+        if bid and bsign:
+            return {"x-launcher-id": bid, "x-launcher-sign": bsign}
+    except Exception:
+        pass
+
+    # Fallback: try to read file `build_secret.py` directly.
+    try:
+        secret_path = os.path.join(os.path.dirname(__file__), 'build_secret.py')
+        if os.path.isfile(secret_path):
+            bid = ''
+            bsign = ''
+            with open(secret_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('BUILD_ID') and '=' in line:
+                        parts = line.split('=', 1)
+                        bid = parts[1].strip().strip('"').strip("'")
+                    elif line.startswith('BUILD_SIGNATURE') and '=' in line:
+                        parts = line.split('=', 1)
+                        bsign = parts[1].strip().strip('"').strip("'")
+            if bid and bsign:
+                return {"x-launcher-id": bid, "x-launcher-sign": bsign}
+    except Exception:
+        pass
+
+    return {}

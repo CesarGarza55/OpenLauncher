@@ -53,6 +53,22 @@ class LoginThread(QThread):
         # Try loading a stored refresh token (keyring first, fallback file)
         refresh_token = variables.load_refresh_token()
 
+        # Quick check: ensure we can write to the config directory where
+        # refresh tokens are stored. If not, show a clear, human-friendly
+        # error so the user knows it's a permissions issue.
+        try:
+            os.makedirs(variables.config_dir, exist_ok=True)
+            test_path = os.path.join(variables.config_dir, '.__ol_write_test')
+            with open(test_path, 'w', encoding='utf-8') as _tf:
+                _tf.write('ok')
+            try:
+                os.remove(test_path)
+            except Exception:
+                pass
+        except Exception:
+            self.error.emit(lang(self.parent.system_lang, 'login_error_no_system_access'))
+            return
+
         if refresh_token:
             try:
                 # Ask the remote auth API to complete a refresh using the stored refresh token.
@@ -60,6 +76,7 @@ class LoginThread(QThread):
                     f"{AUTH_API_BASE}/refresh",
                     json={"refresh_token": refresh_token},
                     timeout=15,
+                    headers=variables.get_auth_headers(),
                 )
                 resp.raise_for_status()
                 account_info = resp.json()
@@ -80,18 +97,30 @@ class LoginThread(QThread):
         # Ask the auth API to start a login. The API will present Microsoft's login page
         # and then redirect back to the API which will in turn redirect the browser to
         # the launcher's local callback (REDIRECT_URL) with the code and state.
+        # Ensure this is an official compiled launcher that supplies the
+        # build secret headers; if not present, emit a clear error.
+        auth_headers = variables.get_auth_headers()
+        if not auth_headers:
+            # Not an official/frozen launcher with a build secret
+            self.error.emit(lang(self.parent.system_lang, 'login_error_official_only'))
+            return
+
         try:
             start_resp = requests.get(
                 f"{AUTH_API_BASE}/start",
                 params={"launcher_redirect_uri": REDIRECT_URL},
                 timeout=15,
+                headers=auth_headers,
             )
             start_resp.raise_for_status()
             data = start_resp.json()
             login_url = data.get("url")
             state = data.get("state")
-        except Exception:
-            self.error.emit(lang(self.parent.system_lang, "login_error"))
+        except requests.RequestException as e:
+            # Network or server error; emit a readable message and include
+            # a short detail for debugging (not a raw stack trace).
+            msg = lang(self.parent.system_lang, 'login_error_network')
+            self.error.emit(msg)
             return
 
         if not login_url:
@@ -111,7 +140,8 @@ class LoginThread(QThread):
         # Wait for callback
         if auth_callback.event.wait(timeout=300):
             if auth_callback.error:
-                self.error.emit(lang(self.parent.system_lang, "login_error"))
+                # The callback reported an error; surface it clearly.
+                self.error.emit(lang(self.parent.system_lang, 'login_error') + f": {auth_callback.error}")
             elif auth_callback.auth_code and auth_callback.state == state:
                 try:
                     # Ask the remote API to complete the login exchange using the code.
@@ -122,14 +152,18 @@ class LoginThread(QThread):
                             "state": auth_callback.state,
                         },
                         timeout=15,
+                        headers=variables.get_auth_headers(),
                     )
                     complete_resp.raise_for_status()
                     account_info = complete_resp.json()
                     if "refresh_token" in account_info:
                         variables.save_refresh_token(account_info["refresh_token"])
                     self.finished.emit(account_info)
-                except Exception:
-                    self.error.emit(lang(self.parent.system_lang, "login_error"))
+                except requests.RequestException as e:
+                    self.error.emit(lang(self.parent.system_lang, 'login_error_network') + f": {str(e)}")
+                except Exception as e:
+                    # Generic fallback with readable text
+                    self.error.emit(lang(self.parent.system_lang, 'login_error') + f": {str(e)}")
             else:
                 self.error.emit(lang(self.parent.system_lang, "invalid_state"))
         else:
