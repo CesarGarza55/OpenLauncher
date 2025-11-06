@@ -10,6 +10,7 @@ import webbrowser
 import http.server
 import threading
 import urllib.parse
+import requests
 
 # Redirect sys.stderr and sys.stdout to a log file in the compiled environment
 if getattr(sys, 'frozen', False):  # Check if running in a frozen/compiled state
@@ -18,7 +19,11 @@ if getattr(sys, 'frozen', False):  # Check if running in a frozen/compiled state
     sys.stderr = open(log_file, 'a', encoding='utf-8')
 
 # Constants
-CLIENT_ID = "3f59fbe7-2c4b-4343-9a61-c03104ddaedf"
+# CLIENT_ID intentionally removed from client. Use a remote auth API that keeps
+# the client secret/ID on the server. Configure the API base URL via
+# environment variable OPENLAUNCHER_AUTH_API or it defaults to the public API.
+AUTH_API_BASE = 'https://openlauncher.api.codevbox.com'
+# Local redirect where the launcher listens for the final redirect from the API
 REDIRECT_URL = "http://localhost:8080/callback"
 
 class AuthCallback:
@@ -50,21 +55,51 @@ class LoginThread(QThread):
 
         if refresh_token:
             try:
-                account_info = minecraft_launcher_lib.microsoft_account.complete_refresh(CLIENT_ID, None, REDIRECT_URL, refresh_token)
+                # Ask the remote auth API to complete a refresh using the stored refresh token.
+                resp = requests.post(
+                    f"{AUTH_API_BASE}/refresh",
+                    json={"refresh_token": refresh_token},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                account_info = resp.json()
+                # Save any returned refresh token (API may rotate it)
+                if "refresh_token" in account_info:
+                    variables.save_refresh_token(account_info["refresh_token"])
                 self.finished.emit(account_info)
                 return
-            except minecraft_launcher_lib.exceptions.InvalidRefreshToken:
-                # Stored token is invalid, remove it and continue to interactive login
+            except requests.RequestException:
+                # Stored token is invalid or API refused it; remove it and continue to interactive login
                 variables.delete_refresh_token()
                 pass
 
-        # Need to login
+        # Need to login via remote auth API to keep client_id on server.
         global auth_callback
         auth_callback = AuthCallback()
-        login_url, state, code_verifier = minecraft_launcher_lib.microsoft_account.get_secure_login_data(CLIENT_ID, REDIRECT_URL)
-        login_url += "&prompt=select_account"
 
-        # Start server
+        # Ask the auth API to start a login. The API will present Microsoft's login page
+        # and then redirect back to the API which will in turn redirect the browser to
+        # the launcher's local callback (REDIRECT_URL) with the code and state.
+        try:
+            start_resp = requests.get(
+                f"{AUTH_API_BASE}/start",
+                params={"launcher_redirect_uri": REDIRECT_URL},
+                timeout=15,
+            )
+            start_resp.raise_for_status()
+            data = start_resp.json()
+            login_url = data.get("url")
+            state = data.get("state")
+        except Exception:
+            self.error.emit(lang(self.parent.system_lang, "login_error"))
+            return
+
+        if not login_url:
+            self.error.emit(lang(self.parent.system_lang, "login_error"))
+            return
+
+        # Start server to receive the final redirect from the API (which will redirect
+        # the browser to our local REDIRECT_URL with the authorization code)
         server = http.server.HTTPServer(('localhost', 8080), CallbackHandler)
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.daemon = True
@@ -79,9 +114,18 @@ class LoginThread(QThread):
                 self.error.emit(lang(self.parent.system_lang, "login_error"))
             elif auth_callback.auth_code and auth_callback.state == state:
                 try:
-                    account_info = minecraft_launcher_lib.microsoft_account.complete_login(CLIENT_ID, None, REDIRECT_URL, auth_callback.auth_code, code_verifier)
+                    # Ask the remote API to complete the login exchange using the code.
+                    complete_resp = requests.post(
+                        f"{AUTH_API_BASE}/complete",
+                        json={
+                            "code": auth_callback.auth_code,
+                            "state": auth_callback.state,
+                        },
+                        timeout=15,
+                    )
+                    complete_resp.raise_for_status()
+                    account_info = complete_resp.json()
                     if "refresh_token" in account_info:
-                        # Save refresh token securely (keyring or protected file)
                         variables.save_refresh_token(account_info["refresh_token"])
                     self.finished.emit(account_info)
                 except Exception:
