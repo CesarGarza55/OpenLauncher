@@ -173,12 +173,6 @@ To log in with your official Microsoft account, follow these steps:
 
 <img width="994" height="600" alt="login" src="https://github.com/user-attachments/assets/d882cbfb-ced4-4e5a-89d3-71b991506a83" />
 
-## Mod Manager
-
-You can install, activate and deactivate mods with the mod manager:
-
-<img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
-
 ### Using your own Microsoft Entra Client ID
 
 The official OpenLauncher builds use a hosted authentication API (a proxy) which is not published
@@ -186,9 +180,10 @@ as open-source. If you fork this repository and want to use your own Microsoft A
 instead of a hosted API, a lightweight example flow is included at `data/no_api_microsoft_auth.py`.
 
 Steps for forks:
-1. Register an app in Microsoft Entra [entra.microsoft.com](entra.microsoft.com): App registrations → New registration.
-    - Add Redirect URI: `http://localhost:8080/callback` (or your chosen URI).
+1. Register an app in Microsoft Entra [https://entra.microsoft.com](https://entra.microsoft.com): App registrations → New registration.
     - Copy the Application (client) ID — this is your `CLIENT_ID`.
+    - On `Authentication` click on `Add a platform` and select `Mobile and desktop applications`
+    - Add Redirect URI: `http://localhost:8080/callback` (or your chosen URI).
 2. Copy `data/no_api_microsoft_auth.py` to `data/microsoft_auth.py` and update `CLIENT_ID` / `REDIRECT_URL`
     or set them via environment variables (recommended). Do not commit secrets.
 3. Ensure required permissions/scopes for Xbox Live / Minecraft are granted (you need to apply to [this form](https://forms.office.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR-ajEQ1td1ROpz00KtS8Gd5UNVpPTkVLNFVROVQxNkdRMEtXVjNQQjdXVC4u))
@@ -204,6 +199,12 @@ Troubleshooting:
 
 References: [https://minecraft-launcher-lib.readthedocs.io/en/stable/tutorial/microsoft_login.html](https://minecraft-launcher-lib.readthedocs.io/en/stable/tutorial/microsoft_login.html)
 
+
+## Mod Manager
+
+You can install, activate and deactivate mods with the mod manager:
+
+<img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
 
 ## 🧪 Testing
 My PC Specs:
@@ -281,4 +282,5 @@ You can review the Terms and Conditions and the Privacy Policy regarding the use
 By using OpenLauncher, you agree to comply with these terms and acknowledge that you have read and understood my privacy practices. I am committed to protecting your personal information and ensuring transparency in how I handle your data. For any questions or concerns, please contact me at [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Terms%20of%20Service).
 
 Thank you for using OpenLauncher!
+
 
