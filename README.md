@@ -179,7 +179,7 @@ You can install, activate and deactivate mods with the mod manager:
 
 <img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
 
-### Using your own Microsoft App (no central API)
+### Using your own Microsoft Entra Client ID
 
 The official OpenLauncher builds use a hosted authentication API (a proxy) which is not published
 as open-source. If you fork this repository and want to use your own Microsoft App (Client ID)
