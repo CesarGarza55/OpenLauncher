@@ -70,7 +70,6 @@ def center_window(window):
 def show_custom_message(title, message, msg_type="info"):
     custom_window = tk.Toplevel()
     custom_window.title(title)
-    custom_window.iconphoto(False, tk.PhotoImage(file=variables.icon))
     tk.Label(custom_window, text=message, padx=20, pady=20, font=("Arial", 12)).pack()
     tk.Button(custom_window, text="OK", command=custom_window.destroy, width=15, font=("Arial", 10)).pack(pady=10)
     center_window(custom_window)
@@ -108,9 +107,16 @@ def update():
 
         if latest_version > actual_version:
             root = tk.Tk()
+            # withdraw main window but keep it as parent for dialogs
             root.withdraw()
-            root.iconphoto(False, tk.PhotoImage(file=variables.icon))
-            if messagebox.askyesno("Update", lang(current_language, "update_available")):
+            # try to bring dialogs to front where supported
+            try:
+                root.update()
+                root.attributes("-topmost", True)
+            except Exception:
+                pass
+            # show the confirmation dialog with root as parent
+            if messagebox.askyesno("Update", lang(current_language, "update_available"), parent=root):
                 os.makedirs(os.path.join(variables.app_directory, "updates"), exist_ok=True)
                 download_location = os.path.join(variables.app_directory, "updates")
                 if sys.platform == "win32":
@@ -120,7 +126,6 @@ def update():
                     progress_window = tk.Toplevel(root)
                     progress_window.title(lang(current_language, "downloading"))
                     progress_window.geometry("400x150")
-                    progress_window.iconphoto(False, tk.PhotoImage(file=variables.icon))
                     # Get the size of the file
                     response = requests.get(url, stream=True)
                     total_size = int(response.headers.get('content-length', 0)) or 1
@@ -162,7 +167,6 @@ def update():
                     progress_window = tk.Toplevel(root)
                     progress_window.title(lang(current_language, "downloading"))
                     progress_window.geometry("400x150")
-                    progress_window.iconphoto(False, tk.PhotoImage(file=variables.icon))
                     # Get the size of the file
                     response = requests.get(url, stream=True)
                     total_size = int(response.headers.get('content-length', 0)) or 1
@@ -186,12 +190,12 @@ def update():
                         elif format_choice == 'deb':
                             # Try with xterm
                             if shutil.which("xterm"):
+                                # Use xterm to run the installation command
                                 os.system(f'xterm -e sudo dpkg -i {dest}')
                             else:
                                 show_custom_message("Error", lang(current_language, "xterm_not_found"), "error").replace("dest", dest)
                             show_custom_message("Download", lang(current_language, "update_complete"))
                             clean_up()
-                            os.system("openlauncher")
                     else:
                         show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
                     sys.exit()
@@ -201,6 +205,7 @@ def update():
         else:
             clean_up()
     except Exception as e:
-        pass
+        # Print exception so issues aren't silently swallowed during headless runs
+        print("Updater error:", repr(e))
 if __name__ == "__main__":
     update()
