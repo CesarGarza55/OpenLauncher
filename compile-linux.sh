@@ -4,7 +4,27 @@ set -e
 clear
     # Generate build_secret.py if .env contains SIGN_KEY
     if [ -f ".env" ]; then
-        SIGN_KEY=$(grep '^SIGN_KEY=' .env | cut -d '=' -f2-)
+        # Read SIGN_KEY from .env and strip surrounding quotes/whitespace so
+        # the key matches what other tools (like admin_builds.py) compute.
+        SIGN_KEY=$(python3 - <<'PY'
+import sys
+val = ''
+try:
+    with open('.env', 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line.startswith('SIGN_KEY='):
+                v = line.split('=', 1)[1].strip()
+                if len(v) >= 2 and ((v[0] == v[-1]) and v[0] in ('"', "'")):
+                    v = v[1:-1]
+                print(v)
+                sys.exit(0)
+except Exception:
+    pass
+PY
+)
         if [ -n "$SIGN_KEY" ]; then
             BUILD_ID=$(date +%Y%m%d_%H%M%S)
             # Use environment variables and a quoted heredoc to avoid
@@ -19,6 +39,15 @@ bid = os.environ.get('BUILD_ID', '').encode()
 print(hmac.new(sign, bid, hashlib.sha256).hexdigest())
 PYCODE
 )
+            # Always regenerate the build secret for Linux builds. Show the
+            # previous values (if any) before overwriting for traceability.
+            if [ -f data/build_secret.py ]; then
+                existing_bid=$(grep -oP 'BUILD_ID\s*=\s*"\K[^"]+' data/build_secret.py || true)
+                existing_bsign=$(grep -oP 'BUILD_SIGNATURE\s*=\s*"\K[^"]+' data/build_secret.py || true)
+                echo -e "Existing build secret (will be overwritten):\n  BUILD_ID = ${existing_bid}\n  BUILD_SIGNATURE = ${existing_bsign}"
+            fi
+
+            mkdir -p data
             echo "BUILD_ID = \"$BUILD_ID\"" > data/build_secret.py
             echo "BUILD_SIGNATURE = \"$BUILD_SIGNATURE\"" >> data/build_secret.py
             echo -e "Build signature generated:\n  BUILD_ID = $BUILD_ID\n  BUILD_SIGNATURE = $BUILD_SIGNATURE"
