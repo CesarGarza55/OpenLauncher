@@ -56,7 +56,7 @@ def include_files(source_folder, target_folder):
 
 additional_files = []
 for file in os.listdir("data"):
-    if file.endswith(".py") and file != "main.py":
+    if file.endswith(".py") and file != "main.py" and file != "no_api_microsoft_auth.py":
         additional_files.append((f"data/{file}", f"lib/{file}"))
 additional_files += include_files("data/img", "lib/img/")
 

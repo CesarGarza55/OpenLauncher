@@ -179,6 +179,32 @@ You can install, activate and deactivate mods with the mod manager:
 
 <img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
 
+### Using your own Microsoft App (no central API)
+
+The official OpenLauncher builds use a hosted authentication API (a proxy) which is not published
+as open-source. If you fork this repository and want to use your own Microsoft App (Client ID)
+instead of a hosted API, a lightweight example flow is included at `data/no_api_microsoft_auth.py`.
+
+Steps for forks:
+1. Register an app in Microsoft Entra [entra.microsoft.com](entra.microsoft.com): App registrations → New registration.
+    - Add Redirect URI: `http://localhost:8080/callback` (or your chosen URI).
+    - Copy the Application (client) ID — this is your `CLIENT_ID`.
+2. Copy `data/no_api_microsoft_auth.py` to `data/microsoft_auth.py` and update `CLIENT_ID` / `REDIRECT_URL`
+    or set them via environment variables (recommended). Do not commit secrets.
+3. Ensure required permissions/scopes for Xbox Live / Minecraft are granted (you need to apply to [this form](https://forms.office.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR-ajEQ1td1ROpz00KtS8Gd5UNVpPTkVLNFVROVQxNkdRMEtXVjNQQjdXVC4u))
+4. Run the launcher locally and use "Login with Microsoft"; the example starts a local HTTP server
+    to capture the OAuth callback (default `localhost:8080`).
+
+Security reminder: never commit client secrets or refresh tokens to a public repository. For
+production use, host an auth backend to store and rotate secrets securely.
+
+Troubleshooting:
+- If the browser doesn't redirect back, verify the redirect URI in the Entra Admin Panel app matches `REDIRECT_URL`.
+- If refresh tokens fail, check `minecraft_launcher_lib` docs and that `offline_access` is requested.
+
+References: [https://minecraft-launcher-lib.readthedocs.io/en/stable/tutorial/microsoft_login.html](https://minecraft-launcher-lib.readthedocs.io/en/stable/tutorial/microsoft_login.html)
+
+
 ## 🧪 Testing
 My PC Specs:
 - CPU: AMD Ryzen 5 5600g (3.90 GHz)
