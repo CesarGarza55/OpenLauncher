@@ -7,16 +7,21 @@ clear
         SIGN_KEY=$(grep '^SIGN_KEY=' .env | cut -d '=' -f2-)
         if [ -n "$SIGN_KEY" ]; then
             BUILD_ID=$(date +%Y%m%d_%H%M%S)
-            BUILD_SIGNATURE=$(python3 - <<PYCODE
-import hmac, hashlib, sys
-sign=b"$SIGN_KEY"
-bid=b"$BUILD_ID"
+            # Use environment variables and a quoted heredoc to avoid
+            # syntax errors when SIGN_KEY contains characters that would
+            # break Python string literals when expanded directly.
+            BUILD_SIGNATURE=$(SIGN_KEY="$SIGN_KEY" BUILD_ID="$BUILD_ID" python3 - <<'PYCODE'
+import hmac, hashlib, os
+
+# Read values from environment to avoid any shell-driven quoting issues
+sign = os.environ.get('SIGN_KEY', '').encode()
+bid = os.environ.get('BUILD_ID', '').encode()
 print(hmac.new(sign, bid, hashlib.sha256).hexdigest())
 PYCODE
 )
             echo "BUILD_ID = \"$BUILD_ID\"" > data/build_secret.py
             echo "BUILD_SIGNATURE = \"$BUILD_SIGNATURE\"" >> data/build_secret.py
-            echo -e "Build firmado como $BUILD_ID ✅"
+            echo -e "Build signature generated:\n  BUILD_ID = $BUILD_ID\n  BUILD_SIGNATURE = $BUILD_SIGNATURE"
         fi
     fi
 # Colors
