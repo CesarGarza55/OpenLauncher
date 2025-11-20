@@ -147,11 +147,16 @@ When you open the application, a welcome window greets you. You can disable this
 
 The main interface shows different sections:
 
-<img width="994" height="600" alt="main" src="https://github.com/user-attachments/assets/b24609e8-7d7e-48f5-8642-ecd4cf258c10" />
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/ddc13691-ca56-4d4c-a3d7-2510b889e9e8" />
+
+You can create, edit, and switch between multiple profiles.
+Each profile can be either a local profile or linked to a Microsoft account, and it stores its own configuration, including custom JVM arguments:
+
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/a7144138-9b71-43d8-b64a-e2f5f5ff0272" />
 
 To install a version, use the following interface where you select the version and click install:
 
-<img width="994" height="600" alt="install" src="https://github.com/user-attachments/assets/6310e4b3-0b6c-4c7b-94d3-f5169d0b68ed" />
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/6aa82874-0d2f-46b5-b890-ed0ac96ea5cb" />
 
 By default the following JVM arguments are used:
 
@@ -161,7 +166,7 @@ By default the following JVM arguments are used:
 
 If you want to change something you need to do it from the settings window.
 
-<img width="994" height="600" alt="settings" src="https://github.com/user-attachments/assets/61e6ce6f-c22e-4c71-9e9d-58fec48f36b6" />
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/e37df55a-bb8a-4652-a4bb-97f748924a3d" />
 
 ## 🔑 Sign in with Microsoft Account
 To log in with your official Microsoft account, follow these steps:
@@ -171,7 +176,7 @@ To log in with your official Microsoft account, follow these steps:
 3. Enter your Microsoft account with Minecraft purchased
 4. Once the authentication process is complete, you will see your account appear in the launcher
 
-<img width="994" height="600" alt="login" src="https://github.com/user-attachments/assets/d882cbfb-ced4-4e5a-89d3-71b991506a83" />
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/1f23ee04-0dc1-4f74-b955-93f113832246" />
 
 ### Using your own Microsoft Entra Client ID
 
@@ -204,7 +209,7 @@ References: [https://minecraft-launcher-lib.readthedocs.io/en/stable/tutorial/mi
 
 You can install, activate and deactivate mods with the mod manager:
 
-<img width="994" height="600" alt="image" src="https://github.com/user-attachments/assets/265efff3-a5e0-4c8c-92b2-61869d97ef35" />
+<img width="1002" height="632" alt="image" src="https://github.com/user-attachments/assets/75fb0be8-10eb-4fdc-8ca8-3cbb83de9142" />
 
 ## 🧪 Testing
 My PC Specs:
@@ -282,5 +287,6 @@ You can review the Terms and Conditions and the Privacy Policy regarding the use
 By using OpenLauncher, you agree to comply with these terms and acknowledge that you have read and understood my privacy practices. I am committed to protecting your personal information and ensuring transparency in how I handle your data. For any questions or concerns, please contact me at [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Terms%20of%20Service).
 
 Thank you for using OpenLauncher!
+
 
 
