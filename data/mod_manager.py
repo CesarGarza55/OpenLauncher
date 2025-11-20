@@ -1,8 +1,8 @@
 import os, shutil
 from tkinter import messagebox
-from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QGraphicsBlurEffect, QAbstractItemView, QWidget, QListWidget, QSplitter, QTabWidget
+from PyQt5.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QAbstractItemView, QWidget, QListWidget, QSplitter, QTabWidget
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon
 import variables
 from lang import lang
 from material_design import MaterialCard, AnimatedButton, MaterialColors

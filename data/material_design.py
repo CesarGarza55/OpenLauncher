@@ -24,7 +24,7 @@ class MaterialColors:
     SURFACE_HOVER = "#2d2d2d"
     
     # Border and divider
-    BORDER = "#3a3a3a"
+    BORDER = "#4d4d4d"
     DIVIDER = "#2d2d2d"
     
     # Alert colors
@@ -67,7 +67,7 @@ QFrame.card {{
 QPushButton.primary {{
     background-color: {MaterialColors.PRIMARY};
     color: #ffffff;
-    border: none;
+    border: 0.5px solid {MaterialColors.PRIMARY};
     border-radius: 4px;
     padding: 10px 20px;
     font-size: 14px;
@@ -111,7 +111,7 @@ QPushButton.outlined:pressed {{
 QPushButton.text {{
     background-color: transparent;
     color: {MaterialColors.PRIMARY};
-    border: none;
+    border: 1px solid {MaterialColors.PRIMARY};
     border-radius: 4px;
     padding: 10px 20px;
     font-size: 14px;
@@ -151,9 +151,13 @@ QComboBox {{
     color: {MaterialColors.TEXT_PRIMARY};
     border: 1px solid {MaterialColors.BORDER};
     border-radius: 4px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 13px;
-    min-height: 32px;
+}}
+
+QComboBox:disabled {{
+    background-color: {MaterialColors.DIVIDER};
+    color: {MaterialColors.TEXT_DISABLED};
 }}
 
 QComboBox:hover {{
@@ -377,6 +381,23 @@ QMessageBox QLabel {{
 QMessageBox QPushButton {{
     min-width: 80px;
 }}
+
+/* QSpinBox Style */
+QSpinBox {{
+    background-color: {MaterialColors.SURFACE};
+    color: {MaterialColors.TEXT_PRIMARY};
+    border: 1px solid {MaterialColors.BORDER};
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+}}
+QSpinBox:hover {{
+    border-color: {MaterialColors.PRIMARY};
+}}
+QSpinBox:focus {{
+    border-color: {MaterialColors.PRIMARY};
+    border-width: 2px;
+}}
 """
 
 
@@ -405,11 +426,12 @@ class AnimatedButton(QPushButton):
         super().__init__(text, parent)
         self.setProperty("class", button_type)
         
-        # Setup animation
-        self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(200)
+        # Setup animation (animate position for a stable lift effect)
+        # Animating geometry inside layouts can cause layout conflicts; animating pos is safer.
+        self.animation = QPropertyAnimation(self, b"pos")
+        self.animation.setDuration(180)
         self.animation.setEasingCurve(QEasingCurve.OutCubic)
-        
+
         # Shadow effect
         self.shadow = QGraphicsDropShadowEffect()
         self.shadow.setBlurRadius(15)
@@ -418,38 +440,57 @@ class AnimatedButton(QPushButton):
         self.shadow.setColor(QColor(0, 0, 0, 80))
         self.setGraphicsEffect(self.shadow)
         
-        self._original_geometry = None
+        # Store original position so we can restore reliably
+        self._original_pos = None
     
     def enterEvent(self, event):
         """Animate on hover"""
-        if self._original_geometry is None:
-            self._original_geometry = self.geometry()
-        
-        # Lift effect
-        new_geo = self.geometry()
-        new_geo.moveTop(new_geo.top() - 2)
-        
-        self.animation.setStartValue(self.geometry())
-        self.animation.setEndValue(new_geo)
-        self.animation.start()
-        
+        # Record original position when first hovered (or if geometry changed)
+        try:
+            current_pos = self.pos()
+            # Always capture the current layout position at the moment hover begins.
+            # This ensures if the layout moved the widget since app start, we return
+            # to the correct, up-to-date position when hover ends.
+            self._original_pos = QPoint(current_pos)
+            # Small lift: move up by 4 pixels (gentle)
+            target = QPoint(current_pos.x(), current_pos.y() - 4)
+            # Start animation from current pos to target
+            self.animation.stop()
+            self.animation.setStartValue(current_pos)
+            self.animation.setEndValue(target)
+            self.animation.start()
+        except Exception:
+            pass
+
         # Enhance shadow
-        self.shadow.setBlurRadius(20)
-        self.shadow.setYOffset(4)
-        
+        try:
+            self.shadow.setBlurRadius(20)
+            self.shadow.setYOffset(4)
+        except Exception:
+            pass
+
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """Return to normal on leave"""
-        if self._original_geometry:
-            self.animation.setStartValue(self.geometry())
-            self.animation.setEndValue(self._original_geometry)
-            self.animation.start()
-        
+        try:
+            if self._original_pos is not None:
+                # Animate back to stored original position
+                current_pos = self.pos()
+                self.animation.stop()
+                self.animation.setStartValue(current_pos)
+                self.animation.setEndValue(self._original_pos)
+                self.animation.start()
+        except Exception:
+            pass
+
         # Reset shadow
-        self.shadow.setBlurRadius(15)
-        self.shadow.setYOffset(2)
-        
+        try:
+            self.shadow.setBlurRadius(15)
+            self.shadow.setYOffset(2)
+        except Exception:
+            pass
+
         super().leaveEvent(event)
 
 

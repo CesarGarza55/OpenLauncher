@@ -8,13 +8,11 @@ import subprocess
 from PyQt5.QtCore import QRunnable, pyqtSlot, pyqtSignal, QObject
 from PyQt5.QtGui import QTextCursor
 
-
 class CommandWorkerSignals(QObject):
     """Signals for CommandWorker to communicate with the main thread"""
     finished = pyqtSignal()
     error = pyqtSignal(str)
     output = pyqtSignal(str)
-
 
 class CommandWorker(QRunnable):
     """Worker to execute shell commands in a separate thread"""

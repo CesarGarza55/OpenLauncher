@@ -6,13 +6,10 @@ Combines all UI components and methods
 import sys
 import os
 import json
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QWidget, QVBoxLayout, QLabel, QCheckBox, QPushButton, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QTextEdit, QWidget, QVBoxLayout, QLabel, QCheckBox, QHBoxLayout
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QApplication
-from resource_cache import get_cached_pixmap
-from material_design import AnimatedButton, MaterialColors
-
+from material_design import AnimatedButton
 from workers import StdoutRedirector
 from ui_components import Ui_MainWindow
 from ui_methods import UiMethods

@@ -5,19 +5,13 @@ Main entry point for the application
 Refactored for better maintainability with modular structure
 """
 
-import time
-import os
-import sys
-import json
-import argparse
+import time, os, sys, argparse
 import minecraft_launcher_lib
 from PyQt5.QtWidgets import QApplication
 from tkinter import messagebox
-
 import variables
-from variables import write_log
 from updater import update
-from microsoft_auth import login  # Updated to use the new login function
+from microsoft_auth import login
 from lang import lang, change_language, current_language
 from mc_run import run_minecraft
 from discord_manager import DiscordManager
@@ -29,7 +23,7 @@ from material_design import apply_material_theme
 # Function to handle exceptions
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Log exceptions instead of crashing"""
-    write_log(f"Exception: {exc_type}, {exc_value}", "exception")
+    variables.write_log(f"Exception: {exc_type}, {exc_value}", "exception")
 
 # Set exception hook
 # sys.excepthook = handle_exception
@@ -50,7 +44,7 @@ if args.mc_ver or args.mc_name or args.jvm_args or args.online or args.mc_dir:
             messagebox.showerror("Error", lang(current_language, "no_refresh_token"))
             sys.exit()
         try:
-            profile = login(current_language, None)  # Updated to use the new login function
+            profile = login(current_language, None)
             if profile and 'id' in profile and 'name' in profile:
                 args.mc_name = profile['name']
                 args.online = profile['access_token']
@@ -120,7 +114,7 @@ def load_versions_async():
         fabric_versions = minecraft_launcher_lib.fabric.get_all_minecraft_versions()
         fabric_loaders = minecraft_launcher_lib.fabric.get_all_loader_versions()
     except Exception as e:
-        write_log(f"Error loading versions: {e}", "version_load")
+        variables.write_log(f"Error loading versions: {e}", "version_load")
         versions = list()
         forge_versions = list()
         fabric_versions = list()

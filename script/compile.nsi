@@ -18,8 +18,8 @@ OutFile "..\OpenLauncher.exe"
 !define LICENSE_TEXT_FILE "LICENSE.txt"
 !define HEADER_IMG_FILE "header.bmp"
 !define VERSIONMAJOR 1
-!define VERSIONMINOR 6
-!define VERSIONBUILD 1
+!define VERSIONMINOR 7
+!define VERSIONBUILD 0
 !define BUILDNUMBER 0
 !define HELPURL "https://github.com/CesarGarza55/OpenLauncher"
 !define UPDATEURL "https://github.com/CesarGarza55/OpenLauncher/releases/latest/download/OpenLauncher.exe"

@@ -4,20 +4,17 @@ Contains installation and settings window methods
 """
 
 import re
-import json
 import requests
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QPushButton, QVBoxLayout, QWidget, QGroupBox, 
+from PyQt5.QtWidgets import (QPushButton, QVBoxLayout, QGroupBox, 
                              QLineEdit, QLabel, QComboBox, QHBoxLayout, QSizePolicy, 
-                             QCheckBox, QApplication, QDialog, QGraphicsBlurEffect, QMessageBox)
-from PyQt5.QtCore import QSize, Qt, QCoreApplication
-from PyQt5.QtGui import QIcon, QPixmap
+                             QCheckBox, QApplication, QDialog, QMessageBox)
+from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtGui import QIcon
 
 import variables
 from lang import lang, change_language
 from ui_dialogs import create_version_dialog, create_fabric_dialog
-from utils import open_website, open_launcher_dir, open_minecraft_dir, check_internet_connection
-from resource_cache import get_cached_pixmap, get_cached_icon
+from utils import open_launcher_dir, open_minecraft_dir, check_internet_connection
 
 
 class WindowMethods:

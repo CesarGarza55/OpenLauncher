@@ -3,14 +3,12 @@ UI Dialogs for OpenLauncher
 Contains installation dialogs and settings window
 """
 
-import json
-from PyQt5.QtWidgets import (QPushButton, QVBoxLayout, QLabel, QComboBox, QHBoxLayout, 
-                             QCheckBox, QApplication, QDialog, QGraphicsBlurEffect)
+from PyQt5.QtWidgets import (QVBoxLayout, QLabel, QComboBox, QApplication, QDialog)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import variables
 from lang import lang
-from resource_cache import get_cached_pixmap, get_cached_icon
+from resource_cache import get_cached_icon
 from material_design import MaterialCard, AnimatedButton, MaterialColors
 
 

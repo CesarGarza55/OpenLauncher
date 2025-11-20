@@ -2,8 +2,6 @@ import sys
 from PyQt5.QtCore import pyqtSignal, QThread
 from variables import write_log
 from lang import lang
-import minecraft_launcher_lib
-import json
 import os
 import variables
 import webbrowser
@@ -42,16 +40,33 @@ class LoginThread(QThread):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
 
-    def __init__(self, parent):
+    def __init__(self, parent, profile_key=None, force_interactive=False):
         super().__init__()
         self.parent = parent
+        # optional profile key to scope refresh tokens
+        self.profile_key = profile_key
+        # when True, skip any refresh-token automatic flow and force the interactive browser login
+        self.force_interactive = bool(force_interactive)
 
     def run(self):
         self.do_login()
 
     def do_login(self):
         # Try loading a stored refresh token (keyring first, fallback file)
-        refresh_token = variables.load_refresh_token()
+        # If force_interactive is requested, skip automatic refresh and go straight to interactive login.
+        refresh_token = None
+        if not getattr(self, 'force_interactive', False):
+            # load profile-scoped when possible
+            if getattr(self, 'profile_key', None):
+                try:
+                    refresh_token = variables.load_refresh_token_for(self.profile_key)
+                except Exception:
+                    refresh_token = None
+            if not refresh_token:
+                try:
+                    refresh_token = variables.load_refresh_token()
+                except Exception:
+                    refresh_token = None
 
         # Quick check: ensure we can write to the config directory where
         # refresh tokens are stored. If not, show a clear, human-friendly
@@ -82,12 +97,20 @@ class LoginThread(QThread):
                 account_info = resp.json()
                 # Save any returned refresh token (API may rotate it)
                 if "refresh_token" in account_info:
-                    variables.save_refresh_token(account_info["refresh_token"])
+                    # save token scoped to the profile if available
+                    if getattr(self, 'profile_key', None):
+                        variables.save_refresh_token_for(self.profile_key, account_info["refresh_token"])
+                    else:
+                        variables.save_refresh_token(account_info["refresh_token"])
                 self.finished.emit(account_info)
                 return
             except requests.RequestException:
                 # Stored token is invalid or API refused it; remove it and continue to interactive login
-                variables.delete_refresh_token()
+                if getattr(self, 'profile_key', None):
+                    variables.delete_refresh_token_for(self.profile_key)
+                else:
+                    variables.delete_refresh_token()
+                # fallthrough to interactive login
                 pass
 
         # Need to login via remote auth API to keep client_id on server.
@@ -157,7 +180,10 @@ class LoginThread(QThread):
                     complete_resp.raise_for_status()
                     account_info = complete_resp.json()
                     if "refresh_token" in account_info:
-                        variables.save_refresh_token(account_info["refresh_token"])
+                        if getattr(self, 'profile_key', None):
+                            variables.save_refresh_token_for(self.profile_key, account_info["refresh_token"])
+                        else:
+                            variables.save_refresh_token(account_info["refresh_token"])
                     self.finished.emit(account_info)
                 except requests.RequestException as e:
                     self.error.emit(lang(self.parent.system_lang, 'login_error_network') + f": {str(e)}")
@@ -242,4 +268,9 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
 def login(system_lang, icon, main_window):
     """Start the Microsoft authentication process."""
     write_log("Starting Microsoft authentication process.", "latest")
+    # Force interactive login when invoked programmatically
+    try:
+        main_window._auth_force_interactive = True
+    except Exception:
+        pass
     main_window.start_auth_flow()

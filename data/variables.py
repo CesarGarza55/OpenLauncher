@@ -5,7 +5,6 @@ import time
 import requests
 import minecraft_launcher_lib
 import json
-import stat
 
 # Optional secure storage for refresh tokens via keyring
 try:
@@ -84,7 +83,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.6.1"
+version = "1.7.0"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -104,6 +103,7 @@ play_icon = os.path.join(script_dir, 'img/play.webp').replace("\\", "/")
 logout_icon = os.path.join(script_dir, 'img/logout.webp').replace("\\", "/")
 login_icon = os.path.join(script_dir, 'img/login.webp').replace("\\", "/")
 splash_screen = os.path.join(script_dir, 'img/splash.webp').replace("\\", "/")
+steve_head = os.path.join(script_dir, 'img/steve.webp').replace("\\", "/")
 
 # Set app directory
 if sys.platform == "win32":
@@ -145,6 +145,85 @@ def save_refresh_token(token):
             os.chmod(path, 0o600)
         except Exception:
             pass
+    except Exception:
+        pass
+
+
+def _profile_token_name(profile_key: str):
+    # internal helper name for keyring or file
+    return f"refresh_token:{profile_key}"
+
+
+def save_refresh_token_for(profile_key: str, token):
+    """Save refresh token for a specific profile."""
+    try:
+        s = token if isinstance(token, str) else json.dumps(token)
+    except Exception:
+        s = str(token)
+
+    name = _profile_token_name(profile_key)
+    if KEYRING_AVAILABLE:
+        try:
+            keyring.set_password(SERVICE_NAME, name, s)
+            return
+        except Exception:
+            pass
+
+    # Fallback to file per profile
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        path = os.path.join(config_dir, f"refresh_token_{profile_key}.json")
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(s)
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def load_refresh_token_for(profile_key: str):
+    """Load refresh token for a specific profile. Returns None if not found."""
+    name = _profile_token_name(profile_key)
+    if KEYRING_AVAILABLE:
+        try:
+            s = keyring.get_password(SERVICE_NAME, name)
+            if s:
+                try:
+                    return json.loads(s)
+                except Exception:
+                    return s
+        except Exception:
+            pass
+
+    path = os.path.join(config_dir, f"refresh_token_{profile_key}.json")
+    if os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                s = f.read()
+            try:
+                return json.loads(s)
+            except Exception:
+                return s
+        except Exception:
+            return None
+
+    return None
+
+
+def delete_refresh_token_for(profile_key: str):
+    """Delete stored refresh token for a specific profile."""
+    name = _profile_token_name(profile_key)
+    if KEYRING_AVAILABLE:
+        try:
+            keyring.delete_password(SERVICE_NAME, name)
+        except Exception:
+            pass
+    try:
+        path = os.path.join(config_dir, f"refresh_token_{profile_key}.json")
+        if os.path.exists(path):
+            os.remove(path)
     except Exception:
         pass
 
@@ -223,9 +302,9 @@ def get_auth_headers():
     """Return launcher build headers used to authenticate with the auth API.
 
     If data/build_secret.py is missing, returns an empty dict.
-    """
     if not getattr(sys, 'frozen', False):
         return {}
+    """
 
     # Running in a frozen build — attempt to load build_secret values.
     try:

@@ -18,7 +18,6 @@ from PyQt5.QtCore import pyqtSignal, QThread
 from variables import write_log
 from lang import lang
 import minecraft_launcher_lib
-import json
 import os
 import variables
 import webbrowser
@@ -33,7 +32,7 @@ if getattr(sys, 'frozen', False):  # Check if running in a frozen/compiled state
     sys.stderr = open(log_file, 'a', encoding='utf-8')
 
 # Constants
-CLIENT_ID = "3f59fbe7-2c4b-4343-9a61-c03104ddaedf"
+CLIENT_ID = "YOUR_CLIENT_ID_HERE"
 REDIRECT_URL = "http://localhost:8080/callback"
 
 class AuthCallback:

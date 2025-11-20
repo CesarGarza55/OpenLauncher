@@ -12,11 +12,10 @@ from PyQt5.QtWidgets import (QApplication,QSplashScreen)
 from PyQt5.QtCore import Qt, QThreadPool, QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from tkinter import messagebox
-
 import variables
-from lang import lang, change_language
-from workers import CommandWorker, FunctionWorker, StdoutRedirector
-from utils import open_website, open_launcher_dir, open_minecraft_dir, is_java_installed
+from lang import lang
+from workers import CommandWorker, FunctionWorker
+from utils import is_java_installed
 
 
 class UiMethods:
@@ -179,8 +178,29 @@ class UiMethods:
             'maximized': self.isMaximized() if hasattr(self, 'isMaximized') else False
         }
         
-        self.config_manager.save_user_data(data)
-        self.config_manager.save_user_uuid(self.user_uuid)
+        # Persist legacy single-user data for compatibility
+        try:
+            self.config_manager.save_user_data(data)
+            self.config_manager.save_user_uuid(self.user_uuid)
+        except Exception:
+            pass
+
+        # Also persist into the active profile (if profiles are enabled)
+        try:
+            active = None
+            if hasattr(self.config_manager, 'get_active_profile_key'):
+                active = self.config_manager.get_active_profile_key()
+            if active:
+                profiles = self.config_manager.load_profiles()
+                prof = profiles.get('profiles', {}).get(active, {})
+                prof['account_name'] = self.user_name
+                prof['user_uuid'] = self.user_uuid
+                prof['jvm_arguments'] = arg
+                prof['last_version'] = self.comboBox.currentText()
+                profiles['profiles'][active] = prof
+                self.config_manager.save_profiles(profiles)
+        except Exception:
+            pass
 
     def generate_uuid(self, name):
         """Generate a UUID for the username"""

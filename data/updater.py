@@ -6,16 +6,32 @@ from variables import check_network
 import variables
 
 def version_to_tuple(version):
-    if 'alpha' in version:
+    # Determine release type
+    v = str(version or "")
+    v_lower = v.lower()
+    if 'alpha' in v_lower:
         version_type = 0
-        version = version.replace('alpha-', '')
-    elif 'beta' in version:
+    elif 'beta' in v_lower:
         version_type = 1
-        version = version.replace('beta-', '')
     else:
         version_type = 2
-    parts = version.split('.')
-    return (version_type,) + tuple(map(int, parts))
+
+    # Extract the first numeric group like '1.2.3' or '1' from tag names such as
+    # 'v1.2.3', 'release-1.0.0', '1.20.4-alpha-1'. If no numeric part is found, fall
+    # back to 0.
+    import re
+    m = re.search(r"(\d+(?:\.\d+)*)", v)
+    if not m:
+        return (version_type, 0)
+
+    parts_str = m.group(1)
+    try:
+        parts = tuple(int(p) for p in parts_str.split('.'))
+    except Exception:
+        # In the unlikely case digits can't be parsed, fall back to a safe value
+        parts = (0,)
+
+    return (version_type,) + parts
 
 class CustomDialog(simpledialog.Dialog):
     def __init__(self, parent, title=None):
@@ -103,7 +119,6 @@ def update():
         update = requests.get(f"{repo_latest}")
         actual_version = version_to_tuple(variables.launcher_version)
         latest_version = version_to_tuple(update.url.split('/').pop())
-        latest_name = update.url.split('/').pop()
 
         if latest_version > actual_version:
             root = tk.Tk()
