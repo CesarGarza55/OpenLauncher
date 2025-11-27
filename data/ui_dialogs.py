@@ -72,7 +72,7 @@ def create_version_dialog(system_lang, icon,
 
 def create_fabric_dialog(system_lang, icon,
                          versions_list, loaders_list, default_version, 
-                         install_callback, version_type):
+                         install_callback, version_type, access_token=None):
     """Create modern Material Design Fabric installation dialog"""
     window = QDialog()
     window.setWindowTitle(f"{lang(system_lang, 'install')} Fabric")

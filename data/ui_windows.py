@@ -23,12 +23,16 @@ class WindowMethods:
     def install_normal_versions(self):
         """Show Minecraft version installation dialog"""
         self.save_data()
-        
+
         if not self.versions:
             if not check_internet_connection():
                 QMessageBox.critical(None, "Error", lang(self.system_lang, "no_internet"))
             else:
                 QMessageBox.critical(None, "Error", lang(self.system_lang, "version_error"))
+            return
+        
+        if not self.access_token:
+            QMessageBox.critical(None, "Error", lang(self.system_lang, "install_login_required"))
             return
         
         # Prepare versions list

@@ -1740,10 +1740,47 @@ class Ui_MainWindow(object):
                 active = self.config_manager.get_active_profile_key() if hasattr(self.config_manager, 'get_active_profile_key') else None
             except Exception:
                 active = None
-            if active:
-                variables.delete_refresh_token_for(active)
-            else:
+            # Remove both profile-scoped and global refresh tokens to ensure logout is complete.
+            # Also attempt to remove any leftover token files for all known profiles.
+            try:
+                if active:
+                    variables.delete_refresh_token_for(active)
+                    write_log(f"Deleted refresh token for profile '{active}'", "microsoft_logout")
+            except Exception as e:
+                write_log(f"Failed deleting profile token for {active}: {e}", "microsoft_logout")
+
+            try:
                 variables.delete_refresh_token()
+                write_log("Deleted global refresh token", "microsoft_logout")
+            except Exception as e:
+                write_log(f"Failed deleting global token: {e}", "microsoft_logout")
+
+            # Try to delete tokens for all profiles listed in profiles configuration
+            try:
+                profiles = self.config_manager.load_profiles()
+                for k in profiles.get('profiles', {}).keys():
+                    try:
+                        variables.delete_refresh_token_for(k)
+                        write_log(f"Deleted refresh token for profile '{k}' (cleanup)", "microsoft_logout")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Remove any lingering refresh_token files in config_dir
+            try:
+                cfg_dir = variables.config_dir
+                if os.path.isdir(cfg_dir):
+                    for fname in os.listdir(cfg_dir):
+                        if fname.startswith('refresh_token') and fname.endswith('.json'):
+                            fpath = os.path.join(cfg_dir, fname)
+                            try:
+                                os.remove(fpath)
+                                write_log(f"Removed token file {fpath}", "microsoft_logout")
+                            except Exception:
+                                pass
+            except Exception:
+                pass
             self.access_token = ""
             self.user_uuid = ""
             self.user_name = ""

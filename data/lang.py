@@ -206,6 +206,7 @@ languages = {
         "token_revoked_desc": "Refresh token has been revoked",
         "profile_exists": "Profile already exists",
         "profile_not_selected": "No profile selected",
+        "install_login_required": "You must log in with your Microsoft account and have Minecraft Java Edition to install Minecraft versions",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -382,6 +383,7 @@ languages = {
         "token_revoked_desc": "El token de actualización ha sido revocado",
         "profile_exists": "El perfil ya existe",
         "profile_not_selected": "Ningún perfil seleccionado",
+        "install_login_required": "Debes iniciar sesión con tu cuenta de Microsoft y tener Minecraft Java Edition para instalar versiones de Minecraft",
     },
     "fr": {
         "language": "Sélectionnez la langue",
@@ -558,6 +560,7 @@ languages = {
         "token_revoked_desc": "Le jeton de rafraîchissement a été révoqué",
         "profile_exists": "Le profil existe déjà",
         "profile_not_selected": "Aucun profil sélectionné",
+        "install_login_required": "Vous devez être connecté avec votre compte Microsoft et posséder Minecraft Java Edition pour installer des versions de Minecraft",
     }
 }
 

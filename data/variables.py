@@ -83,7 +83,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.7.0"
+version = "1.7.1"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -218,8 +218,23 @@ def delete_refresh_token_for(profile_key: str):
     if KEYRING_AVAILABLE:
         try:
             keyring.delete_password(SERVICE_NAME, name)
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the failure and try a safer fallback: overwrite then delete
+            try:
+                try:
+                    keyring.set_password(SERVICE_NAME, name, '')
+                except Exception:
+                    pass
+                keyring.delete_password(SERVICE_NAME, name)
+            except Exception:
+                # As a last resort on Windows, try removing the credential via cmdkey
+                try:
+                    if sys.platform == 'win32':
+                        target = f"LegacyGeneric:target={name.lower()}@{SERVICE_NAME}"
+                        import subprocess
+                        subprocess.run(["cmdkey", "/delete:" + target], check=False)
+                except Exception:
+                    pass
     try:
         path = os.path.join(config_dir, f"refresh_token_{profile_key}.json")
         if os.path.exists(path):
@@ -261,8 +276,22 @@ def delete_refresh_token():
     if KEYRING_AVAILABLE:
         try:
             keyring.delete_password(SERVICE_NAME, 'refresh_token')
-        except Exception:
-            pass
+        except Exception as e:
+            # Try overwrite then delete, and fallback to Windows cmdkey if necessary
+            try:
+                try:
+                    keyring.set_password(SERVICE_NAME, 'refresh_token', '')
+                except Exception:
+                    pass
+                keyring.delete_password(SERVICE_NAME, 'refresh_token')
+            except Exception:
+                try:
+                    if sys.platform == 'win32':
+                        target = f"LegacyGeneric:target=refresh_token:default@{SERVICE_NAME}"
+                        import subprocess
+                        subprocess.run(["cmdkey", "/delete:" + target], check=False)
+                except Exception:
+                    pass
     try:
         if os.path.exists(refresh_token_file):
             os.remove(refresh_token_file)

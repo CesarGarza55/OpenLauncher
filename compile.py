@@ -36,7 +36,7 @@ def generate_build_secret():
         with open(os.path.join('data', 'build_secret.py'), 'w', encoding='utf-8') as f:
             f.write(f'BUILD_ID = "{build_id}"\n')
             f.write(f'BUILD_SIGNATURE = "{signature}"\n')
-        print(f'Build firmado como {build_id} con firma {signature}.')
+        print(f'Build signed with BUILD_ID: {build_id} and BUILD_SIGNATURE: {signature}')
     except Exception as e:
         print('Failed to write data/build_secret.py:', e)
 
