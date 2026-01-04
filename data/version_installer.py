@@ -4,15 +4,50 @@ Handles installation of Minecraft versions (Vanilla, Fabric, Forge)
 """
 
 import minecraft_launcher_lib
-from tkinter import messagebox
+from PyQt5.QtCore import Qt, QObject, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
 from lang import lang
+
+
+class _MessageDispatcher(QObject):
+    """Qt helper that shows dialogs on the UI thread."""
+
+    showRequested = pyqtSignal(str, str, object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._parent = parent
+        self.showRequested.connect(self._show_dialog)
+
+    def _show_dialog(self, title, text, icon):
+        dialog = QMessageBox(self._parent)
+        dialog.setIcon(icon)
+        dialog.setWindowTitle(title)
+        dialog.setText(text)
+        dialog.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+        dialog.exec_()
 
 
 class VersionInstaller:
     """Handles Minecraft version installations"""
     
-    def __init__(self, minecraft_directory):
+    def __init__(self, minecraft_directory, message_parent=None):
         self.minecraft_directory = minecraft_directory
+        self.message_parent = message_parent
+        self._dispatcher = _MessageDispatcher(message_parent)
+
+    def _show_message(self, title, text, icon):
+        """Display Qt message box that stays above the UI."""
+        if self._dispatcher is None:
+            # Fallback in case Qt dispatcher is unavailable
+            dialog = QMessageBox(self.message_parent)
+            dialog.setIcon(icon)
+            dialog.setWindowTitle(title)
+            dialog.setText(text)
+            dialog.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            dialog.exec_()
+            return
+        self._dispatcher.showRequested.emit(title, text, icon)
     
     def install_minecraft(self, version, callback, system_lang):
         """Install a Minecraft version"""
@@ -26,13 +61,14 @@ class VersionInstaller:
                 self.minecraft_directory, 
                 callback=callback
             )
-            messagebox.showinfo(
-                "Minecraft", 
-                lang(system_lang, "minecraft_installed").replace("1.0", version)
+            self._show_message(
+                "Minecraft",
+                lang(system_lang, "minecraft_installed").replace("1.0", version),
+                QMessageBox.Information
             )
             return True
         except Exception as e:
-            messagebox.showerror("Error", f"Could not install version: {e}")
+            self._show_message("Error", f"Could not install version: {e}", QMessageBox.Critical)
             raise
     
     def install_fabric(self, version, loader, callback, system_lang):
@@ -58,19 +94,21 @@ class VersionInstaller:
                         callback=callback, 
                         loader_version=loader
                     )
-                messagebox.showinfo(
-                    "Fabric", 
-                    lang(system_lang, "forge_installed").replace("1.0", version).replace("Forge", "Fabric")
+                self._show_message(
+                    "Fabric",
+                    lang(system_lang, "forge_installed").replace("1.0", version).replace("Forge", "Fabric"),
+                    QMessageBox.Information
                 )
                 return True
             else:
-                messagebox.showerror(
-                    "Error", 
-                    lang(system_lang, "forge_not_found").replace("Forge", "Fabric")
+                self._show_message(
+                    "Error",
+                    lang(system_lang, "forge_not_found").replace("Forge", "Fabric"),
+                    QMessageBox.Critical
                 )
                 return False
         except Exception as e:
-            messagebox.showerror("Error", f"Fabric could not be installed: {e}")
+            self._show_message("Error", f"Fabric could not be installed: {e}", QMessageBox.Critical)
             raise
     
     def install_forge(self, version, forge_versions, callback, system_lang):
@@ -94,17 +132,19 @@ class VersionInstaller:
                     self.minecraft_directory, 
                     callback=callback
                 )
-                messagebox.showinfo(
-                    "Forge", 
-                    lang(system_lang, "forge_installed").replace("1.0", version)
+                self._show_message(
+                    "Forge",
+                    lang(system_lang, "forge_installed").replace("1.0", version),
+                    QMessageBox.Information
                 )
                 return True
             else:
-                messagebox.showerror(
-                    "Error", 
-                    lang(system_lang, "forge_not_found")
+                self._show_message(
+                    "Error",
+                    lang(system_lang, "forge_not_found"),
+                    QMessageBox.Critical
                 )
                 return False
         except Exception as e:
-            messagebox.showerror("Error", f"Forge could not be installed: {e}")
+            self._show_message("Error", f"Forge could not be installed: {e}", QMessageBox.Critical)
             raise

@@ -180,6 +180,7 @@ compile_application() {
         --add-data data/variables.py:. \
         --add-data data/version_installer.py:. \
         --add-data data/workers.py:. \
+        --add-data data/shortcut_utils.py:. \
         --name OpenLauncher.bin \
         data/main.py
 

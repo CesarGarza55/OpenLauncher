@@ -33,10 +33,8 @@ def is_java_installed():
     except Exception:
         return False
 
-def run_minecraft(mc_ver, mc_name, jvm_args=None, online=None, mc_dir=None):
+def run_minecraft(mc_ver, mc_name, jvm_args=None, online=None, mc_dir=None, *, headless=False, wait_for_exit=False):
     global user_uuid
-
-    signals = WorkerSignals()
 
     if not mc_dir:
         minecraft_directory = variables.minecraft_directory
@@ -53,27 +51,41 @@ def run_minecraft(mc_ver, mc_name, jvm_args=None, online=None, mc_dir=None):
         generate_uuid(mc_name)
 
     if not jvm_args:
-        arg = variables.defaultJVM
+        arg = list(variables.defaultJVM)
     else:
-        arg = jvm_args
-        arg = list(filter(None, arg.split(" ")))
+        if isinstance(jvm_args, str):
+            arg = list(filter(None, jvm_args.split()))
+        else:
+            arg = list(jvm_args)
     if not online or online == "false":
         online = ""
         if not mc_name:
-            messagebox.showerror(lang(current_language,"offline_mode"), lang(current_language,"offline_mode_error"))
-            sys.exit()
+            if headless:
+                return "USERNAME_REQUIRED"
+            messagebox.showerror(lang(current_language, "offline_mode"), lang(current_language, "offline_mode_error"))
+            return "USERNAME_REQUIRED"
 
     if not is_java_installed():
+        if headless:
+            return "JAVA_NOT_INSTALLED"
         if sys.platform == 'win32':
-            if messagebox.askyesno(lang(current_language,"java_not_installed"), lang(current_language,"ask_install_java")):
+            if messagebox.askyesno(
+                lang(current_language, "java_not_installed"),
+                lang(current_language, "ask_install_java"),
+            ):
                 webbrowser.open('https://www.java.com/es/download/')
             else:
-                messagebox.showerror(lang(current_language,"java_not_installed"), lang(current_language,"java_not_installed_win"))
-                sys.exit()
+                messagebox.showerror(
+                    lang(current_language, "java_not_installed"),
+                    lang(current_language, "java_not_installed_win"),
+                )
+            return "JAVA_NOT_INSTALLED"
         elif sys.platform == 'linux':
-            messagebox.showinfo(lang(current_language,"java_not_installed"), lang(current_language,"java_not_installed_linux"))
-            sys.exit()
-        return
+            messagebox.showinfo(
+                lang(current_language, "java_not_installed"),
+                lang(current_language, "java_not_installed_linux"),
+            )
+            return "JAVA_NOT_INSTALLED"
 
     if mc_ver:
         options = {
@@ -87,6 +99,33 @@ def run_minecraft(mc_ver, mc_name, jvm_args=None, online=None, mc_dir=None):
 
         try:
             minecraft_command = minecraft_launcher_lib.command.get_minecraft_command(mc_ver, minecraft_directory, options)
+
+            if headless:
+                try:
+                    startupinfo = None
+                    creationflags = 0
+                    if sys.platform == 'win32':
+                        startupinfo = subprocess.STARTUPINFO()
+                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+                    if wait_for_exit:
+                        completed = subprocess.run(
+                            minecraft_command,
+                            check=False,
+                            startupinfo=startupinfo,
+                            creationflags=creationflags,
+                        )
+                        return completed.returncode
+                    subprocess.Popen(
+                        minecraft_command,
+                        startupinfo=startupinfo,
+                        creationflags=creationflags,
+                    )
+                    return 0
+                except Exception:
+                    return "MC_FAIL"
+
+            signals = WorkerSignals()
 
             def run_command(command):
                 process = None

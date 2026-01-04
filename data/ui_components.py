@@ -6,8 +6,9 @@ Contains main window UI, dialogs, and styling
 import os, re, requests
 import minecraft_launcher_lib
 from PyQt5.QtWidgets import (QVBoxLayout, QWidget, QLineEdit, QLabel,
-                             QComboBox, QHBoxLayout, QGridLayout, QSpacerItem, 
-                             QSizePolicy, QCheckBox, QTextEdit, QMessageBox, QTabWidget)
+                             QComboBox, QHBoxLayout, QGridLayout, QSpacerItem,
+                             QSizePolicy, QCheckBox, QTextEdit, QMessageBox, QTabWidget,
+                             QDialog, QDialogButtonBox, QFormLayout)
 from PyQt5.QtCore import QSize, Qt, QCoreApplication, QMetaObject, QTimer
 from PyQt5.QtGui import QPainter, QColor, QPixmap
 from tkinter import messagebox
@@ -18,6 +19,7 @@ from lang import lang, change_language
 from microsoft_auth import LoginThread, AUTH_API_BASE
 from version_installer import VersionInstaller
 from utils import open_launcher_dir, open_minecraft_dir
+from shortcut_utils import create_launch_shortcut, ShortcutCreationError
 from resource_cache import get_cached_pixmap, get_cached_icon
 from material_design import (MaterialCard, AnimatedButton, MaterialColors)
 
@@ -38,7 +40,7 @@ class Ui_MainWindow(object):
         self.app_dir = variables.app_directory
         
         # Initialize version installer
-        self.version_installer = VersionInstaller(self.minecraft_directory)
+        self.version_installer = VersionInstaller(self.minecraft_directory, MainWindow)
         
         # Store version data-
         self.versions = versions
@@ -474,6 +476,11 @@ class Ui_MainWindow(object):
         self.btn_minecraft_dir.setMinimumHeight(40)
         self.btn_minecraft_dir.clicked.connect(open_minecraft_dir)
         links_hlayout.addWidget(self.btn_minecraft_dir)
+
+        self.btn_create_shortcut = AnimatedButton(lang(self.system_lang, "create_shortcut"), settings_widget, "outlined")
+        self.btn_create_shortcut.setMinimumHeight(40)
+        self.btn_create_shortcut.clicked.connect(self.open_shortcut_dialog)
+        links_hlayout.addWidget(self.btn_create_shortcut)
         
         links_layout.addLayout(links_hlayout)
         
@@ -506,6 +513,130 @@ class Ui_MainWindow(object):
         self.save_btn.setMinimumHeight(40)
         
         return settings_widget
+
+    def open_shortcut_dialog(self):
+        """Open a dialog that creates a desktop shortcut for direct launches."""
+        dialog = QDialog(self.centralwidget)
+        dialog.setWindowTitle(lang(self.system_lang, "shortcut_dialog_title"))
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        dialog.resize(500, 300)
+        profile_combo = QComboBox(dialog)
+        profiles = {"profiles": {}}
+        active_profile = None
+        try:
+            profiles = self.config_manager.load_profiles()
+            if hasattr(self.config_manager, 'get_active_profile_key'):
+                active_profile = self.config_manager.get_active_profile_key()
+        except Exception:
+            profiles = {"profiles": {}}
+
+        for key, profile in profiles.get('profiles', {}).items():
+            display = profile.get('display_name', key)
+            profile_combo.addItem(display, key)
+            if active_profile and key == active_profile:
+                profile_combo.setCurrentIndex(profile_combo.count() - 1)
+
+        if profile_combo.count() == 0:
+            QMessageBox.warning(
+                self.centralwidget,
+                lang(self.system_lang, "shortcut_error_title"),
+                lang(self.system_lang, "profile_not_selected"),
+            )
+            return
+
+        version_combo = QComboBox(dialog)
+        for idx in range(self.comboBox.count()):
+            version_combo.addItem(self.comboBox.itemText(idx))
+        if version_combo.count() == 0:
+            QMessageBox.warning(
+                self.centralwidget,
+                lang(self.system_lang, "shortcut_error_title"),
+                lang(self.system_lang, "no_versions_installed"),
+            )
+            return
+        current_idx = self.comboBox.currentIndex()
+        if current_idx >= 0:
+            version_combo.setCurrentIndex(current_idx)
+
+        shortcut_name_input = QLineEdit(dialog)
+        shortcut_name_input.setText(f"{profile_combo.currentText()} - {version_combo.currentText()}")
+
+        online_checkbox = QCheckBox(lang(self.system_lang, "shortcut_online_label"), dialog)
+        offline_username_input = QLineEdit(dialog)
+        offline_username_input.setPlaceholderText(lang(self.system_lang, "shortcut_offline_label"))
+
+        def update_username_state():
+            offline_username_input.setDisabled(online_checkbox.isChecked())
+
+        online_checkbox.toggled.connect(update_username_state)
+
+        def sync_online_state():
+            """Auto-toggle the online flag based on profile type and login state."""
+            profile_key = profile_combo.currentData()
+            profile_data = {}
+            if profile_key:
+                profile_data = profiles.get('profiles', {}).get(profile_key, {})
+            profile_type = profile_data.get('type', 'local') if isinstance(profile_data, dict) else 'local'
+            is_local_profile = profile_type == 'local'
+            is_logged_in = bool(getattr(self, 'access_token', ''))
+            target_checked = bool(is_logged_in and not is_local_profile)
+            previous_state = online_checkbox.blockSignals(True)
+            online_checkbox.setChecked(target_checked)
+            online_checkbox.blockSignals(previous_state)
+            update_username_state()
+
+        profile_combo.currentIndexChanged.connect(lambda _: sync_online_state())
+        sync_online_state()
+
+        form.addRow(lang(self.system_lang, "shortcut_profile_label"), profile_combo)
+        form.addRow(lang(self.system_lang, "shortcut_version_label"), version_combo)
+        form.addRow(lang(self.system_lang, "shortcut_name_label"), shortcut_name_input)
+        form.addRow("", online_checkbox)
+        form.addRow(lang(self.system_lang, "shortcut_offline_label"), offline_username_input)
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok, dialog)
+        layout.addWidget(buttons)
+
+        def accept_dialog():
+            profile_key = profile_combo.currentData()
+            mc_version = version_combo.currentText().strip()
+            shortcut_name = shortcut_name_input.text().strip() or f"{profile_combo.currentText()} - {mc_version}"
+            use_online = online_checkbox.isChecked()
+            offline_username = offline_username_input.text().strip() or None
+            if not mc_version:
+                QMessageBox.warning(self.centralwidget, lang(self.system_lang, "shortcut_error_title"), lang(self.system_lang, "no_version"))
+                return
+            if not use_online and not offline_username:
+                QMessageBox.warning(
+                    self.centralwidget,
+                    lang(self.system_lang, "shortcut_error_title"),
+                    lang(self.system_lang, "shortcut_offline_username_required"),
+                )
+                return
+            try:
+                shortcut_path = create_launch_shortcut(
+                    profile_key,
+                    mc_version,
+                    shortcut_name,
+                    use_online=use_online,
+                    offline_username=offline_username,
+                )
+            except ShortcutCreationError as exc:
+                QMessageBox.warning(self.centralwidget, lang(self.system_lang, "shortcut_error_title"), str(exc))
+                return
+            QMessageBox.information(
+                self.centralwidget,
+                lang(self.system_lang, "shortcut_created_title"),
+                lang(self.system_lang, "shortcut_created_message").format(path=shortcut_path),
+            )
+            dialog.accept()
+
+        buttons.accepted.connect(accept_dialog)
+        buttons.rejected.connect(dialog.reject)
+        dialog.exec_()
 
     # --- Profile UI helpers ---
     def load_profiles_selector(self):
@@ -1555,6 +1686,9 @@ class Ui_MainWindow(object):
             
         if hasattr(self, 'btn_minecraft_dir'):
             self.btn_minecraft_dir.setText(lang(self.system_lang, "open_minecraft_directory"))
+
+        if hasattr(self, 'btn_create_shortcut'):
+            self.btn_create_shortcut.setText(lang(self.system_lang, "create_shortcut"))
             
         if hasattr(self, 'save_btn'):
             self.save_btn.setText(lang(self.system_lang, "save"))

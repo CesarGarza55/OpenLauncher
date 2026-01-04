@@ -55,18 +55,51 @@ class LoginThread(QThread):
         # Try loading a stored refresh token (keyring first, fallback file)
         # If force_interactive is requested, skip automatic refresh and go straight to interactive login.
         refresh_token = None
-        if not getattr(self, 'force_interactive', False):
-            # load profile-scoped when possible
-            if getattr(self, 'profile_key', None):
+        profile_key = getattr(self, 'profile_key', None)
+        forced_interactive = bool(getattr(self, 'force_interactive', False))
+
+        if forced_interactive:
+            if profile_key:
+                variables.write_log(
+                    f"Interactive login explicitly requested for profile '{profile_key}'",
+                    "auth",
+                )
+            else:
+                variables.write_log("Interactive login explicitly requested without active profile", "auth")
+
+        if not forced_interactive:
+            if profile_key:
                 try:
-                    refresh_token = variables.load_refresh_token_for(self.profile_key)
+                    refresh_token = variables.load_refresh_token_for(profile_key)
                 except Exception:
                     refresh_token = None
-            if not refresh_token:
+                if not refresh_token:
+                    variables.write_log(
+                        f"No refresh token found for profile '{profile_key}'",
+                        "auth",
+                    )
+            else:
                 try:
                     refresh_token = variables.load_refresh_token()
+                    if refresh_token:
+                        variables.write_log(
+                            "Using legacy refresh token without active profile",
+                            "auth",
+                        )
                 except Exception:
                     refresh_token = None
+
+        if not refresh_token and not forced_interactive:
+            if profile_key:
+                variables.write_log(
+                    f"Forcing interactive login for profile '{profile_key}' (no stored refresh token)",
+                    "auth",
+                )
+            else:
+                variables.write_log(
+                    "Forcing interactive login without stored legacy refresh token",
+                    "auth",
+                )
 
         # Quick check: ensure we can write to the config directory where
         # refresh tokens are stored. If not, show a clear, human-friendly
@@ -106,10 +139,15 @@ class LoginThread(QThread):
                 return
             except requests.RequestException:
                 # Stored token is invalid or API refused it; remove it and continue to interactive login
-                if getattr(self, 'profile_key', None):
-                    variables.delete_refresh_token_for(self.profile_key)
+                if profile_key:
+                    variables.delete_refresh_token_for(profile_key)
+                    variables.write_log(
+                        f"Deleted invalid refresh token for profile '{profile_key}'",
+                        "auth",
+                    )
                 else:
                     variables.delete_refresh_token()
+                    variables.write_log("Deleted invalid legacy refresh token", "auth")
                 # fallthrough to interactive login
                 pass
 

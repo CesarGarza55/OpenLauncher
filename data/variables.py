@@ -83,7 +83,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.7.1"
+version = "1.7.2"
 launcher_version = f"beta-{version}"
 
 # User UUID
