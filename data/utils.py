@@ -8,6 +8,7 @@ import sys
 import subprocess
 import webbrowser
 import variables
+import shutil
 from tkinter import messagebox
 
 
@@ -28,10 +29,15 @@ def open_launcher_dir():
         if sys.platform == "win32":
             subprocess.Popen(['explorer', app_dir])
         elif sys.platform == "linux":
-            try:
-                subprocess.Popen(['gio', 'open', app_dir])
-            except Exception as e:
+            # Prefer xdg-open to avoid invoking KDE's dolphin (which may crash
+            # if Qt/KF5 versions mismatch). Fallback to gio if xdg-open missing.
+            if shutil.which('xdg-open'):
                 subprocess.Popen(['xdg-open', app_dir])
+            else:
+                try:
+                    subprocess.Popen(['gio', 'open', app_dir])
+                except Exception:
+                    messagebox.showerror("Error", f"Could not open directory {app_dir}")
     else:
         messagebox.showerror("Error", f"Directory {app_dir} does not exist")
 
@@ -46,10 +52,13 @@ def open_minecraft_dir():
         if sys.platform == "win32":
             subprocess.Popen(['explorer', minecraft_directory])
         elif sys.platform == "linux":
-            try:
-                subprocess.Popen(['gio', 'open', minecraft_directory])
-            except Exception as e:
+            if shutil.which('xdg-open'):
                 subprocess.Popen(['xdg-open', minecraft_directory])
+            else:
+                try:
+                    subprocess.Popen(['gio', 'open', minecraft_directory])
+                except Exception:
+                    print(f"Could not open directory {minecraft_directory}")
     else:
         print(f"Directory {minecraft_directory} does not exist")
 

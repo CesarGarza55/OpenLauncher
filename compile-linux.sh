@@ -102,7 +102,7 @@ install_deps_debian() {
 
     # Install required dependencies
     sudo apt install -y python3 python3-venv python3-tk python3-pip python3-full default-jre \
-        libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1 \
+        libxcb-xinerama0 libxcb1 libx11-xcb1 libxrender1 libfontconfig1 xterm \
         libqt5widgets5 libqt5gui5 libqt5core5a libxcb-cursor0
     # Create (or reuse) virtual environment and install python dependencies there
     create_venv
@@ -116,7 +116,7 @@ install_deps_fedora() {
 
     # Install required dependencies
     sudo dnf install -y python3 python3-pip python3-virtualenv python3-tkinter java-11-openjdk \
-        libxcb libX11-xcb libXrender fontconfig qt5-qtbase-gui qt5-qtbase xcb-util-cursor
+        libxcb libX11-xcb libXrender fontconfig qt5-qtbase-gui qt5-qtbase xcb-util-cursor xterm
     # Create (or reuse) virtual environment and install python dependencies there
     create_venv
     python3 -m pip install --upgrade pip setuptools wheel
