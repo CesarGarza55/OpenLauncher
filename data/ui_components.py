@@ -22,6 +22,7 @@ from utils import open_launcher_dir, open_minecraft_dir
 from shortcut_utils import create_launch_shortcut, ShortcutCreationError
 from resource_cache import get_cached_pixmap, get_cached_icon
 from material_design import (MaterialCard, AnimatedButton, MaterialColors)
+from updater import update as run_updater, version_to_tuple
 
 
 class Ui_MainWindow(object):
@@ -59,8 +60,8 @@ class Ui_MainWindow(object):
         
         if not MainWindow.objectName():
             MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1000, 600)
-        MainWindow.setMinimumSize(QSize(1000, 600))
+        MainWindow.resize(1200, 700)
+        MainWindow.setMinimumSize(QSize(1200, 700))
         # Use cached icon with a reasonable size to avoid sending oversized pixmaps to X
         MainWindow.setWindowIcon(get_cached_icon(icon, size=256))
         
@@ -451,6 +452,15 @@ class Ui_MainWindow(object):
         self.discord_checkbox = QCheckBox(lang(self.system_lang, "discord_rpc"))
         self.discord_checkbox.setChecked(self.discord_manager.enabled)
         options_layout.addWidget(self.discord_checkbox)
+
+        self.ask_update_checkbox = QCheckBox(lang(self.system_lang, "ask_update_auto"))
+        self.ask_update_checkbox.setChecked(self.config_manager.get_ask_update() == "yes")
+        options_layout.addWidget(self.ask_update_checkbox)
+
+        self.btn_manual_update = AnimatedButton(lang(self.system_lang, "ask_update"), settings_widget, "outlined")
+        self.btn_manual_update.setMinimumHeight(40)
+        self.btn_manual_update.clicked.connect(self.manual_check_for_updates)
+        options_layout.addWidget(self.btn_manual_update)
         
         settings_layout.addWidget(options_card)
         
@@ -682,6 +692,13 @@ class Ui_MainWindow(object):
         self.user_name = profile.get('account_name', '') or ''
         self.user_uuid = profile.get('user_uuid', '') or ''
         self.jvm_arguments = profile.get('jvm_arguments', variables.defaultJVM if hasattr(variables, 'defaultJVM') else '')
+        # Reset access token when switching profiles; refreshed tokens will overwrite this later
+        self.access_token = ''
+        try:
+            if hasattr(self, 'username_input') and self.username_input:
+                self.username_input.setText(self.user_name)
+        except Exception:
+            pass
         # Set last selected version in UI if present
         last_version = profile.get('last_version', '')
         if last_version and hasattr(self, 'comboBox'):
@@ -1275,6 +1292,8 @@ class Ui_MainWindow(object):
         self.lang_combobox.setCurrentIndex(self.lang_combobox.findData(self.system_lang))
         self.snapshots_checkbox.setChecked(self.show_snapshots)
         self.discord_checkbox.setChecked(self.discord_manager.enabled)
+        if hasattr(self, 'ask_update_checkbox'):
+            self.ask_update_checkbox.setChecked(self.config_manager.get_ask_update() == "yes")
 
     def save_settings(self):
         """Save settings from the settings tab"""
@@ -1304,6 +1323,18 @@ class Ui_MainWindow(object):
             else:
                 # DiscordManager provides a cleanup method to stop RPC
                 self.discord_manager.cleanup()
+
+        if hasattr(self, 'ask_update_checkbox'):
+            ask_update_value = "yes" if self.ask_update_checkbox.isChecked() else "no"
+            try:
+                user_data = self.config_manager.load_user_data()
+            except Exception:
+                user_data = {}
+            user_data['ask_update'] = ask_update_value
+            try:
+                self.config_manager.save_user_data(user_data)
+            except Exception:
+                pass
         
         # Save all data
         self.save_data()
@@ -1313,6 +1344,32 @@ class Ui_MainWindow(object):
                 
         # Switch back to game tab
         self.tab_widget.setCurrentIndex(0)
+
+    def manual_check_for_updates(self):
+        """Manually compare launcher versions and trigger the updater if needed."""
+        parent = self.centralwidget
+        repo_latest = "https://github.com/CesarGarza55/OpenLauncher/releases/latest"
+        try:
+            response = requests.get(repo_latest, timeout=10)
+            response.raise_for_status()
+            latest_tag = response.url.rstrip('/').split('/').pop()
+            latest_version = version_to_tuple(latest_tag)
+            current_version = version_to_tuple(variables.launcher_version)
+        except requests.RequestException:
+            QMessageBox.warning(parent, "Error", lang(self.system_lang, "no_internet"))
+            return
+        except Exception as exc:
+            QMessageBox.warning(parent, "Error", lang(self.system_lang, "error_occurred") + str(exc))
+            return
+
+        if latest_version > current_version:
+            run_updater()
+        else:
+            QMessageBox.information(
+                parent,
+                lang(self.system_lang, "ask_update"),
+                lang(self.system_lang, "update_latest"),
+            )
     
     def create_mod_manager_tab(self):
         """Create mod manager tab with modern dark styling"""
@@ -1679,6 +1736,12 @@ class Ui_MainWindow(object):
         
         if hasattr(self, 'discord_checkbox'):
             self.discord_checkbox.setText(lang(self.system_lang, "discord_rpc"))
+
+        if hasattr(self, 'ask_update_checkbox'):
+            self.ask_update_checkbox.setText(lang(self.system_lang, "ask_update_auto"))
+        
+        if hasattr(self, 'btn_manual_update'):
+            self.btn_manual_update.setText(lang(self.system_lang, "ask_update"))
         
         # Update buttons
         if hasattr(self, 'btn_launcher_dir'):

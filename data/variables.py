@@ -83,7 +83,7 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.7.2"
+version = "1.7.3"
 launcher_version = f"beta-{version}"
 
 # User UUID
@@ -331,9 +331,9 @@ def get_auth_headers():
     """Return launcher build headers used to authenticate with the auth API.
 
     If data/build_secret.py is missing, returns an empty dict.
-    """
     if not getattr(sys, 'frozen', False):
         return {}
+    """
 
     # Running in a frozen build — attempt to load build_secret values.
     try:

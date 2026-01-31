@@ -1,4 +1,4 @@
-import os, sys, requests, shutil
+import os, sys, requests, shutil, subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from lang import lang, current_language
@@ -47,6 +47,23 @@ class CustomDialog(simpledialog.Dialog):
 
     def apply(self):
         self.result = self.choice.get()
+
+def is_deb_install():
+    """Return True if openlauncher is installed via a .deb package."""
+    launcher_path = shutil.which("openlauncher")
+    if not launcher_path:
+        return False
+    try:
+        result = subprocess.run(
+            ["dpkg-query", "-S", launcher_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False
+    return result.returncode == 0
 
 def download_file(url, dest, progress_var, progress_bar, progress_label):
     response = requests.get(url, stream=True)
@@ -159,11 +176,11 @@ def update():
                         os.system(f'start {dest}')
                     sys.exit()
                 elif sys.platform == "linux":
-                    if not shutil.which("openlauncher"):
+                    if is_deb_install():
+                        format_choice = "deb"
+                    else:
                         dialog = CustomDialog(root, title=lang(current_language, "download_format"))
                         format_choice = dialog.result
-                    else:
-                        format_choice = "deb"
                     if format_choice == 'bin':
                         url = f"{repo_latest}/download/OpenLauncher.bin"
                         messagebox.showinfo("Download", lang(current_language, "select_folder"))
@@ -198,19 +215,25 @@ def update():
                     root.update()
                     if download_file(url, dest, progress_var, progress_bar, progress_label):
                         progress_window.destroy()
+                        install_success = False
                         if format_choice == 'bin':
                             os.chmod(dest, 0o755)
                             show_custom_message("Download", lang(current_language, "download_success"))
                             show_custom_message("Download", lang(current_language, "open_bin")).replace("dest", dest)
+                            install_success = True
                         elif format_choice == 'deb':
-                            # Try with xterm
                             if shutil.which("xterm"):
-                                # Use xterm to run the installation command
-                                os.system(f'xterm -e sudo dpkg -i {dest}')
+                                exit_code = os.system(f'xterm -e sudo dpkg -i {dest}')
+                                install_success = (exit_code == 0)
+                                if not install_success:
+                                    show_custom_message("Error", lang(current_language, "error_occurred") + str(exit_code), "error")
                             else:
                                 show_custom_message("Error", lang(current_language, "xterm_not_found"), "error").replace("dest", dest)
-                            show_custom_message("Download", lang(current_language, "update_complete"))
-                            clean_up()
+                                install_success = False
+
+                            if install_success:
+                                show_custom_message("Download", lang(current_language, "update_complete"))
+                                clean_up()
                     else:
                         show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
                     sys.exit()
