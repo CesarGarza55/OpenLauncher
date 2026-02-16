@@ -60,10 +60,11 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-# Ask for the OS type (Debian or Fedora)
+# Ask for the OS type (Debian, Fedora, or Arch)
 echo "Select your operating system:"
 echo "1) Debian-based systems"
 echo "2) Fedora-based systems"
+echo "3) Arch Linux"
 read -p "Enter the number of your choice: " os_choice
 
 # Clear the terminal
@@ -74,6 +75,8 @@ if [ "$os_choice" -eq 1 ]; then
     echo -e "${BLUE}You selected Debian-based systems.${NC}"
 elif [ "$os_choice" -eq 2 ]; then
     echo -e "${BLUE}You selected Fedora-based systems.${NC}"
+elif [ "$os_choice" -eq 3 ]; then
+    echo -e "${BLUE}You selected Arch Linux.${NC}"
 fi
 
 echo "Select an option:"
@@ -117,6 +120,19 @@ install_deps_fedora() {
     # Install required dependencies
     sudo dnf install -y python3 python3-pip python3-virtualenv python3-tkinter java-11-openjdk \
         libxcb libX11-xcb libXrender fontconfig qt5-qtbase-gui qt5-qtbase xcb-util-cursor xterm
+    # Create (or reuse) virtual environment and install python dependencies there
+    create_venv
+    python3 -m pip install --upgrade pip setuptools wheel
+    python3 -m pip install -r data/requirements_linux.txt
+}
+
+# Function to install dependencies for Arch Linux
+install_deps_arch() {
+    echo -e "${YELLOW}Installing dependencies for Arch Linux...${NC}"
+
+    # Install required dependencies
+    sudo pacman -Syu --noconfirm python tk python-pip jre-openjdk \
+        libxcb libx11 libxrender fontconfig qt5-base xcb-util-cursor xterm
     # Create (or reuse) virtual environment and install python dependencies there
     create_venv
     python3 -m pip install --upgrade pip setuptools wheel
@@ -288,6 +304,23 @@ case $os_choice in
             fi
         elif [ "$action_choice" -eq 2 ]; then
             install_deps_fedora
+        else
+            echo -e "${RED}Invalid choice. Exiting...${NC}"
+            exit 1
+        fi
+        ;;
+    3)
+        if [ "$action_choice" -eq 1 ]; then
+            install_deps_arch
+            create_venv
+            if confirm_compile; then
+                compile_application
+            else
+                echo -e "${RED}Compilation cancelled. Exiting.${NC}"
+                exit 0
+            fi
+        elif [ "$action_choice" -eq 2 ]; then
+            install_deps_arch
         else
             echo -e "${RED}Invalid choice. Exiting...${NC}"
             exit 1
