@@ -14,6 +14,21 @@
 
 **Note**: Currently, OpenLauncher is designed only for Windows and Linux.
 
+## DevLog
+I've been working on a new redesign of the launcher. This update will be the first stable release (no longer a beta). It comes with a brand-new interface and a complete codebase rework.
+
+This transition is currently being tested, with the goal of providing a smoother, more polished, and better overall user experience.
+
+This update focuses on improving usability, responsiveness, and maintainability to make OpenLauncher feel better than ever.
+
+Stay tuned for the new release!
+
+### WIP Preview 👀
+
+The new interface is still under development, but here's a small preview:
+
+<img width="1463" height="855" alt="image" src="https://github.com/user-attachments/assets/693c2dba-9586-4e62-bb13-be99b50f1ea9" />
+
 ## ⚠️ Warning for Windows Users
 
 **Warning**: On Windows, the launcher may be flagged as a false positive by antivirus software due to the absence of a valid certificate. Please be assured that this is a false alarm and the software is safe to use.
