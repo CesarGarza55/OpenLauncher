@@ -220,6 +220,17 @@ languages = {
         "profile_exists": "Profile already exists",
         "profile_not_selected": "No profile selected",
         "install_login_required": "You must log in with your Microsoft account and have Minecraft Java Edition to install Minecraft versions",
+        "legacy_deprecated": (
+            "This legacy system is no longer being updated and will eventually be replaced by the new OpenLauncher. "
+            "Do you want to migrate to the new version now?"
+        ),
+        "legacy_deprecated_title": "Legacy mode deprecated",
+        "legacy_deprecated_startup": (
+            "You are running the legacy version of OpenLauncher. This version is no longer updated and will not receive future updates. "
+            "Please migrate to the new OpenLauncher to continue receiving updates."
+        ),
+        "legacy_notice": "⚠️ This legacy version is no longer updated. Please migrate to the new OpenLauncher.",
+        "migrate_to_new": "Go to new version",
     },
     "es": {
         "language": "Seleccionar Idioma",
@@ -410,6 +421,17 @@ languages = {
         "profile_exists": "El perfil ya existe",
         "profile_not_selected": "Ningún perfil seleccionado",
         "install_login_required": "Debes iniciar sesión con tu cuenta de Microsoft y tener Minecraft Java Edition para instalar versiones de Minecraft",
+        "legacy_deprecated": (
+            "Este sistema legacy ya no recibe actualizaciones y eventualmente será reemplazado por el nuevo OpenLauncher. "
+            "¿Deseas migrar a la nueva versión ahora?"
+        ),
+        "legacy_deprecated_title": "Modo legacy obsoleto",
+        "legacy_deprecated_startup": (
+            "Estás ejecutando la versión legacy de OpenLauncher. Esta versión ya no recibe actualizaciones y no se actualizará en el futuro. "
+            "Por favor migra al nuevo OpenLauncher para continuar recibiendo actualizaciones."
+        ),
+        "legacy_notice": "⚠️ Esta versión legacy ya no recibe actualizaciones. Por favor migra al nuevo OpenLauncher.",
+        "migrate_to_new": "Ir a la nueva versión",
     },
     "fr": {
         "language": "Sélectionnez la langue",
@@ -600,6 +622,16 @@ languages = {
         "profile_exists": "Le profil existe déjà",
         "profile_not_selected": "Aucun profil sélectionné",
         "install_login_required": "Vous devez être connecté avec votre compte Microsoft et posséder Minecraft Java Edition pour installer des versions de Minecraft",
+        "legacy_deprecated": (
+            "Ce système legacy n'est plus mis à jour et sera remplacé par le nouveau OpenLauncher. Voulez-vous migrer vers la nouvelle version maintenant ?"
+        ),
+        "legacy_deprecated_title": "Mode legacy obsolète",
+        "legacy_deprecated_startup": (
+            "Vous utilisez la version legacy d'OpenLauncher. Cette version n'est plus mise à jour et ne recevra pas de futures mises à jour. "
+            "Veuillez migrer vers le nouveau OpenLauncher pour continuer à recevoir des mises à jour."
+        ),
+        "legacy_notice": "⚠️ Cette version legacy n'est plus mise à jour. Veuillez migrer vers le nouveau OpenLauncher.",
+        "migrate_to_new": "Aller à la nouvelle version",
     }
 }
 

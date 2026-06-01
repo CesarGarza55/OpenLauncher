@@ -2,7 +2,6 @@ import os, sys, requests, shutil, subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from lang import lang, current_language
-from variables import check_network
 import variables
 
 def version_to_tuple(version):
@@ -11,7 +10,7 @@ def version_to_tuple(version):
     v_lower = v.lower()
     if 'alpha' in v_lower:
         version_type = 0
-    elif 'beta' in v_lower:
+    elif 'beta' in v_lower or 'legacy' in v_lower:
         version_type = 1
     else:
         version_type = 2
@@ -128,122 +127,195 @@ def clean_up():
     except:
         pass
 
+def is_release_version(version):
+    v = str(version or "").lower()
+    return 'release' in v and 'alpha' not in v and 'beta' not in v and 'legacy' not in v
+
+
+def is_legacy_version(version):
+    v = str(version or "").lower()
+    return 'legacy' in v or 'beta' in v
+
+
+def show_migration_dialog():
+    root = tk.Tk()
+    root.withdraw()
+    root.update()
+    root.attributes("-topmost", True)
+
+    msg = lang(current_language, "legacy_deprecated")
+    answer = messagebox.askyesno(
+        lang(current_language, "legacy_deprecated_title"),
+        msg,
+        parent=root,
+    )
+    root.destroy()
+    return bool(answer)
+
+
 def update():
-    if not check_network():
+    if not variables.check_network():
         return
     repo_latest = "https://github.com/CesarGarza55/OpenLauncher/releases/latest"
     try:
-        update = requests.get(f"{repo_latest}")
+        response = requests.get(f"{repo_latest}")
         actual_version = version_to_tuple(variables.launcher_version)
-        latest_version = version_to_tuple(update.url.split('/').pop())
+        latest_tag = response.url.split('/').pop().rstrip('/')
+        latest_version = version_to_tuple(latest_tag)
 
         if latest_version > actual_version:
-            root = tk.Tk()
-            # withdraw main window but keep it as parent for dialogs
-            root.withdraw()
-            # try to bring dialogs to front where supported
-            try:
+            # New version available
+            if is_release_version(latest_tag) and (is_legacy_version(variables.launcher_version) or version_to_tuple(variables.launcher_version)[0] < version_to_tuple(latest_tag)[0]):
+                migrate = show_migration_dialog()
+                if migrate:
+                    if sys.platform == "win32":
+                        url = f"{repo_latest}/download/OpenLauncher.exe"
+                        dest = f'{variables.app_directory}/updates/update.exe'
+                        os.makedirs(os.path.join(variables.app_directory, "updates"), exist_ok=True)
+
+                        progress_window = tk.Toplevel(root if 'root' in locals() else None)
+                        progress_window.title(lang(current_language, "downloading"))
+                        progress_window.geometry("400x150")
+                        response = requests.get(url, stream=True)
+                        total_size = int(response.headers.get('content-length', 0)) or 1
+                        tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
+                        progress_var = tk.DoubleVar()
+                        progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
+                        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+                        progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
+                        progress_label.pack()
+
+                        center_window(progress_window)
+                        progress_window.update()
+                        if download_file(url, dest, progress_var, progress_bar, progress_label):
+                            progress_window.destroy()
+                            os.system(f'start {dest}')
+                        sys.exit()
+                    elif sys.platform == "linux":
+                        url = f"{repo_latest}/download/OpenLauncher.bin"
+                        dest = f'{variables.app_directory}/updates/update.bin'
+                        os.makedirs(os.path.join(variables.app_directory, "updates"), exist_ok=True)
+
+                        progress_window = tk.Toplevel(root if 'root' in locals() else None)
+                        progress_window.title(lang(current_language, "downloading"))
+                        progress_window.geometry("400x150")
+                        response = requests.get(url, stream=True)
+                        total_size = int(response.headers.get('content-length', 0)) or 1
+                        tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
+                        progress_var = tk.DoubleVar()
+                        progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
+                        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+                        progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
+                        progress_label.pack()
+
+                        center_window(progress_window)
+                        progress_window.update()
+                        if download_file(url, dest, progress_var, progress_bar, progress_label):
+                            progress_window.destroy()
+                            show_custom_message("Download", lang(current_language, "download_success"))
+                            show_custom_message("Download", lang(current_language, "open_bin").replace("dest", dest))
+                        sys.exit()
+                else:
+                    variables.managed_update_channel = "legacy"
+                    clean_up()
+            else:
+                root = tk.Tk()
+                root.withdraw()
                 root.update()
                 root.attributes("-topmost", True)
-            except Exception:
-                pass
-            # show the confirmation dialog with root as parent
-            if messagebox.askyesno("Update", lang(current_language, "update_available"), parent=root):
-                os.makedirs(os.path.join(variables.app_directory, "updates"), exist_ok=True)
-                download_location = os.path.join(variables.app_directory, "updates")
-                if sys.platform == "win32":
-                    url = f"{repo_latest}/download/OpenLauncher.exe"
-                    dest = f'{download_location}/update.exe'
-
-                    progress_window = tk.Toplevel(root)
-                    progress_window.title(lang(current_language, "downloading"))
-                    progress_window.geometry("400x150")
-                    # Get the size of the file
-                    response = requests.get(url, stream=True)
-                    total_size = int(response.headers.get('content-length', 0)) or 1
-                    tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
-                    progress_var = tk.DoubleVar()
-                    progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
-                    progress_bar.pack(fill=tk.X, padx=20, pady=10)
-                    progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
-                    progress_label.pack()
-
-                    center_window(progress_window)
-
-                    root.update()
-                    if download_file(url, dest, progress_var, progress_bar, progress_label):
-                        progress_window.destroy()
-                        os.system(f'start {dest}')
-                    sys.exit()
-                elif sys.platform == "linux":
-                    if is_deb_install():
-                        format_choice = "deb"
-                    else:
-                        dialog = CustomDialog(root, title=lang(current_language, "download_format"))
-                        format_choice = dialog.result
-                    if format_choice == 'bin':
-                        url = f"{repo_latest}/download/OpenLauncher.bin"
-                        messagebox.showinfo("Download", lang(current_language, "select_folder"))
-                        down_location = filedialog.askdirectory()
-                        if not down_location:
+                if messagebox.askyesno("Update", lang(current_language, "update_available"), parent=root):
+                    os.makedirs(os.path.join(variables.app_directory, "updates"), exist_ok=True)
+                    if sys.platform == "win32":
+                        url = f"{repo_latest}/download/OpenLauncher.exe"
+                        dest = f'{variables.app_directory}/updates/update.exe'
+                        progress_window = tk.Toplevel(root)
+                        progress_window.title(lang(current_language, "downloading"))
+                        progress_window.geometry("400x150")
+                        response = requests.get(url, stream=True)
+                        total_size = int(response.headers.get('content-length', 0)) or 1
+                        tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
+                        progress_var = tk.DoubleVar()
+                        progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
+                        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+                        progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
+                        progress_label.pack()
+                        center_window(progress_window)
+                        root.update()
+                        if download_file(url, dest, progress_var, progress_bar, progress_label):
+                            progress_window.destroy()
+                            os.system(f'start {dest}')
+                        sys.exit()
+                    elif sys.platform == "linux":
+                        if is_deb_install():
+                            format_choice = "deb"
+                        else:
+                            dialog = CustomDialog(root, title=lang(current_language, "download_format"))
+                            format_choice = dialog.result
+                        if format_choice == 'bin':
+                            url = f"{repo_latest}/download/OpenLauncher.bin"
+                            messagebox.showinfo("Download", lang(current_language, "select_folder"))
+                            down_location = filedialog.askdirectory()
+                            if not down_location:
+                                show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
+                                sys.exit()
+                            dest = f'{down_location}/update.bin'
+                        elif format_choice == 'deb':
+                            url = f"{repo_latest}/download/OpenLauncher.deb"
+                            dest = f'{variables.app_directory}/updates/update.deb'
+                        else:
                             show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
                             sys.exit()
-                        dest = f'{down_location}/update.bin'
-                    elif format_choice == 'deb':
-                        url = f"{repo_latest}/download/OpenLauncher.deb"
-                        dest = f'{download_location}/update.deb'
-                    else:
-                        show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
+
+                        progress_window = tk.Toplevel(root)
+                        progress_window.title(lang(current_language, "downloading"))
+                        progress_window.geometry("400x150")
+                        response = requests.get(url, stream=True)
+                        total_size = int(response.headers.get('content-length', 0)) or 1
+                        tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
+                        progress_var = tk.DoubleVar()
+                        progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
+                        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+                        progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
+                        progress_label.pack()
+                        center_window(progress_window)
+                        root.update()
+                        if download_file(url, dest, progress_var, progress_bar, progress_label):
+                            progress_window.destroy()
+                            install_success = False
+                            if format_choice == 'bin':
+                                os.chmod(dest, 0o755)
+                                show_custom_message("Download", lang(current_language, "download_success"))
+                                show_custom_message("Download", lang(current_language, "open_bin").replace("dest", dest))
+                                install_success = True
+                            elif format_choice == 'deb':
+                                if shutil.which("xterm"):
+                                    exit_code = os.system(f'xterm -e sudo dpkg -i {dest}')
+                                    install_success = (exit_code == 0)
+                                    if not install_success:
+                                        show_custom_message("Error", lang(current_language, "error_occurred") + str(exit_code), "error")
+                                else:
+                                    show_custom_message("Error", lang(current_language, "xterm_not_found"), "error").replace("dest", dest)
+                                    install_success = False
+
+                                if install_success:
+                                    show_custom_message("Download", lang(current_language, "update_complete"))
+                                    clean_up()
+                        else:
+                            show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
                         sys.exit()
-
-                    progress_window = tk.Toplevel(root)
-                    progress_window.title(lang(current_language, "downloading"))
-                    progress_window.geometry("400x150")
-                    # Get the size of the file
-                    response = requests.get(url, stream=True)
-                    total_size = int(response.headers.get('content-length', 0)) or 1
-                    
-                    tk.Label(progress_window, text=f"{lang(current_language, 'downloading')} ({total_size / 1024 / 1024:.2f} MB)", font=("Arial", 12)).pack(pady=10)
-                    progress_var = tk.DoubleVar()
-                    progress_bar = ttk.Progressbar(progress_window, variable=progress_var, maximum=100)
-                    progress_bar.pack(fill=tk.X, padx=20, pady=10)
-                    progress_label = tk.Label(progress_window, text="0%", font=("Arial", 10))
-                    progress_label.pack()
-
-                    center_window(progress_window)
-
-                    root.update()
-                    if download_file(url, dest, progress_var, progress_bar, progress_label):
-                        progress_window.destroy()
-                        install_success = False
-                        if format_choice == 'bin':
-                            os.chmod(dest, 0o755)
-                            show_custom_message("Download", lang(current_language, "download_success"))
-                            show_custom_message("Download", lang(current_language, "open_bin")).replace("dest", dest)
-                            install_success = True
-                        elif format_choice == 'deb':
-                            if shutil.which("xterm"):
-                                exit_code = os.system(f'xterm -e sudo dpkg -i {dest}')
-                                install_success = (exit_code == 0)
-                                if not install_success:
-                                    show_custom_message("Error", lang(current_language, "error_occurred") + str(exit_code), "error")
-                            else:
-                                show_custom_message("Error", lang(current_language, "xterm_not_found"), "error").replace("dest", dest)
-                                install_success = False
-
-                            if install_success:
-                                show_custom_message("Download", lang(current_language, "update_complete"))
-                                clean_up()
-                    else:
-                        show_custom_message("Error", lang(current_language, "download_cancelled"), "error")
-                    sys.exit()
-            else:
-                pass
-            root.destroy()
+                else:
+                    pass
+                root.destroy()
         else:
             clean_up()
+        if is_legacy_version(variables.launcher_version):
+            variables.managed_update_channel = "legacy"
     except Exception as e:
-        # Print exception so issues aren't silently swallowed during headless runs
         print("Updater error:", repr(e))
+        try:
+            if is_legacy_version(variables.launcher_version):
+                variables.managed_update_channel = "legacy"
+        except Exception:
+            pass
 if __name__ == "__main__":
     update()

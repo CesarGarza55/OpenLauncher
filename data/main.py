@@ -11,6 +11,7 @@ import argparse
 import os
 import sys
 import time
+import tkinter as tk
 from tkinter import messagebox
 
 import minecraft_launcher_lib
@@ -299,8 +300,21 @@ def launch_gui_mode() -> None:
         config["lang"] = "en"
         config_manager.save_config(config)
 
-    if config_manager.get_ask_update() == "yes":
-        update()
+    if getattr(variables, 'managed_update_channel', 'release') == 'legacy':
+        if config_manager.get_ask_update() == "yes":
+            try:
+                tk_root = tk.Tk()
+                tk_root.withdraw()
+                tk_root.update()
+                tk_root.attributes("-topmost", True)
+                messagebox.showwarning(
+                    lang(system_lang, "legacy_deprecated_title"),
+                    lang(system_lang, "legacy_deprecated_startup"),
+                    parent=tk_root,
+                )
+                tk_root.destroy()
+            except Exception:
+                pass
 
     discord_manager = DiscordManager()
     icon = variables.icon

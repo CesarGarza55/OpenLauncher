@@ -83,8 +83,11 @@ show_snapshots = False
 ask_update = "yes"
 
 # Launcher version
-version = "1.7.3"
+version = "1.7.4"
 launcher_version = f"beta-{version}"
+
+no_auto_update = False
+managed_update_channel = "legacy"
 
 # User UUID
 user_uuid = ""

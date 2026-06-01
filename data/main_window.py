@@ -6,7 +6,7 @@ Combines all UI components and methods
 import sys
 import os
 import json
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QWidget, QVBoxLayout, QLabel, QCheckBox, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QTextEdit, QWidget, QVBoxLayout, QLabel, QCheckBox, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 from material_design import AnimatedButton
@@ -15,6 +15,8 @@ from ui_components import Ui_MainWindow
 from ui_methods import UiMethods
 from ui_windows import WindowMethods
 from lang import lang
+from material_design import MaterialColors
+import variables
 
 
 class MainWindow(QMainWindow, Ui_MainWindow, UiMethods, WindowMethods):
@@ -91,6 +93,20 @@ class MainWindow(QMainWindow, Ui_MainWindow, UiMethods, WindowMethods):
         layout = QVBoxLayout(get_started_tab)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
+
+        if getattr(variables, 'managed_update_channel', 'release') == 'legacy':
+            legacy_label = QLabel(lang(self.system_lang, "legacy_notice"))
+            legacy_label.setStyleSheet(
+                f"font-size: 16px; color: {MaterialColors.ERROR}; padding: 12px; border: 1px solid {MaterialColors.ERROR}; border-radius: 8px;"
+            )
+            legacy_label.setWordWrap(True)
+            layout.addWidget(legacy_label)
+
+            migrate_btn = AnimatedButton(lang(self.system_lang, "migrate_to_new"), get_started_tab, "primary")
+            migrate_btn.setStyleSheet("font-size: 16px; padding: 12px 24px; border-radius: 8px;")
+            migrate_btn.clicked.connect(lambda: __import__('webbrowser').open('https://github.com/CesarGarza55/OpenLauncher/releases/latest'))
+            layout.addWidget(migrate_btn)
+            layout.addSpacing(12)
 
         # Welcome label
         welcome_label = QLabel(lang(self.system_lang, "welcome"))
