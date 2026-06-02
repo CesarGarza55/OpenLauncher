@@ -1,7 +1,0 @@
-cx_Freeze
-minecraft_launcher_lib
-PyQt5
-PyQtWebEngine
-pypresence
-requests
-keyring

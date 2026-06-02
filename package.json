@@ -1,0 +1,115 @@
+{
+  "name": "OpenLauncher",
+  "private": true,
+  "version": "1.0.0",
+  "description": "OpenLauncher is an open source Minecraft launcher developed by CesarGarza55",
+  "author": "CesarGarza55",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "vite": "vite",
+    "electron": "wait-on http://localhost:5173 && electron .",
+    "electron:dev": "wait-on http://localhost:5173 && nodemon --watch electron --watch src/lib --ext js,cjs,mjs,json --exec \"electron . --dev\"",
+    "dev": "concurrently \"npm run vite\" \"npm run electron:dev\"",
+    "build": "vite build",
+    "start": "electron .",
+    "build:win:dir": "npm run build && electron-builder --win --dir",
+    "build:win:installer": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.9",
+    "keytar": "^7.9.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "@babel/core": "^7.29.0",
+    "@eslint/js": "^10.0.1",
+    "@rolldown/plugin-babel": "^0.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "nodemon": "^3.1.10",
+    "wait-on": "^9.0.10",
+    "vite": "^8.0.12"
+  },
+  "build": {
+    "appId": "com.codevbox.openlauncher",
+    "productName": "OpenLauncher",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "compression": "maximum",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "src/lib/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Game",
+      "maintainer": "CesarGarza55",
+      "artifactName": "${productName}.${ext}"
+    },
+    "deb": {
+      "artifactName": "${productName}.${ext}",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libappindicator3-1",
+        "libsecret-1-0"
+      ]
+    },
+    "tar.gz": {
+      "artifactName": "${productName}-Portable-Linux.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-Windows.${ext}"
+    },
+    "electronLanguages": [
+      "en-US",
+      "es"
+    ],
+    "icon": "script/icon.ico"
+  }
+}

@@ -1,9 +1,0 @@
-Package: openlauncher
-Version: 1.7.3
-Section: games
-Priority: optional
-Architecture: all
-Essential: no
-Depends: python3, python3-pyqt5, python3-requests
-Maintainer: CesarGarza55 <itzcesargzm@gmail.com>
-Description: Open source Minecraft launcher developed in Python with PyQt5.
