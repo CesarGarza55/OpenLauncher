@@ -15,6 +15,9 @@ import {
   loginMicrosoftInteractive,
   logoutMicrosoft,
 } from '../src/lib/microsoftAuth.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const require = createRequire(import.meta.url);
 const AdmZip = require('adm-zip');

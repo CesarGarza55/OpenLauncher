@@ -18,13 +18,12 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.9",
+    "dotenv": "^17.4.2",
     "keytar": "^7.9.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "electron": "^42.2.0",
-    "electron-builder": "^26.8.1",
     "@babel/core": "^7.29.0",
     "@eslint/js": "^10.0.1",
     "@rolldown/plugin-babel": "^0.2.3",
@@ -33,13 +32,15 @@
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^9.2.1",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "nodemon": "^3.1.10",
-    "wait-on": "^9.0.10",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "wait-on": "^9.0.10"
   },
   "build": {
     "appId": "com.codevbox.openlauncher",
@@ -62,11 +63,15 @@
       "target": [
         {
           "target": "dir",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -74,11 +79,15 @@
       "target": [
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Game",
