@@ -109,9 +109,7 @@
         "libsecret-1-0"
       ]
     },
-    "tar.gz": {
-      "artifactName": "${productName}-Portable-Linux.${ext}"
-    },
+
     "portable": {
       "artifactName": "${productName}-Portable-Windows.${ext}"
     },
