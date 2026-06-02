@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="100px" src="data/img/icon.webp" align="center" alt="OpenLauncher" />
+  <img width="100px" src="public/icon.webp" align="center" alt="OpenLauncher" />
   <h2 align="center">OpenLauncher</h2>
   <p align="center">An open-source Minecraft launcher for Windows and Linux built with Electron.</p>
 </p>
