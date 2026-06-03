@@ -73,7 +73,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+    "icon": "script/icon.ico"
     },
     "linux": {
       "target": [
@@ -92,7 +93,8 @@
       ],
       "category": "Game",
       "maintainer": "CesarGarza55",
-      "artifactName": "${productName}.${ext}"
+      "artifactName": "${productName}.${ext}",
+      "icon": "script/icon.png"
     },
     "deb": {
       "artifactName": "${productName}.${ext}",
