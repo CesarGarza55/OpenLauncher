@@ -55,7 +55,7 @@ fi
 install_deps_debian() {
     echo -e "${YELLOW}Installing dependencies for Debian-based systems...${NC}"
     sudo apt update
-    sudo apt install -y npm nodejs
+    sudo apt install -y npm nodejs default-jre
     echo -e "${GREEN}Dependencies installed!${NC}"
     echo -e "${YELLOW}Installing project dependencies...${NC}"
     npm install
@@ -65,7 +65,7 @@ install_deps_debian() {
 # Function to install dependencies for Fedora-based systems
 install_deps_fedora() {
     echo -e "${YELLOW}Installing dependencies for Fedora-based systems...${NC}"
-    sudo dnf install -y npm nodejs
+    sudo dnf install -y npm nodejs java
     echo -e "${GREEN}Dependencies installed!${NC}"
     echo -e "${YELLOW}Installing project dependencies...${NC}"
     npm install
@@ -75,7 +75,7 @@ install_deps_fedora() {
 # Function to install dependencies for Arch Linux
 install_deps_arch() {
     echo -e "${YELLOW}Installing dependencies for Arch Linux...${NC}"
-    sudo pacman -Syu --noconfirm npm nodejs
+    sudo pacman -Syu --noconfirm npm nodejs jre-openjdk
     echo -e "${GREEN}Dependencies installed!${NC}"
     echo -e "${YELLOW}Installing project dependencies...${NC}"
     npm install
@@ -84,10 +84,13 @@ install_deps_arch() {
 
 # Function to install dependencies for Other systems
 install_deps_other() {
-    echo -e "${YELLOW}Please install npm and nodejs using your package manager.${NC}"
+    echo -e "${YELLOW}Please install npm, nodejs and java using your package manager.${NC}"
     echo "Example commands:"
-    echo "  - openSUSE: sudo zypper install npm nodejs"
-    echo "  - Gentoo: sudo emerge npm nodejs"
+    echo "  - openSUSE: sudo zypper install npm nodejs java"
+    echo "  - Gentoo: sudo emerge npm nodejs virtual/jre"
+    echo ""
+    echo -e "${RED}IMPORTANT: You must have Java (JRE/JDK) installed to run Minecraft!${NC}"
+    echo "Java is required by the launcher. Install it and configure it in Settings if needed."
 }
 
 # Clean previous builds

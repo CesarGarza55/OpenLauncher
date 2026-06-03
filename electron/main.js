@@ -295,8 +295,13 @@ async function launchDownloadedUpdate(filePath) {
   }
 
   if (isLaunchableUpdateAsset(resolvedPath)) {
-    const child = spawn(resolvedPath, [], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' });
-    child.unref();
+    try {
+      const child = spawn(resolvedPath, [], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' });
+      child.unref();
+    } catch (e) {
+      try { await shell.openExternal(UPDATE_RELEASES_PAGE); } catch {}
+      return { ok: false, launched: false, path: resolvedPath, error: e?.message || String(e) };
+    }
     return { ok: true, launched: true, path: resolvedPath };
   }
 
@@ -625,7 +630,12 @@ async function launchJavaWithArgs(javaCmd, javaArgs, cwd, installId) {
     .map(arg => (String(arg).includes(' ') || String(arg).includes('\t') ? `"${String(arg).replaceAll('"', '\\"')}"` : String(arg)))
     .join('\n');
   await fs.promises.writeFile(argFilePath, argFileContents, 'utf8');
-  const child = spawn(javaCmd, [`@${argFilePath}`], { cwd });
+  let child;
+  try {
+    child = spawn(javaCmd, [`@${argFilePath}`], { cwd });
+  } catch (e) {
+    throw new Error(`Failed to launch Java: ${javaCmd}. Make sure Java is installed. Details: ${e?.message || e}`);
+  }
   return { child, argFilePath };
 }
 
@@ -650,7 +660,12 @@ function resolveJavaCommand(javaPath) {
 }
 
 function detectJavaMajor(javaCmd) {
-  const result = spawnSync(javaCmd, ['-version'], { encoding: 'utf8' });
+  let result;
+  try {
+    result = spawnSync(javaCmd, ['-version'], { encoding: 'utf8' });
+  } catch {
+    return null;
+  }
   if (result.error) return null;
   return parseJavaMajorVersion(`${result.stderr || ''}\n${result.stdout || ''}`);
 }
@@ -965,7 +980,13 @@ async function runForgeProcessors(versionData, minecraftRoot, lzmaPath, installe
     }
 
     await new Promise((resolve, reject) => {
-      const child = spawn(command[0], command.slice(1), { cwd: minecraftRoot });
+      let child;
+      try {
+        child = spawn(command[0], command.slice(1), { cwd: minecraftRoot });
+      } catch (e) {
+        reject(new Error(`Failed to launch Java: ${command[0]}. ${e?.message || e}`));
+        return;
+      }
       let stdout = '';
       let stderr = '';
       child.stdout?.on('data', chunk => {
@@ -2249,7 +2270,18 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
   }
 
    const args = [...jvmArgs, '-cp', classpath, mainClass, ...gameArgs];
-   const child = spawn(finalJavaCmd, args, { cwd: baseDir });
+   let child;
+   try {
+     child = spawn(finalJavaCmd, args, { cwd: baseDir });
+   } catch (e) {
+     try {
+       mainWindow?.webContents.send('minecraft:run-log', {
+         type: 'error',
+         msg: `Failed to launch Java: ${finalJavaCmd}. Error: ${e?.message || e}. Make sure Java (JDK 17+) is installed and configured in Settings.`
+       });
+     } catch {}
+     return { ok: false, error: 'JavaNotFound', message: `Java not found at ${finalJavaCmd}` };
+   }
 
    runningChildren.set(child.pid, child);
 
@@ -2260,9 +2292,20 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
      try { mainWindow.hide(); } catch (e) {}
    }
 
-    child.stdout.on('data', chunk => {
-      try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stdout', msg: String(chunk) }); } catch (e) {}
-    });
+   child.on('error', (err) => {
+     try {
+       mainWindow?.webContents.send('minecraft:run-log', {
+         type: 'error',
+         msg: `Java process error: ${err?.message || err}. Make sure Java is installed and accessible.`
+       });
+     } catch {}
+     runningChildren.delete(child.pid);
+     try { mainWindow?.webContents.send('minecraft:run-exit', { code: -1 }); } catch (e) {}
+   });
+
+   child.stdout.on('data', chunk => {
+     try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stdout', msg: String(chunk) }); } catch (e) {}
+   });
     child.stderr.on('data', chunk => {
       try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stderr', msg: String(chunk) }); } catch (e) {}
     });
