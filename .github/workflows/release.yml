@@ -1,0 +1,164 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+      changelog: ${{ steps.check.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check version
+        id: check
+        run: |
+          # Read version.json
+          VERSION=$(jq -r '.version' version.json)
+          CHANGELOG=$(jq -r '.changelog' version.json)
+          
+          # Get latest release from GitHub
+          LATEST_RELEASE=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || echo "none")
+          
+          echo "Current version: $VERSION"
+          echo "Latest release: $LATEST_RELEASE"
+          
+          # Check if version changed
+          if [ "release-$VERSION" != "$LATEST_RELEASE" ]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "New version detected: release-$VERSION"
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "No new version detected"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Build Electron app folder
+        run: npx electron-builder --win --dir
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Build NSIS installer with custom script
+        run: |
+          cd script
+          "C:\Program Files (x86)\NSIS\makensis.exe" compile-electron.nsi
+          cd ..
+
+      - name: Build portable version
+        run: npx electron-builder --win portable
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            release/*.exe
+
+  build-linux:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: deb
+            name: debian
+          - target: tar.gz
+            name: portable
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y npm nodejs
+          npm install
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Build Linux (${{ matrix.name }})
+        run: npx electron-builder --linux ${{ matrix.target }}
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.name }}-build
+          path: |
+            release/*.deb
+            release/*.tar.gz
+            release/*.AppImage
+
+  create-release:
+    needs: [check-version, build-windows, build-linux]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./release/windows
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*-build
+          path: ./release/linux
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: release-${{ needs.check-version.outputs.version }}
+          name: OpenLauncher release-${{ needs.check-version.outputs.version }}
+          body: ${{ needs.check-version.outputs.changelog }}
+          files: |
+            release/windows/*
+            release/linux/*
+          draft: false
+          prerelease: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
