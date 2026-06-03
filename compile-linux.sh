@@ -57,6 +57,9 @@ install_deps_debian() {
     sudo apt update
     sudo apt install -y npm nodejs
     echo -e "${GREEN}Dependencies installed!${NC}"
+    echo -e "${YELLOW}Installing project dependencies...${NC}"
+    npm install
+    echo -e "${GREEN}Project dependencies installed!${NC}"
 }
 
 # Function to install dependencies for Fedora-based systems
@@ -64,6 +67,9 @@ install_deps_fedora() {
     echo -e "${YELLOW}Installing dependencies for Fedora-based systems...${NC}"
     sudo dnf install -y npm nodejs
     echo -e "${GREEN}Dependencies installed!${NC}"
+    echo -e "${YELLOW}Installing project dependencies...${NC}"
+    npm install
+    echo -e "${GREEN}Project dependencies installed!${NC}"
 }
 
 # Function to install dependencies for Arch Linux
@@ -71,6 +77,9 @@ install_deps_arch() {
     echo -e "${YELLOW}Installing dependencies for Arch Linux...${NC}"
     sudo pacman -Syu --noconfirm npm nodejs
     echo -e "${GREEN}Dependencies installed!${NC}"
+    echo -e "${YELLOW}Installing project dependencies...${NC}"
+    npm install
+    echo -e "${GREEN}Project dependencies installed!${NC}"
 }
 
 # Function to install dependencies for Other systems
