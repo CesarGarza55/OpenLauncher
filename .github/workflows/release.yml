@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -74,7 +77,7 @@ jobs:
       - name: Build NSIS installer with custom script
         run: |
           cd script
-          "C:\Program Files (x86)\NSIS\makensis.exe" compile-electron.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" compile-electron.nsi
           cd ..
 
       - name: Build portable version
@@ -117,7 +120,7 @@ jobs:
         run: npm run build
 
       - name: Build Linux (${{ matrix.name }})
-        run: npx electron-builder --linux ${{ matrix.target }}
+        run: npx electron-builder --linux ${{ matrix.target }} --publish never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
