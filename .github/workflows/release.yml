@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -156,7 +159,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: release-${{ needs.check-version.outputs.version }}
-          name: OpenLauncher release-${{ needs.check-version.outputs.version }}
+          name: release-${{ needs.check-version.outputs.version }}
           body: ${{ needs.check-version.outputs.changelog }}
           files: |
             release/windows/*
