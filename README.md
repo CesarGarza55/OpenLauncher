@@ -133,6 +133,10 @@ By default the following JVM arguments are used:
    -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M
    ```
 
+You can view the most recent news and articles from the official Minecraft website:
+
+<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/3a22625d-3ff4-4682-b898-713ea15e5981" />
+
 If you want to change something you need to do it from the settings window.
 
 <img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/b7d06554-4d3c-494f-8440-3bed928fe2f6" />
