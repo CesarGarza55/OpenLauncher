@@ -39,7 +39,10 @@ The new Electron-based version represents a complete rewrite with improved perfo
 
 ## 🛠️ Compilation
 
-### Windows
+<details>
+<summary><b>Windows Build Instructions</b></summary>
+
+### Compilation for Windows
 
 1. Clone the repository:
     ```bash
@@ -68,8 +71,12 @@ The new Electron-based version represents a complete rewrite with improved perfo
 4. You need to install Java to be able to play:
 
     [https://www.java.com/es/download/](https://www.java.com/es/download/)
+</details>
 
-### Linux
+<details>
+<summary><b>Linux Build Instructions</b></summary>
+
+### Compilation for Linux
 
 1. Clone the repository:
     ```bash
@@ -106,6 +113,7 @@ The new Electron-based version represents a complete rewrite with improved perfo
    cd OpenLauncher
    ./OpenLauncher
    ```
+</details>
 
 ## 📥 Download options
 
@@ -142,6 +150,7 @@ If you want to change something you need to do it from the settings window.
 <img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/b7d06554-4d3c-494f-8440-3bed928fe2f6" />
 
 ## 🔑 Sign in with Microsoft Account
+
 To log in with your official Microsoft account, follow these steps:
 
 1. Open the launcher.
@@ -151,6 +160,8 @@ To log in with your official Microsoft account, follow these steps:
 
 <img width="341" height="132" alt="image" src="https://github.com/user-attachments/assets/8a987d9a-061a-43c7-b5c8-f88bc50bd8df" />
 
+<details>
+<summary><b>Using your own Microsoft Entra Client ID (For Forks & Developers)</b></summary>
 
 ### Using your own Microsoft Entra Client ID
 
@@ -173,7 +184,7 @@ production use, host an auth backend to store and rotate secrets securely.
 Troubleshooting:
 - If the browser doesn't redirect back, verify the redirect URI in the Entra Admin Panel app matches `REDIRECT_URL`.
 - If refresh tokens fail, ensure `offline_access` scope is requested.
-
+</details>
 
 ## Mod Manager
 
@@ -182,6 +193,12 @@ You can install, activate and deactivate mods with the mod manager:
 <img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/854f777a-2038-430c-b683-7d91c6c427a9" />
 
 ## 🧪 Testing
+
+<details>
+<summary><b>Tested PC Specifications & Configuration</b></summary>
+
+### Testing Configuration
+
 My PC Specs:
 - CPU: AMD Ryzen 5 5600g (3.90 GHz)
 - GPU: Radeon Vega 7 Graphics
@@ -196,8 +213,10 @@ Tested Minecraft Version:
 - Shaders: [MakeUp-UltraFast-9.1b](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
 <img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/8247ecfc-2acc-4f55-a2ab-2ff21801d36c" />
+</details>
 
 ## 🤝 Contributing
+
 Contributions are welcome! Follow these steps to contribute:
 
 - Fork the repository.
@@ -207,9 +226,11 @@ Contributions are welcome! Follow these steps to contribute:
 - Open a Pull Request on GitHub.
 
 ## 📜 License
+
 This project is licensed under the GPL-2.0 License. For more details, see the [LICENSE](https://github.com/CesarGarza55/OpenLauncher/blob/main/LICENSE) file.
 
 ## 🙏 Credits
+
 OpenLauncher uses the following libraries and tools:
 
 - Electron

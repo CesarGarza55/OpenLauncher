@@ -26,7 +26,7 @@ function getMcHeadsAvatarUrl(username, size = 256) {
     return '';
   }
 
-  return `https://api.mcheads.org/head/${encodeURIComponent(resolvedUsername)}/${size}`;
+  return `https://minotar.net/avatar/${encodeURIComponent(resolvedUsername)}/${size}`;
 }
 
 function truncateText(value, maxLength) {
@@ -57,10 +57,10 @@ const launcher = window?.launcher ?? {
   minecraftLogout: () => Promise.resolve(null),
   minecraftCheckUpdate: () => Promise.resolve({ skipped: true }),
   getAppVersion: () => Promise.resolve(''),
-  windowMinimize: () => {},
-  windowMaximize: () => {},
-  windowClose: () => {},
-  openExternal: () => {},
+  windowMinimize: () => { },
+  windowMaximize: () => { },
+  windowClose: () => { },
+  openExternal: () => { },
   invoke: () => Promise.resolve(),
 };
 
@@ -81,27 +81,27 @@ const Icon = ({ d, size = 14 }) => (
 );
 
 const ICONS = {
-  play:      'M5 3l14 9-14 9V3z',
-  stop:      'M6 6h12v12H6z',
-  edit:      'M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z',
-  download:  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
-  settings:  'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
-  folder:    'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z',
-  cube:      'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12',
-  console:   'M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm0 2v10h16V7H4zm3 7.5l3-2.5-3-2.5v5zm6-1.5h4v2h-4v-2z',
-  logout:    'M10 17l5-5-5-5M15 12H3M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4',
-  plus:      'M12 5v14M5 12h14',
-  trash:     'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2',
-  copy:      'M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2M8 4a2 2 0 012-2h4a2 2 0 012 2M8 4a2 2 0 000 4h8a2 2 0 000-4',
-  clear:     'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
-  x:         'M18 6L6 18M6 6l12 12',
-  news:      'M4 5h16v12H4zM7 8h10M7 11h10M7 14h6',
-  external:  'M14 5h5v5M10 14L19 5M19 14v5H5V5h5',
-  minimize:  'M5 12h14',
-  maximize:  'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  play: 'M5 3l14 9-14 9V3z',
+  stop: 'M6 6h12v12H6z',
+  edit: 'M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z',
+  download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  settings: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
+  folder: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z',
+  cube: 'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12',
+  console: 'M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm0 2v10h16V7H4zm3 7.5l3-2.5-3-2.5v5zm6-1.5h4v2h-4v-2z',
+  logout: 'M10 17l5-5-5-5M15 12H3M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2',
+  copy: 'M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2M8 4a2 2 0 012-2h4a2 2 0 012 2M8 4a2 2 0 000 4h8a2 2 0 000-4',
+  clear: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+  x: 'M18 6L6 18M6 6l12 12',
+  news: 'M4 5h16v12H4zM7 8h10M7 11h10M7 14h6',
+  external: 'M14 5h5v5M10 14L19 5M19 14v5H5V5h5',
+  minimize: 'M5 12h14',
+  maximize: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
   microsoft: null,
-  refresh:   'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
-  wrench:    'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z',
+  refresh: 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  wrench: 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z',
 };
 
 // ── Sub-components ───────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ function NewsCard({ item, onOpen }) {
   );
 }
 
-function ProfileCardActions({ active, name, disabled, onEdit, onDelete }) {
+function ProfileCardActions({ active, name, disabled, onEdit, onDuplicate, onDelete }) {
   const { t } = useI18n();
 
   return (
@@ -201,6 +201,15 @@ function ProfileCardActions({ active, name, disabled, onEdit, onDelete }) {
         disabled={disabled}
       >
         <Icon d={ICONS.edit} size={11} />
+      </button>
+      <button
+        className="profile-edit-btn"
+        title={t('profile.duplicate') || 'Duplicar'}
+        aria-label={`${t('profile.duplicate') || 'Duplicar'} ${name}`}
+        onClick={onDuplicate}
+        disabled={disabled}
+      >
+        <Icon d={ICONS.copy} size={11} />
       </button>
       <button
         className="profile-delete-btn"
@@ -259,36 +268,36 @@ function Toast({ toast, onClose }) {
 // ── Modals ────────────────────────────────────────────────────────────────────
 function ProfileModal({ mode = 'new', profile, versions, onClose, onSave }) {
   const { t } = useI18n();
-   const [name, setName] = useState(profile?.name || '');
-   const [localName, setLocalName] = useState(profile?.localName || '');
-   const [version, setVersion] = useState(profile?.version || '');
-   const [ram, setRam] = useState(profile?.ram || 4);
-   const [jvmArguments, setJvmArguments] = useState(profile?.jvmArguments || '');
+  const [name, setName] = useState(profile?.name || '');
+  const [localName, setLocalName] = useState(profile?.localName || '');
+  const [version, setVersion] = useState(profile?.version || '');
+  const [ram, setRam] = useState(profile?.ram || 4);
+  const [jvmArguments, setJvmArguments] = useState(profile?.jvmArguments || '');
   const canSave = Boolean(name.trim() && localName.trim());
 
-   useEffect(() => {
-     setName(profile?.name || '');
-     setLocalName(profile?.localName || '');
-     setVersion(profile?.version || '');
-     setRam(profile?.ram || 4);
-     setJvmArguments(profile?.jvmArguments || '');
-   }, [profile, versions]);
+  useEffect(() => {
+    setName(profile?.name || '');
+    setLocalName(profile?.localName || '');
+    setVersion(profile?.version || '');
+    setRam(profile?.ram || 4);
+    setJvmArguments(profile?.jvmArguments || '');
+  }, [profile, versions]);
 
-   const handleSave = () => {
-     const trimmedName = name.trim();
-     const trimmedLocalName = localName.trim();
-     const trimmedJvmArguments = jvmArguments.trim();
-     if (!trimmedName || !trimmedLocalName) return;
-     onSave({
-       id: profile?.id ?? null,
-       name: trimmedName,
-       localName: trimmedLocalName,
-       version: version || null,
-       ram,
-       jvmArguments: trimmedJvmArguments,
-     });
-     onClose();
-   };
+  const handleSave = () => {
+    const trimmedName = name.trim();
+    const trimmedLocalName = localName.trim();
+    const trimmedJvmArguments = jvmArguments.trim();
+    if (!trimmedName || !trimmedLocalName) return;
+    onSave({
+      id: profile?.id ?? null,
+      name: trimmedName,
+      localName: trimmedLocalName,
+      version: version || null,
+      ram,
+      jvmArguments: trimmedJvmArguments,
+    });
+    onClose();
+  };
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -350,16 +359,16 @@ function ProfileModal({ mode = 'new', profile, versions, onClose, onSave }) {
           <div className="modal-field-desc">{t('profile.moreRAMHelps')}</div>
         </div>
 
-         <div className="modal-field">
-           <label className="modal-label">{t('profile.jvmArguments')}</label>
-           <input
-             className="modal-input"
-             value={jvmArguments}
-             onChange={e => setJvmArguments(e.target.value)}
-             placeholder={t('profile.jvmArgumentsPlaceholder')}
-           />
-           <div className="modal-field-desc">{t('profile.jvmArgumentsDescription')}</div>
-         </div>
+        <div className="modal-field">
+          <label className="modal-label">{t('profile.jvmArguments')}</label>
+          <input
+            className="modal-input"
+            value={jvmArguments}
+            onChange={e => setJvmArguments(e.target.value)}
+            placeholder={t('profile.jvmArgumentsPlaceholder')}
+          />
+          <div className="modal-field-desc">{t('profile.jvmArgumentsDescription')}</div>
+        </div>
 
         <div className="modal-actions">
           <button className="btn-ghost" onClick={onClose}>{t('profile.cancel')}</button>
@@ -679,7 +688,7 @@ function LoginLoadingModal({ onCancel }) {
       <div className="modal" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div className="modal-title">{t('account.loginWithMicrosoft')}</div>
         <div className="modal-subtitle">{t('account.loginInProgress')}</div>
-        
+
         <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
             <span className="play-btn-icon spinning" style={{ fontSize: 24 }}>
@@ -708,6 +717,9 @@ export default function App() {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [stateHydrated, setStateHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState('console');
+  const [modSearch, setModSearch] = useState('');
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [logFilter, setLogFilter] = useState('all');
   const [versionCatalog, setVersionCatalog] = useState([]);
   const [installedVersions, setInstalledVersions] = useState([]);
   const [installTargets, setInstallTargets] = useState(INSTALL_TARGETS);
@@ -808,10 +820,10 @@ export default function App() {
 
   // Auto-scroll console
   useEffect(() => {
-    if (consoleRef.current) {
+    if (autoScroll && consoleRef.current) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logs, autoScroll]);
 
   useEffect(() => {
     void loadNews();
@@ -837,7 +849,7 @@ export default function App() {
       setInstallId(null);
       launcher.minecraftGetInstalledVersions?.().then((versions) => {
         if (Array.isArray(versions)) setInstalledVersions(versions);
-      }).catch(() => {});
+      }).catch(() => { });
       pushToast({
         tone: 'success',
         title: t(`install.${r.type}`),
@@ -915,37 +927,36 @@ export default function App() {
           setAppVersion(version.trim());
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       cancelled = true;
-      try { installProgressOff?.(); installFileOff?.(); installCompleteOff?.(); installErrorOff?.(); installCancelledOff?.(); updateStatusOff?.(); updateProgressOff?.(); updateCompleteOff?.(); runLogOff?.(); runExitOff?.(); } catch (e) {}
+      try { installProgressOff?.(); installFileOff?.(); installCompleteOff?.(); installErrorOff?.(); installCancelledOff?.(); updateStatusOff?.(); updateProgressOff?.(); updateCompleteOff?.(); runLogOff?.(); runExitOff?.(); } catch (e) { }
     };
   }, []);
 
   const handleOpenNewsSource = useCallback(() => {
-    launcher.openExternal?.(newsSourceUrl).catch(() => {});
+    launcher.openExternal?.(newsSourceUrl).catch(() => { });
   }, [newsSourceUrl]);
 
   const handleOpenNewsArticle = useCallback((url) => {
-    launcher.openExternal?.(url).catch(() => {});
+    launcher.openExternal?.(url).catch(() => { });
   }, []);
 
   const handleOpenSourceCode = useCallback(() => {
-    launcher.openExternal?.(APP_SOURCE_URL).catch(() => {});
+    launcher.openExternal?.(APP_SOURCE_URL).catch(() => { });
   }, []);
 
   const handleOpenReleases = useCallback(() => {
-    launcher.openExternal?.(APP_RELEASES_URL).catch(() => {});
+    launcher.openExternal?.(APP_RELEASES_URL).catch(() => { });
   }, []);
 
   const handleOpenAbout = useCallback(() => {
     setModal('about');
   }, []);
 
-  useEffect(() => {
-    stateRef.current = { profiles, mods, logs, settings };
-  }, [profiles, mods, logs, settings]);
+  // Update stateRef synchronously on every render to prevent async race conditions with state persistence
+  stateRef.current = { profiles, mods, logs, settings };
 
   useEffect(() => {
     return () => {
@@ -963,125 +974,125 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-const hydrateState = async () => {
-        const state = await launcher.minecraftGetState();
-        if (cancelled || !state) return;
+    const hydrateState = async () => {
+      const state = await launcher.minecraftGetState();
+      if (cancelled || !state) return;
 
-        const incomingProfiles = Array.isArray(state.profiles) ? state.profiles : [];
-        const defaultProfile = {
-          id: 'Default',
-          name: 'Default',
-          localName: 'Steve',
-          version: null,
-          ram: null,
-          jvmArguments: '',
-          active: true,
-        };
-        const nextProfiles = incomingProfiles.length > 0 ? incomingProfiles : [defaultProfile];
+      const incomingProfiles = Array.isArray(state.profiles) ? state.profiles : [];
+      const defaultProfile = {
+        id: 'Default',
+        name: 'Default',
+        localName: 'Steve',
+        version: null,
+        ram: null,
+        jvmArguments: '',
+        active: true,
+      };
+      const nextProfiles = incomingProfiles.length > 0 ? incomingProfiles : [defaultProfile];
 
-        setProfiles(nextProfiles);
-        setLogs([]);
-        if (state.minecraftRoot) {
-          setSettings(prev => ({ ...prev, minecraftRoot: state.minecraftRoot }));
+      setProfiles(nextProfiles);
+      setLogs([]);
+      if (state.minecraftRoot) {
+        setSettings(prev => ({ ...prev, minecraftRoot: state.minecraftRoot }));
+      }
+      if (state.settings && typeof state.settings === 'object') {
+        setSettings(prev => ({
+          ...prev,
+          keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : prev.keepOpen,
+          showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : prev.showConsole,
+          autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : prev.autoUpdate,
+          showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : prev.showSnapshots,
+          javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : prev.javaPath,
+          language: typeof state.settings.language === 'string' && state.settings.language.trim()
+            ? state.settings.language.trim()
+            : prev.language,
+        }));
+      }
+      if (Array.isArray(state.versions) && state.versions.length > 0) {
+        setVersionCatalog(state.versions);
+      }
+      const hasInstallTargets = state.installTargets
+        && typeof state.installTargets === 'object'
+        && Object.values(state.installTargets).some(target => Array.isArray(target?.versions) && target.versions.length > 0);
+      if (hasInstallTargets) {
+        setInstallTargets(state.installTargets);
+      }
+      const savedMods = Array.isArray(state.mods) ? state.mods : [];
+      launcher.minecraftGetInstalledVersions?.().then((versions) => {
+        if (Array.isArray(versions)) setInstalledVersions(versions);
+      }).catch(() => { });
+      launcher.minecraftGetInstalledMods?.().then((mods) => {
+        if (!Array.isArray(mods)) {
+          setMods(savedMods);
+          return;
         }
-        if (state.settings && typeof state.settings === 'object') {
-         setSettings(prev => ({
-           ...prev,
-           keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : prev.keepOpen,
-           showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : prev.showConsole,
-           autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : prev.autoUpdate,
-           showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : prev.showSnapshots,
-           javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : prev.javaPath,
-           language: typeof state.settings.language === 'string' && state.settings.language.trim()
-             ? state.settings.language.trim()
-             : prev.language,
-         }));
-       }
-       if (Array.isArray(state.versions) && state.versions.length > 0) {
-         setVersionCatalog(state.versions);
-       }
-       const hasInstallTargets = state.installTargets
-         && typeof state.installTargets === 'object'
-         && Object.values(state.installTargets).some(target => Array.isArray(target?.versions) && target.versions.length > 0);
-       if (hasInstallTargets) {
-         setInstallTargets(state.installTargets);
-       }
-       const savedMods = Array.isArray(state.mods) ? state.mods : [];
-       launcher.minecraftGetInstalledVersions?.().then((versions) => {
-         if (Array.isArray(versions)) setInstalledVersions(versions);
-       }).catch(() => {});
-       launcher.minecraftGetInstalledMods?.().then((mods) => {
-         if (!Array.isArray(mods)) {
-           setMods(savedMods);
-           return;
-         }
 
-         const savedById = new Map(savedMods.map(mod => [mod.id, mod]));
-         const mergedMods = mods.map(mod => ({ ...mod, ...(savedById.get(mod.id) || {}) }));
-         setMods(mergedMods.length > 0 ? mergedMods : savedMods);
-       }).catch(() => {
-         setMods(savedMods);
-       });
-       setActiveProfileId(prev => prev ?? nextProfiles?.[0]?.id ?? null);
-       setStateHydrated(true);
-       if (incomingProfiles.length === 0) {
-         persistState({
-           profiles: nextProfiles,
-           mods: savedMods,
-           logs: [],
-           versions: state.versions && Array.isArray(state.versions) ? state.versions : [],
-           installTargets: state.installTargets && typeof state.installTargets === 'object'
-             ? state.installTargets
-             : installTargets,
-           settings: state.settings && typeof state.settings === 'object'
-             ? {
-                 javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : '',
-                 keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : false,
-                 showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : true,
-                 autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : true,
-                 showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : false,
-                 language: typeof state.settings.language === 'string' && state.settings.language.trim()
-                   ? state.settings.language.trim()
-                   : language,
-               }
-             : {
-                 javaPath: '',
-                 keepOpen: false,
-                 showConsole: true,
-                 autoUpdate: true,
-                 showSnapshots: false,
-                 language,
-               },
-         });
-       } else {
-         clearConsole({
-           profiles: nextProfiles,
-           mods: Array.isArray(state.mods) ? state.mods : [],
-           versions: state.versions && Array.isArray(state.versions) ? state.versions : [],
-           installTargets: state.installTargets && typeof state.installTargets === 'object'
-             ? state.installTargets
-             : installTargets,
-           settings: state.settings && typeof state.settings === 'object'
-             ? {
-                 javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : '',
-                 keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : false,
-                 showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : true,
-                 autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : true,
-                 showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : false,
-                 language: typeof state.settings.language === 'string' && state.settings.language.trim()
-                   ? state.settings.language.trim()
-                   : language,
-               }
-             : {
-                 javaPath: '',
-                 keepOpen: false,
-                 showConsole: true,
-                 autoUpdate: true,
-                 showSnapshots: false,
-                 language,
-               },
-         });
-       }
+        const savedById = new Map(savedMods.map(mod => [mod.id, mod]));
+        const mergedMods = mods.map(mod => ({ ...mod, ...(savedById.get(mod.id) || {}) }));
+        setMods(mergedMods.length > 0 ? mergedMods : savedMods);
+      }).catch(() => {
+        setMods(savedMods);
+      });
+      setActiveProfileId(prev => prev ?? nextProfiles?.[0]?.id ?? null);
+      setStateHydrated(true);
+      if (incomingProfiles.length === 0) {
+        persistState({
+          profiles: nextProfiles,
+          mods: savedMods,
+          logs: [],
+          versions: state.versions && Array.isArray(state.versions) ? state.versions : [],
+          installTargets: state.installTargets && typeof state.installTargets === 'object'
+            ? state.installTargets
+            : installTargets,
+          settings: state.settings && typeof state.settings === 'object'
+            ? {
+              javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : '',
+              keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : false,
+              showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : true,
+              autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : true,
+              showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : false,
+              language: typeof state.settings.language === 'string' && state.settings.language.trim()
+                ? state.settings.language.trim()
+                : language,
+            }
+            : {
+              javaPath: '',
+              keepOpen: false,
+              showConsole: true,
+              autoUpdate: true,
+              showSnapshots: false,
+              language,
+            },
+        });
+      } else {
+        clearConsole({
+          profiles: nextProfiles,
+          mods: Array.isArray(state.mods) ? state.mods : [],
+          versions: state.versions && Array.isArray(state.versions) ? state.versions : [],
+          installTargets: state.installTargets && typeof state.installTargets === 'object'
+            ? state.installTargets
+            : installTargets,
+          settings: state.settings && typeof state.settings === 'object'
+            ? {
+              javaPath: typeof state.settings.javaPath === 'string' ? state.settings.javaPath : '',
+              keepOpen: typeof state.settings.keepOpen === 'boolean' ? state.settings.keepOpen : false,
+              showConsole: typeof state.settings.showConsole === 'boolean' ? state.settings.showConsole : true,
+              autoUpdate: typeof state.settings.autoUpdate === 'boolean' ? state.settings.autoUpdate : true,
+              showSnapshots: typeof state.settings.showSnapshots === 'boolean' ? state.settings.showSnapshots : false,
+              language: typeof state.settings.language === 'string' && state.settings.language.trim()
+                ? state.settings.language.trim()
+                : language,
+            }
+            : {
+              javaPath: '',
+              keepOpen: false,
+              showConsole: true,
+              autoUpdate: true,
+              showSnapshots: false,
+              language,
+            },
+        });
+      }
     };
 
     hydrateState();
@@ -1161,7 +1172,7 @@ const hydrateState = async () => {
     launcher.minecraftSaveState({
       ...nextState,
       settings: nextSettings,
-    }).catch(() => {});
+    }).catch(() => { });
   }, [language]);
 
   const clearConsole = useCallback((nextState = {}) => {
@@ -1246,14 +1257,14 @@ const hydrateState = async () => {
         username: account.name,
         userType: account.kind === 'local' ? 'legacy' : 'msa',
       };
-       const result = await run({
-         profile: activeProfile,
-         version: activeVersion,
-         profileKey: String(activeProfileId ?? 'default'),
-         javaPath: activeProfile?.javaPath || settings.javaPath,
-         jvmArguments: activeProfile?.jvmArguments || '',
-         session: authSession,
-       });
+      const result = await run({
+        profile: activeProfile,
+        version: activeVersion,
+        profileKey: String(activeProfileId ?? 'default'),
+        javaPath: activeProfile?.javaPath || settings.javaPath,
+        jvmArguments: activeProfile?.jvmArguments || '',
+        session: authSession,
+      });
       if (result?.error) {
         addLog('error', result.message || result.error);
         setGameState('idle');
@@ -1274,9 +1285,9 @@ const hydrateState = async () => {
     const usesGameAndLoader = type === 'fabric' || type === 'forge';
     const payload = usesGameAndLoader && selection && typeof selection === 'object'
       ? {
-          gameVersion: String(selection.gameVersion || '').trim(),
-          loaderVersion: String(selection.loaderVersion || '').trim(),
-        }
+        gameVersion: String(selection.gameVersion || '').trim(),
+        loaderVersion: String(selection.loaderVersion || '').trim(),
+      }
       : { version: String(selection || '').trim() };
     const logLabel = usesGameAndLoader
       ? `${payload.loaderVersion} / ${payload.gameVersion}`
@@ -1351,32 +1362,32 @@ const hydrateState = async () => {
           if (!catalog) return;
           if (Array.isArray(catalog.versions)) setVersionCatalog(catalog.versions);
           if (catalog.installTargets) setInstallTargets(catalog.installTargets);
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return nextSettings;
     });
   };
 
-   const handleSaveProfile = ({ id, name, localName, version, ram, jvmArguments }) => {
-     const resolvedLocalName = String(localName || '').trim();
-     const newProfileId = id == null ? Date.now() : id;
-     setProfiles(prev => {
-       const nextProfiles = id == null
-         ? [...prev, { id: newProfileId, name, localName: resolvedLocalName, version: version || null, ram, jvmArguments, active: false }]
-         : prev.map(profile => profile.id === id
-           ? { ...profile, name, localName: resolvedLocalName, version: version || null, ram, jvmArguments }
-           : profile);
-       const currentState = stateRef.current;
-       persistState({
-         profiles: nextProfiles,
-         mods: currentState.mods,
-         logs: currentState.logs,
-         versions: versionCatalog,
-         installTargets,
-         settings: currentState.settings,
-       });
-       return nextProfiles;
-     });
+  const handleSaveProfile = ({ id, name, localName, version, ram, jvmArguments }) => {
+    const resolvedLocalName = String(localName || '').trim();
+    const newProfileId = id == null ? Date.now() : id;
+    setProfiles(prev => {
+      const nextProfiles = id == null
+        ? [...prev, { id: newProfileId, name, localName: resolvedLocalName, version: version || null, ram, jvmArguments, active: false }]
+        : prev.map(profile => profile.id === id
+          ? { ...profile, name, localName: resolvedLocalName, version: version || null, ram, jvmArguments }
+          : profile);
+      const currentState = stateRef.current;
+      persistState({
+        profiles: nextProfiles,
+        mods: currentState.mods,
+        logs: currentState.logs,
+        versions: versionCatalog,
+        installTargets,
+        settings: currentState.settings,
+      });
+      return nextProfiles;
+    });
     if (id == null) {
       setActiveProfileId(newProfileId);
       addLog('info', `Profile "${name}" created.`);
@@ -1428,6 +1439,36 @@ const hydrateState = async () => {
     } catch (error) {
       addLog('error', `Profile delete failed: ${error?.message || error}`);
     }
+  };
+
+  const handleDuplicateProfile = (profileId, e) => {
+    if (e) e.stopPropagation();
+    const sourceProfile = profiles.find(p => p.id === profileId);
+    if (!sourceProfile) return;
+    if (authRefreshing || gameState === 'running') return;
+
+    const duplicatedProfile = {
+      ...sourceProfile,
+      id: Date.now(),
+      name: `${sourceProfile.name} (Copy)`,
+      active: false,
+    };
+
+    setProfiles(prev => {
+      const nextProfiles = [...prev, duplicatedProfile];
+      const currentState = stateRef.current;
+      persistState({
+        profiles: nextProfiles,
+        mods: currentState.mods,
+        logs: currentState.logs,
+        versions: versionCatalog,
+        installTargets,
+        settings: currentState.settings,
+      });
+      return nextProfiles;
+    });
+
+    addLog('info', `Profile "${duplicatedProfile.name}" duplicated from "${sourceProfile.name}".`);
   };
 
   const handleModToggle = async (id) => {
@@ -1605,10 +1646,10 @@ const hydrateState = async () => {
     const profileKey = String(activeProfileId ?? 'default');
     addLog('info', 'Opening Microsoft login...');
     setLoginLoading(true);
-    
+
     const controller = new AbortController();
     loginAbortControllerRef.current = controller;
-    
+
     try {
       const session = await minecraftLoginWithAbort(profileKey, controller.signal);
       if (session?.error) {
@@ -1806,6 +1847,7 @@ const hydrateState = async () => {
                         e.stopPropagation();
                         setProfileEditor({ mode: 'edit', profileId: p.id });
                       }}
+                      onDuplicate={(e) => handleDuplicateProfile(p.id, e)}
                       onDelete={(e) => {
                         if (authRefreshing || gameState === 'running') return;
                         e.stopPropagation();
@@ -1813,14 +1855,14 @@ const hydrateState = async () => {
                       }}
                     />
                   </div>
-                  <div className="profile-version">
-                    {profileVersionLabel}
-                    {' · '}
-                    {profileVersionType}
-                    {' · '}
-                    {p.ram}GB
-                    {p.localName ? ` · ${p.localName}` : ''}
-                    {p.javaPath ? ' · custom JVM' : ''}
+                  <div className="profile-version" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    {p.version ? (
+                      <span className="profile-version-chip profile-version-primary">{profileVersionLabel}</span>
+                    ) : (
+                      <span className="profile-version-chip">{t('profile.useLauncherSelector')}</span>
+                    )}
+                    <span className="profile-version-chip">{p.ram || 4}GB RAM</span>
+                    {p.javaPath && <span className="profile-version-chip" title={p.javaPath}>JVM</span>}
                   </div>
                 </div>
               );
@@ -1840,7 +1882,7 @@ const hydrateState = async () => {
               { key: 'console', label: t('sidebar.console'), icon: ICONS.console },
               { key: 'mods', label: t('sidebar.modManager'), icon: ICONS.cube },
             ].map(item => (
-              <div key={item.key} className="nav-item" onClick={() => setActiveTab(item.key)} disabled={authRefreshing}>
+              <div key={item.key} className={`nav-item ${activeTab === item.key ? 'active' : ''}`} onClick={() => setActiveTab(item.key)} disabled={authRefreshing}>
                 <span className="nav-icon"><Icon d={item.icon} size={14} /></span>
                 {item.label}
               </div>
@@ -1857,7 +1899,14 @@ const hydrateState = async () => {
                         src={accountAvatarUrl}
                         alt={`${account.name} avatar`}
                         onError={(event) => {
-                          event.currentTarget.style.display = 'none';
+                          const currentSrc = event.currentTarget.src;
+                          if (currentSrc.includes('minotar.net')) {
+                            event.currentTarget.src = `https://crafatar.com/avatars/${encodeURIComponent(account.name)}?size=256`;
+                          } else if (currentSrc.includes('crafatar.com')) {
+                            event.currentTarget.src = `https://mc-heads.net/avatar/${encodeURIComponent(account.name)}/256`;
+                          } else {
+                            event.currentTarget.style.display = 'none';
+                          }
                         }}
                       />
                     ) : (
@@ -1869,7 +1918,7 @@ const hydrateState = async () => {
                     <div className={`account-status ${gameState === 'running' ? 'online' : 'offline'}`}>
                       {authRefreshing ? (
                         <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', verticalAlign: 'middle' }}>
                             <span className="play-btn-icon spinning"><Icon d={ICONS.refresh} size={10} /></span>
                             {t('account.refreshingAuth')}
                           </span>
@@ -1908,7 +1957,7 @@ const hydrateState = async () => {
                     <div className="account-name">{t('account.loggedOut')}</div>
                     <div className="account-status offline">
                       {authRefreshing ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', verticalAlign: 'middle' }}>
                           <span className="play-btn-icon spinning"><Icon d={ICONS.refresh} size={10} /></span>
                           {t('account.loading')}
                         </span>
@@ -1945,75 +1994,120 @@ const hydrateState = async () => {
               </div>
             </div>
           ) : null}
-            {/* Action bar */}
-           <div className="action-bar">
-             <button className="action-btn" onClick={() => setModal('install-minecraft')} disabled={gameState === 'running'}>
-               <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
-                 {t('install.minecraft')}
-             </button>
-             <button className="action-btn" onClick={() => setModal('install-fabric')} disabled={gameState === 'running'}>
-               <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
-                 {t('install.fabric')}
-             </button>
-             <button className="action-btn" onClick={() => setModal('install-forge')} disabled={gameState === 'running'}>
-               <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
-                 {t('install.forge')}
-             </button>
-             <button className="action-btn" style={{ marginLeft: 'auto' }} onClick={() => setModal('settings')} disabled={gameState === 'running'}>
-               <span className="btn-icon"><Icon d={ICONS.settings} size={13} /></span>
-                 {t('settings.title')}
-             </button>
-           </div>
+          {/* Action bar */}
+          <div className="action-bar">
+            <button className="action-btn" onClick={() => setModal('install-minecraft')} disabled={gameState === 'running'}>
+              <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
+              {t('install.minecraft')}
+            </button>
+            <button className="action-btn" onClick={() => setModal('install-fabric')} disabled={gameState === 'running'}>
+              <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
+              {t('install.fabric')}
+            </button>
+            <button className="action-btn" onClick={() => setModal('install-forge')} disabled={gameState === 'running'}>
+              <span className="btn-icon"><Icon d={ICONS.download} size={13} /></span>
+              {t('install.forge')}
+            </button>
+            <button className="action-btn" style={{ marginLeft: 'auto' }} onClick={() => setModal('settings')} disabled={gameState === 'running'}>
+              <span className="btn-icon"><Icon d={ICONS.settings} size={13} /></span>
+              {t('settings.title')}
+            </button>
+          </div>
 
-{/* Console tab */}
-           <div className={`tab-panel ${activeTab === 'console' ? 'active' : ''}`}
-             style={{ display: activeTab === 'console' ? 'flex' : 'none' }}>
-             <div className="console-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-               <div className="console-header">
-                 <div className="console-title">
-                   <div className={`console-indicator ${gameState === 'running' ? 'running' : ''}`} />
-                   {t('console.outputLog')}
-                   {gameState === 'loading' && (
-                     <span style={{ color: 'var(--warning)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                       — {t('console.loading', { progress })}
-                     </span>
-                   )}
-                   {gameState === 'running' && (
-                     <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                       — {t('console.running')}
-                     </span>
-                   )}
-                 </div>
-                 {settings.showConsole ? (
-                   <div className="console-actions">
-                     <button className="console-icon-btn" title={t('console.copy')} onClick={handleCopyConsole}>
-                       <Icon d={ICONS.copy} size={11} />
-                     </button>
-                     <button className="console-icon-btn" title={t('console.clear')} onClick={handleClearConsole}>
-                       <Icon d={ICONS.clear} size={11} />
-                     </button>
-                   </div>
-                 ) : (
-                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
-                     {t('console.hiddenInSettings')}
-                   </div>
-                 )}
-               </div>
-               {settings.showConsole ? (
-                 <div className="console-body" ref={consoleRef} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                   {logs.length === 0 ? (
-                     <span style={{ color: 'var(--text-muted)' }}>{t('console.noLogsYet')}</span>
-                   ) : (
-                     logs.map((entry, i) => <LogLine key={i} entry={entry} />)
-                   )}
-                 </div>
-               ) : (
-                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                   {t('console.consoleOutputHidden')}
-                 </div>
-               )}
-             </div>
-           </div>
+          {/* Console tab */}
+          <div className={`tab-panel ${activeTab === 'console' ? 'active' : ''}`}
+            style={{ display: activeTab === 'console' ? 'flex' : 'none' }}>
+            <div className="console-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="console-header">
+                <div className="console-title">
+                  <div className={`console-indicator ${gameState === 'running' ? 'running' : ''}`} />
+                  {t('console.outputLog')}
+                  {gameState === 'loading' && (
+                    <span style={{ color: 'var(--warning)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      — {t('console.loading', { progress })}
+                    </span>
+                  )}
+                  {gameState === 'running' && (
+                    <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      — {t('console.running')}
+                    </span>
+                  )}
+                </div>
+                {settings.showConsole ? (
+                  <div className="console-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {/* Log Filters */}
+                    <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.02)', padding: '2px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      {['all', 'info', 'warn', 'error'].map(lvl => (
+                        <button
+                          key={lvl}
+                          className={`console-icon-btn ${logFilter === lvl ? 'active' : ''}`}
+                          style={{
+                            fontSize: '9px',
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            color: logFilter === lvl ? 'var(--accent)' : 'var(--text-muted)',
+                            background: logFilter === lvl ? 'rgba(255,255,255,0.05)' : 'transparent',
+                            border: 'none',
+                            textTransform: 'uppercase',
+                            fontFamily: 'var(--font-mono)',
+                            cursor: 'pointer',
+                            width: '48px',
+                            display: 'inline-flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}
+                          onClick={() => setLogFilter(lvl)}
+                        >
+                          {t(`console.level.${lvl}`) || lvl}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Auto scroll toggle */}
+                    <button
+                      className="console-icon-btn"
+                      title={autoScroll ? t('console.disableScroll') || 'Pausar Scroll' : t('console.enableScroll') || 'Reanudar Scroll'}
+                      onClick={() => setAutoScroll(prev => !prev)}
+                      style={{ color: autoScroll ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      <Icon d={autoScroll ? ICONS.play : ICONS.stop} size={11} />
+                    </button>
+                    <button className="console-icon-btn" title={t('console.copy')} onClick={handleCopyConsole}>
+                      <Icon d={ICONS.copy} size={11} />
+                    </button>
+                    <button className="console-icon-btn" title={t('console.clear')} onClick={handleClearConsole}>
+                      <Icon d={ICONS.clear} size={11} />
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+                    {t('console.hiddenInSettings')}
+                  </div>
+                )}
+              </div>
+              {settings.showConsole ? (
+                <div className="console-body" ref={consoleRef} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  {(() => {
+                    const filteredLogs = logs.filter(entry => {
+                      if (logFilter === 'all') return true;
+                      const entryLevel = String(entry.level || '').toLowerCase();
+                      if (logFilter === 'warn') return entryLevel === 'warn' || String(entry.msg || '').includes('WARN');
+                      if (logFilter === 'error') return entryLevel === 'error' || String(entry.msg || '').includes('ERROR') || String(entry.msg || '').includes('Exception') || String(entry.msg || '').includes('FATAL');
+                      if (logFilter === 'info') return entryLevel === 'info' || (!String(entry.msg || '').includes('WARN') && !String(entry.msg || '').includes('ERROR') && !String(entry.msg || '').includes('Exception') && !String(entry.msg || '').includes('FATAL'));
+                      return true;
+                    });
+                    if (filteredLogs.length === 0) {
+                      return <span style={{ color: 'var(--text-muted)' }}>{t('console.noLogsYet')}</span>;
+                    }
+                    return filteredLogs.map((entry, i) => <LogLine key={i} entry={entry} />);
+                  })()}
+                </div>
+              ) : (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                  {t('console.consoleOutputHidden')}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* News tab */}
           <div className={`tab-panel ${activeTab === 'news' ? 'active' : ''}`}
@@ -2075,6 +2169,23 @@ const hydrateState = async () => {
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
                 {mods.filter(m => m.enabled).length} {t('mods.active')} · {mods.filter(m => !m.enabled).length} {t('mods.disabled')}
               </span>
+              <input
+                type="text"
+                className="modal-input"
+                placeholder={t('mods.searchPlaceholder') || 'Buscar mod...'}
+                value={modSearch}
+                onChange={e => setModSearch(e.target.value)}
+                style={{
+                  maxWidth: '180px',
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  height: '28px',
+                  marginLeft: '12px',
+                  marginRight: 'auto',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderColor: 'rgba(255,255,255,0.06)'
+                }}
+              />
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="action-btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => handleSetAllModsEnabled(true)} disabled={!mods.some(mod => !mod.enabled)}>
                   <Icon d={ICONS.download} size={11} />
@@ -2091,9 +2202,11 @@ const hydrateState = async () => {
               </div>
             </div>
             <div className="mod-grid">
-              {mods.map(mod => (
-                <ModCard key={mod.id} mod={mod} onToggle={handleModToggle} onDelete={handleModDelete} />
-              ))}
+              {mods
+                .filter(mod => String(mod.name || '').toLowerCase().includes(modSearch.toLowerCase()))
+                .map(mod => (
+                  <ModCard key={mod.id} mod={mod} onToggle={handleModToggle} onDelete={handleModDelete} />
+                ))}
             </div>
           </div>
 
@@ -2134,9 +2247,9 @@ const hydrateState = async () => {
 
             <div className="ram-indicator">
               <div className="ram-bar">
-                <div className="ram-fill" style={{ width: `${Math.min(100, (activeProfile?.ram / 16) * 100)}%` }} />
+                <div className="ram-fill" style={{ width: `${Math.min(100, ((activeProfile?.ram || 4) / 16) * 100)}%` }} />
               </div>
-              {activeProfile?.ram}{t('game.ram')}
+              {activeProfile?.ram || 4}{t('game.ram')}
             </div>
 
             <div style={{ position: 'relative' }}>
@@ -2150,12 +2263,12 @@ const hydrateState = async () => {
                 onClick={handlePlay}
                 disabled={gameState === 'loading' || authRefreshing}
               >
-{gameState === 'loading' || authRefreshing ? (
-                   <>
-                     <span className="play-btn-icon spinning"><Icon d={ICONS.refresh} size={14} /></span>
-                     <span className="play-btn-text">{authRefreshing ? t('game.authenticating') : t('game.loading')}</span>
-                   </>
-                 ) : gameState === 'running' ? (
+                {gameState === 'loading' || authRefreshing ? (
+                  <>
+                    <span className="play-btn-icon spinning"><Icon d={ICONS.refresh} size={14} /></span>
+                    <span className="play-btn-text">{authRefreshing ? t('game.authenticating') : t('game.loading')}</span>
+                  </>
+                ) : gameState === 'running' ? (
                   <>
                     <span className="play-btn-icon"><Icon d={ICONS.stop} size={14} /></span>
                     <span className="play-btn-text">{t('game.stop')}</span>
@@ -2239,10 +2352,10 @@ const hydrateState = async () => {
 function MicrosoftLogo() {
   return (
     <svg width="14" height="14" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-      <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-      <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-      <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
     </svg>
   );
 }

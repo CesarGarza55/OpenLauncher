@@ -17,29 +17,29 @@
     "build:win:installer": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
-    "adm-zip": "^0.5.9",
+    "adm-zip": "^0.6.0",
     "dotenv": "^17.4.2",
     "keytar": "^7.9.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
+    "@babel/core": "^7.29.7",
     "@eslint/js": "^10.0.1",
     "@rolldown/plugin-babel": "^0.2.3",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^6.0.3",
     "babel-plugin-react-compiler": "^1.0.0",
-    "concurrently": "^9.2.1",
-    "electron": "^42.2.0",
-    "electron-builder": "^26.8.1",
-    "eslint": "^10.3.0",
+    "concurrently": "^10.0.3",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.6.0",
-    "nodemon": "^3.1.10",
-    "vite": "^8.0.12",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "nodemon": "^3.1.14",
+    "vite": "^8.1.5",
     "wait-on": "^9.0.10"
   },
   "build": {
@@ -74,7 +74,7 @@
           ]
         }
       ],
-    "icon": "script/icon.ico"
+      "icon": "script/icon.ico"
     },
     "linux": {
       "target": [
@@ -111,7 +111,6 @@
         "libsecret-1-0"
       ]
     },
-
     "portable": {
       "artifactName": "${productName}-Portable-Windows.${ext}"
     },

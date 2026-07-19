@@ -41,7 +41,8 @@
      "customJVMPath": "Ruta personalizada de JVM",
      "cancel": "Cancelar",
     "saveChanges": "Guardar Cambios",
-    "createProfileButton": "Crear Perfil"
+    "createProfileButton": "Crear Perfil",
+    "duplicate": "Duplicar perfil"
   },
   "install": {
     "minecraft": "Instalar Minecraft",
@@ -116,7 +117,15 @@
     "clear": "Limpiar",
     "hiddenInSettings": "Oculto en Configuración",
     "consoleOutputHidden": "Salida de consola oculta en Configuración",
-    "noLogsYet": "Aún no hay registros. Lanza el juego para ver la salida aquí."
+    "noLogsYet": "Aún no hay registros. Lanza el juego para ver la salida aquí.",
+    "disableScroll": "Pausar Desplazamiento",
+    "enableScroll": "Reanudar Desplazamiento",
+    "level": {
+      "all": "Todos",
+      "info": "Info",
+      "warn": "Warn",
+      "error": "Error"
+    }
   },
   "news": {
     "title": "Noticias oficiales de Minecraft",
@@ -140,7 +149,8 @@
     "enableMod": "Activar mod",
     "disableAll": "Desactivar todos los mods",
     "enableAll": "Activar todos los mods",
-    "deleteMod": "Eliminar mod"
+    "deleteMod": "Eliminar mod",
+    "searchPlaceholder": "Buscar mod..."
   },
   "account": {
     "loggedIn": "Sesión iniciada",
