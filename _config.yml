@@ -1,3 +1,24 @@
 remote_theme: pages-themes/cayman@v0.2.0
 plugins:
 - jekyll-remote-theme
+
+exclude:
+  - index.html
+  - src
+  - electron
+  - node_modules
+  - dist
+  - dist-ssr
+  - script
+  - public
+  - compile-linux.sh
+  - compile-windows.bat
+  - package.json
+  - package-lock.json
+  - pnpm-lock.yaml
+  - pnpm-workspace.yaml
+  - vite.config.js
+  - eslint.config.js
+  - version.json
+  - .gitignore
+  - .gitattributes
