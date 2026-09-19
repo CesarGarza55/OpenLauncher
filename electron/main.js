@@ -435,7 +435,7 @@ function makeInstallId() {
 }
 
 function makeOfflineUuid(seed) {
-  const hash = crypto.createHash('sha1').update(`OfflinePlayer:${seed}`).digest('hex');
+  const hash = crypto.createHash('sha256').update(`OfflinePlayer:${seed}`).digest('hex');
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
 }
 
