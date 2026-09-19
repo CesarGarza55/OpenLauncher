@@ -29,13 +29,13 @@ jobs:
           # Read version.json
           VERSION=$(jq -r '.version' version.json)
           CHANGELOG=$(jq -r '.changelog' version.json)
-          
+
           # Get latest release from GitHub
           LATEST_RELEASE=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || echo "none")
-          
+
           echo "Current version: $VERSION"
           echo "Latest release: $LATEST_RELEASE"
-          
+
           # Check if version changed
           if [ "release-$VERSION" != "$LATEST_RELEASE" ]; then
             echo "should_release=true" >> $GITHUB_OUTPUT
@@ -63,7 +63,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install
@@ -104,6 +104,8 @@ jobs:
             name: debian
           - target: tar.gz
             name: portable
+          - target: AppImage
+            name: appimage
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -111,7 +113,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install dependencies
         run: |
@@ -134,8 +136,38 @@ jobs:
             release/*.tar.gz
             release/*.AppImage
 
+  build-macos:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Build macOS packages (Apple Silicon)
+        run: npx electron-builder --mac dmg zip --arm64 --publish never
+
+      - name: Upload macOS artifacts (Apple Silicon)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-apple-silicon-build
+          path: |
+            release/*.dmg
+            release/*.zip
+
   create-release:
-    needs: [check-version, build-windows, build-linux]
+    needs: [check-version, build-windows, build-linux, build-macos]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -155,6 +187,12 @@ jobs:
           path: ./release/linux
           merge-multiple: true
 
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-apple-silicon-build
+          path: ./release/macos
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -164,6 +202,7 @@ jobs:
           files: |
             release/windows/*
             release/linux/*
+            release/macos/*
           draft: false
           prerelease: false
         env:

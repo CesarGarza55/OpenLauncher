@@ -1,7 +1,7 @@
 {
   "name": "OpenLauncher",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "OpenLauncher is an open source Minecraft launcher developed by CesarGarza55",
   "author": "CesarGarza55",
   "type": "module",
@@ -14,7 +14,12 @@
     "build": "vite build",
     "start": "electron .",
     "build:win:dir": "npm run build && electron-builder --win --dir",
-    "build:win:installer": "npm run build && electron-builder --win nsis"
+    "build:win:installer": "npm run build && electron-builder --win nsis",
+    "build:mac:dir": "npm run build && electron-builder --mac --dir",
+    "build:mac:dmg": "npm run build && electron-builder --mac dmg",
+    "build:mac:zip": "npm run build && electron-builder --mac zip",
+    "build:mac:universal": "npm run build && electron-builder --mac --universal",
+    "build:mac:all": "npm run build && electron-builder --mac dmg zip"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
@@ -113,6 +118,44 @@
     },
     "portable": {
       "artifactName": "${productName}-Portable-Windows.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "icon": "script/icon.icns",
+      "artifactName": "${productName}-mac-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "artifactName": "${productName}-mac-${arch}.${ext}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "electronLanguages": [
       "en-US",

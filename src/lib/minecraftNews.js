@@ -1,4 +1,6 @@
+const MOJANG_NEWS_V2_URL = 'https://launchercontent.mojang.com/v2/news.json';
 const MINECRAFT_ARTICLES_URL = 'https://www.minecraft.net/en-us/articles';
+const MOJANG_CONTENT_HOST = 'https://launchercontent.mojang.com';
 
 function normalizeWhitespace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -41,6 +43,46 @@ function extractAgeLabel(segment) {
 function extractMetaContent(html, pattern) {
   const match = String(html || '').match(pattern);
   return match ? stripTags(match[1]) : '';
+}
+
+async function fetchHtml(url, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'OpenLauncher-News',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchJson(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'OpenLauncher-News',
+        Accept: 'application/json',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchArticleDetails(url) {
@@ -112,27 +154,7 @@ function extractSummaryFromHtmlSnippet(htmlSnippet, title) {
   return summary.slice(0, 220);
 }
 
-async function fetchHtml(url, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'OpenLauncher-News',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
-    return await response.text();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-export async function loadMinecraftNews({ limit = 8 } = {}) {
+async function scrapeMinecraftArticles(limit) {
   const html = await fetchHtml(MINECRAFT_ARTICLES_URL);
   const items = extractMinecraftNewsCards(html, limit);
 
@@ -156,10 +178,7 @@ export async function loadMinecraftNews({ limit = 8 } = {}) {
   }));
 
   if (enrichedItems.length > 0) {
-    return {
-      sourceUrl: MINECRAFT_ARTICLES_URL,
-      items: enrichedItems,
-    };
+    return enrichedItems;
   }
 
   const anchorRegex = /<a\b[^>]+href=["']([^"']*\/en-us\/article\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
@@ -197,8 +216,61 @@ export async function loadMinecraftNews({ limit = 8 } = {}) {
     if (fallbackItems.length >= limit) break;
   }
 
-  return {
-    sourceUrl: MINECRAFT_ARTICLES_URL,
-    items: fallbackItems,
-  };
+  return fallbackItems;
+}
+
+export async function loadMinecraftNews({ limit = 24 } = {}) {
+  // 1. Try modern official Mojang Launcher News v2 endpoint (latest 2026/current articles)
+  try {
+    const mojangData = await fetchJson(MOJANG_NEWS_V2_URL);
+    if (mojangData && Array.isArray(mojangData.entries) && mojangData.entries.length > 0) {
+      // Sort entries newest first by date
+      const sortedEntries = [...mojangData.entries].sort((a, b) => {
+        const dateA = new Date(a.date || 0).getTime();
+        const dateB = new Date(b.date || 0).getTime();
+        return dateB - dateA;
+      });
+
+      const items = sortedEntries
+        .slice(0, limit)
+        .map(entry => {
+          const relativeImg = entry.playPageImage?.url || entry.newsPageImage?.url || '';
+          const fullImg = relativeImg ? (relativeImg.startsWith('http') ? relativeImg : `${MOJANG_CONTENT_HOST}${relativeImg}`) : '';
+          return {
+            title: entry.title || '',
+            summary: entry.text ? normalizeWhitespace(entry.text).slice(0, 220) : '',
+            author: entry.category || 'Minecraft',
+            published: entry.date || '',
+            url: entry.readMoreLink || MINECRAFT_ARTICLES_URL,
+            image: fullImg,
+            source: 'mojang',
+          };
+        })
+        .filter(item => Boolean(item.title));
+
+      if (items.length > 0) {
+        return {
+          sourceUrl: MINECRAFT_ARTICLES_URL,
+          items,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Mojang news v2 request failed, falling back to web scraping:', err?.message || err);
+  }
+
+  // 2. Fallback to scraping minecraft.net articles
+  try {
+    const items = await scrapeMinecraftArticles(limit);
+    return {
+      sourceUrl: MINECRAFT_ARTICLES_URL,
+      items,
+    };
+  } catch (err) {
+    console.error('Failed to load Minecraft news from all sources:', err?.message || err);
+    return {
+      sourceUrl: MINECRAFT_ARTICLES_URL,
+      items: [],
+    };
+  }
 }

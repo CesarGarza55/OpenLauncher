@@ -248,25 +248,18 @@ export async function loadRefreshToken(profileKey, storageDir) {
   return legacyToken;
 }
 
-export async function saveRefreshToken(profileKey, token, storageDir) {
-  const savedSecurely = await setSecureRefreshToken(profileKey, token);
-  if (savedSecurely) {
-    // Best-effort cleanup of legacy plaintext token.
-    const store = await readAuthStore(storageDir);
-    if (store.profiles?.[profileKey]?.refresh_token) {
-      delete store.profiles[profileKey].refresh_token;
-      if (Object.keys(store.profiles[profileKey]).length === 0) {
-        delete store.profiles[profileKey];
-      }
-      await writeAuthStore(storageDir, store);
-    }
-    return;
-  }
-
+export async function saveRefreshToken(profileKey, token, storageDir, name = '') {
+  await setSecureRefreshToken(profileKey, token);
   const store = await readAuthStore(storageDir);
   store.profiles ??= {};
   store.profiles[profileKey] ??= {};
-  store.profiles[profileKey].refresh_token = token;
+  if (name) store.profiles[profileKey].name = name;
+  const keytar = await loadKeytar();
+  if (!keytar) {
+    store.profiles[profileKey].refresh_token = token;
+  } else if (store.profiles[profileKey].refresh_token) {
+    delete store.profiles[profileKey].refresh_token;
+  }
   await writeAuthStore(storageDir, store);
 }
 
@@ -275,10 +268,7 @@ export async function deleteRefreshToken(profileKey, storageDir) {
 
   const store = await readAuthStore(storageDir);
   if (store.profiles?.[profileKey]) {
-    delete store.profiles[profileKey].refresh_token;
-    if (Object.keys(store.profiles[profileKey]).length === 0) {
-      delete store.profiles[profileKey];
-    }
+    delete store.profiles[profileKey];
     await writeAuthStore(storageDir, store);
   }
 }
@@ -288,10 +278,10 @@ export async function refreshMicrosoftSession({
   storageDir,
   authApiBase = DEFAULT_AUTH_API_BASE,
   authHeaders = getAuthHeaders(),
-} = {}) {
+}) {
   const refreshToken = await loadRefreshToken(profileKey, storageDir);
   if (!refreshToken) {
-    throw new Error(`No refresh token stored for profile '${profileKey}'.`);
+    throw new Error('No refresh token available');
   }
 
   const { data: accountInfo } = await requestJsonWithFallback(
@@ -306,7 +296,7 @@ export async function refreshMicrosoftSession({
   );
 
   if (accountInfo?.refresh_token) {
-    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir);
+    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir, accountInfo.name || '');
   }
 
   return accountInfo;
@@ -353,34 +343,34 @@ async function waitForPortAvailable(port, maxWaitMs = 5000) {
 
 async function waitForCallback({ port, timeoutMs, abortSignal }) {
   return new Promise((resolve, reject) => {
-    // Clean up any previous pending requests
-    if (callbackResolver) {
-      callbackResolver = null;
-    }
-    if (callbackRejecter) {
-      callbackRejecter = null;
-    }
-    
-    // If server already exists, just update the resolver/rejecter
-    if (callbackServer) {
-      callbackResolver = resolve;
-      callbackRejecter = reject;
-      
-      if (abortSignal) {
-        const handleAbort = () => {
-          if (callbackRejecter) {
-            callbackRejecter(new Error('Login cancelled by user'));
-            callbackResolver = null;
-            callbackRejecter = null;
-          }
-        };
-        abortSignal.addEventListener('abort', handleAbort, { once: true });
-      }
-      return;
-    }
+    let server = null;
+    let timer = null;
+    let finished = false;
 
-    // Create new server
-    callbackServer = http.createServer((req, res) => {
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      if (server) {
+        try { server.close(); } catch { }
+        server = null;
+      }
+      if (callbackServer === server) {
+        callbackServer = null;
+      }
+    };
+
+    const onResolve = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    const onReject = (err) => {
+      cleanup();
+      reject(err);
+    };
+
+    server = http.createServer((req, res) => {
       const requestUrl = new URL(req.url, `http://localhost:${port}`);
 
       if (requestUrl.pathname !== '/callback') {
@@ -396,49 +386,33 @@ async function waitForCallback({ port, timeoutMs, abortSignal }) {
       if (error) {
         res.writeHead(302, { Location: LOGIN_FAILED_REDIRECT_URL });
         res.end();
-        if (callbackRejecter) {
-          callbackRejecter(new Error(error));
-          callbackResolver = null;
-          callbackRejecter = null;
-        }
+        onReject(new Error(error));
         return;
       }
 
       res.writeHead(302, { Location: LOGIN_SUCCESS_REDIRECT_URL });
       res.end();
-      if (callbackResolver) {
-        callbackResolver({ code, state });
-        callbackResolver = null;
-        callbackRejecter = null;
-      }
+      onResolve({ code, state });
     });
 
-    callbackResolver = resolve;
-    callbackRejecter = reject;
+    server.on('error', (err) => {
+      onReject(new Error(`Local authentication server error on port ${port}: ${err.message}`));
+    });
 
-    const timer = setTimeout(() => {
-      if (callbackRejecter) {
-        callbackRejecter(new Error('Login timeout'));
-        callbackResolver = null;
-        callbackRejecter = null;
-      }
-    }, timeoutMs);
-
-    if (abortSignal) {
-      const handleAbort = () => {
-        if (callbackRejecter) {
-          callbackRejecter(new Error('Login cancelled by user'));
-          callbackResolver = null;
-          callbackRejecter = null;
-        }
-        clearTimeout(timer);
-      };
-      abortSignal.addEventListener('abort', handleAbort, { once: true });
+    if (timeoutMs) {
+      timer = setTimeout(() => {
+        onReject(new Error('Login timeout'));
+      }, timeoutMs);
     }
 
-    callbackServer.listen(port, '127.0.0.1', () => {
-      // Server started successfully
-    });
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => {
+        onReject(new Error('Login cancelled by user'));
+      }, { once: true });
+    }
+
+    server.listen(port, '127.0.0.1');
+    callbackServer = server;
   });
 }
 
@@ -496,7 +470,7 @@ export async function loginMicrosoftInteractive({
   );
 
   if (accountInfo?.refresh_token) {
-    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir);
+    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir, accountInfo.name || '');
   }
 
   return accountInfo;

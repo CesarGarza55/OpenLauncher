@@ -166,20 +166,17 @@ function parseFabricLoaderEntries(loaderResponse) {
   );
 }
 
-function buildFabricInstallTargets(gameVersions, loaderResponses) {
+function buildFabricInstallTargets(gameVersions, globalLoaders) {
+  const loaderVersions = parseFabricLoaderEntries(globalLoaders).map(entry => entry.loaderVersion);
   const loadersByGameVersion = {};
   const comboLabels = [];
 
-  loaderResponses.forEach((loaderResponse, index) => {
-    const gameVersion = gameVersions[index];
-    const loaderVersions = parseFabricLoaderEntries(loaderResponse);
-
-    loadersByGameVersion[gameVersion] = uniqueBy(loaderVersions.map(entry => entry.loaderVersion), value => value);
-
-    for (const loaderVersion of loadersByGameVersion[gameVersion]) {
+  for (const gameVersion of gameVersions) {
+    loadersByGameVersion[gameVersion] = loaderVersions;
+    for (const loaderVersion of loaderVersions) {
       comboLabels.push(`Fabric ${loaderVersion} - ${gameVersion}`);
     }
-  });
+  }
 
   return {
     title: 'Install Fabric',
@@ -242,13 +239,30 @@ function buildInstallTargets(versions) {
 }
 
 export async function loadLauncherCatalog({ includeSnapshots = false } = {}) {
+  // If running in renderer with Electron bridge available, prefer IPC to avoid CORS on Forge/Mojang
+  if (typeof window !== 'undefined' && window.launcher && typeof window.launcher.minecraftGetCatalog === 'function') {
+    try {
+      const catalog = await window.launcher.minecraftGetCatalog({ includeSnapshots });
+      if (catalog && Array.isArray(catalog.versions) && catalog.versions.length > 0) {
+        return catalog;
+      }
+    } catch (e) {
+      console.warn('IPC catalog fetch failed, falling back to direct fetch:', e);
+    }
+  }
+
   try {
-    const [vanillaManifest, fabricGameVersions, fabricGlobalLoaders, forgePromotions] = await Promise.all([
+    const [vanillaResult, fabricGameResult, fabricLoaderResult, forgeResult] = await Promise.allSettled([
       fetchJson(MOJANG_MANIFEST_URL),
       fetchJson(FABRIC_GAME_URL),
       fetchJson(FABRIC_LOADER_URL),
       fetchJson(FORGE_PROMOTIONS_URL),
     ]);
+
+    const vanillaManifest = vanillaResult.status === 'fulfilled' ? vanillaResult.value : null;
+    const fabricGameVersions = fabricGameResult.status === 'fulfilled' ? fabricGameResult.value : null;
+    const fabricGlobalLoaders = fabricLoaderResult.status === 'fulfilled' ? fabricLoaderResult.value : null;
+    const forgePromotions = forgeResult.status === 'fulfilled' ? forgeResult.value : null;
 
     const vanillaVersions = sortVersionEntriesDescending(
       (vanillaManifest?.versions || [])
@@ -261,32 +275,15 @@ export async function loadLauncherCatalog({ includeSnapshots = false } = {}) {
     const fabricGameVersionList = uniqueBy((fabricGameVersions || [])
       .filter(entry => entry?.version && entry.version !== '0.0.0')
       .filter(entry => includeSnapshots || entry?.stable)
-      .filter(entry => vanillaReleaseSet.has(entry.version))
+      .filter(entry => vanillaReleaseSet.size === 0 || vanillaReleaseSet.has(entry.version))
       .map(entry => entry.version), value => value);
 
     const globalFabricLoaderEntries = parseFabricLoaderEntries(fabricGlobalLoaders);
 
-    const fabricLoaderResponses = await Promise.all(
-      fabricGameVersionList.map(async (gameVersion) => {
-        try {
-          return await fetchJson(`${FABRIC_LOADER_URL}/${gameVersion}`);
-        } catch {
-          return globalFabricLoaderEntries;
-        }
-      })
-    );
-
     const fabricVersions = uniqueBy(
-      fabricLoaderResponses.flatMap((loaderResponse, index) => {
-        const gameVersion = fabricGameVersionList[index];
-        const parsedLoaders = parseFabricLoaderEntries(loaderResponse);
-        const stableLoader = parsedLoaders.find(entry => entry.stable)
-          || parsedLoaders[0];
-
-        if (!stableLoader) {
-          return [];
-        }
-
+      fabricGameVersionList.flatMap(gameVersion => {
+        const stableLoader = globalFabricLoaderEntries.find(entry => entry.stable) || globalFabricLoaderEntries[0];
+        if (!stableLoader) return [];
         return [normalizeFabricVersion({
           gameVersion,
           loaderVersion: stableLoader.loaderVersion,
@@ -296,7 +293,7 @@ export async function loadLauncherCatalog({ includeSnapshots = false } = {}) {
       version => version.id,
     );
 
-    const fabricInstallTargets = buildFabricInstallTargets(fabricGameVersionList, fabricLoaderResponses);
+    const fabricInstallTargets = buildFabricInstallTargets(fabricGameVersionList, fabricGlobalLoaders);
 
     const forgeVersions = uniqueBy(
       Object.entries(forgePromotions?.promos || {})
@@ -331,7 +328,8 @@ export async function loadLauncherCatalog({ includeSnapshots = false } = {}) {
           : (vanillaManifest?.latest?.release ?? versions.find(version => version.type === 'vanilla')?.mcVer ?? 'unknown'),
       },
     };
-  } catch {
+  } catch (error) {
+    console.error('Failed to load launcher catalog:', error);
     return {
       versions: VERSION_CATALOG,
       installTargets: INSTALL_TARGETS,
@@ -356,8 +354,13 @@ export function getInstallInfo(type, installTargets = INSTALL_TARGETS) {
 
 export async function install({ type, version, profileKey, gameVersion, loaderVersion } = {}) {
   // Prefer calling the Electron main process via the preload bridge.
-  if (typeof window !== 'undefined' && window.launcher && typeof window.launcher.minecraftInstall === 'function') {
-    return await window.launcher.minecraftInstall({ type, version, profileKey, gameVersion, loaderVersion });
+  if (typeof window !== 'undefined' && window.launcher) {
+    if (typeof window.launcher.minecraftInstall === 'function') {
+      return await window.launcher.minecraftInstall({ type, version, profileKey, gameVersion, loaderVersion });
+    }
+    if (typeof window.launcher.invoke === 'function') {
+      return await window.launcher.invoke('minecraft:install', { type, version, profileKey, gameVersion, loaderVersion });
+    }
   }
 
   throw new Error('Installer not available: must run inside Electron with launcher.minecraftInstall exposed.');
@@ -365,8 +368,13 @@ export async function install({ type, version, profileKey, gameVersion, loaderVe
 
 export async function run(options = {}) {
   // options should match the expected run contract (username, uuid, token, jvmArguments, etc.)
-  if (typeof window !== 'undefined' && window.launcher && typeof window.launcher.minecraftRun === 'function') {
-    return await window.launcher.minecraftRun(options);
+  if (typeof window !== 'undefined' && window.launcher) {
+    if (typeof window.launcher.minecraftRun === 'function') {
+      return await window.launcher.minecraftRun(options);
+    }
+    if (typeof window.launcher.invoke === 'function') {
+      return await window.launcher.invoke('minecraft:run', options);
+    }
   }
 
   throw new Error('Runner not available: must run inside Electron with launcher.minecraftRun exposed.');

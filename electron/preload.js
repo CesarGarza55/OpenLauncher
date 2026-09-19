@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('launcher', {
+  platform: process.platform,
+  isMac: process.platform === 'darwin',
   minecraftGetCatalog(options) {
     return ipcRenderer.invoke('minecraft:get-catalog', options);
   },
@@ -60,5 +62,17 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   minecraftDeleteMod(modId) {
     return ipcRenderer.invoke('minecraft:delete-mod', { modId });
+  },
+  minecraftModrinthSearch(params) {
+    return ipcRenderer.invoke('minecraft:modrinth-search', params);
+  },
+  minecraftModrinthGetProject(idOrSlug) {
+    return ipcRenderer.invoke('minecraft:modrinth-get-project', idOrSlug);
+  },
+  minecraftModrinthGetVersions(params) {
+    return ipcRenderer.invoke('minecraft:modrinth-get-versions', params);
+  },
+  minecraftModrinthInstall(payload) {
+    return ipcRenderer.invoke('minecraft:modrinth-install', payload);
   },
 });

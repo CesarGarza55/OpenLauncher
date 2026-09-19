@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('launcher', {
+  platform: process.platform,
+  isMac: process.platform === 'darwin',
   minecraftGetCatalog(options) {
     return ipcRenderer.invoke('minecraft:get-catalog', options);
   },
@@ -31,6 +33,21 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftInstallModFile(sourcePath) {
     return ipcRenderer.invoke('minecraft:install-mod-file', { sourcePath });
   },
+  minecraftModrinthSearch(params) {
+    return ipcRenderer.invoke('minecraft:modrinth-search', params);
+  },
+  minecraftModrinthGetProject(idOrSlug) {
+    return ipcRenderer.invoke('minecraft:modrinth-get-project', idOrSlug);
+  },
+  minecraftModrinthGetVersions(params) {
+    return ipcRenderer.invoke('minecraft:modrinth-get-versions', params);
+  },
+  minecraftModrinthInstall(payload) {
+    return ipcRenderer.invoke('minecraft:modrinth-install', payload);
+  },
+  minecraftCheckModUpdates(params) {
+    return ipcRenderer.invoke('minecraft:check-mod-updates', params);
+  },
   minecraftPickModFiles() {
     return ipcRenderer.invoke('minecraft:pick-mod-files');
   },
@@ -51,6 +68,9 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   getAppVersion() {
     return ipcRenderer.invoke('app:get-version');
+  },
+  getSystemInfo() {
+    return ipcRenderer.invoke('system:get-info');
   },
   minecraftInstall(opts) {
     return ipcRenderer.invoke('minecraft:install', opts);

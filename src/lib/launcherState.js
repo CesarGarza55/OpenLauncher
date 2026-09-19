@@ -5,6 +5,7 @@ const STATE_FILE_NAME = 'launcher-state.json';
 
 export const DEFAULT_LAUNCHER_STATE = {
   profiles: [],
+  activeProfileId: null,
   mods: [],
   logs: [],
   versions: [],
@@ -37,6 +38,34 @@ async function readJsonFile(filePath, fallback) {
   }
 }
 
+export function normalizeProfile(profile, index = 0) {
+  if (!profile || typeof profile !== 'object') {
+    return {
+      id: index === 0 ? 'default' : `profile-${Date.now()}-${index}`,
+      name: index === 0 ? 'Default' : `Profile ${index + 1}`,
+      localName: 'Player',
+      skinName: '',
+      microsoftAccount: '',
+      version: null,
+      ram: 4,
+      jvmArguments: '',
+      javaPath: '',
+    };
+  }
+
+  return {
+    id: String(profile.id || (index === 0 ? 'default' : `profile-${Date.now()}-${index}`)),
+    name: String(profile.name || (index === 0 ? 'Default' : `Profile ${index + 1}`)).trim(),
+    localName: String(profile.localName || profile.name || 'Player').trim(),
+    skinName: typeof profile.skinName === 'string' ? profile.skinName.trim() : '',
+    microsoftAccount: typeof profile.microsoftAccount === 'string' ? profile.microsoftAccount.trim() : '',
+    version: profile.version ? String(profile.version) : null,
+    ram: typeof profile.ram === 'number' && Number.isFinite(profile.ram) && profile.ram > 0 ? profile.ram : 4,
+    jvmArguments: typeof profile.jvmArguments === 'string' ? profile.jvmArguments : '',
+    javaPath: typeof profile.javaPath === 'string' ? profile.javaPath : '',
+  };
+}
+
 function normalizeSettings(settings, fallbackSettings = DEFAULT_LAUNCHER_STATE.settings) {
   return {
     javaPath: typeof settings?.javaPath === 'string' ? settings.javaPath : fallbackSettings.javaPath,
@@ -52,8 +81,21 @@ function normalizeSettings(settings, fallbackSettings = DEFAULT_LAUNCHER_STATE.s
 
 export async function loadLauncherState(storageDir) {
   const state = await readJsonFile(stateFilePath(storageDir), DEFAULT_LAUNCHER_STATE);
+  const authStore = await readJsonFile(path.join(storageDir, 'auth-store.json'), {});
+  const rawProfiles = Array.isArray(state.profiles) ? state.profiles : [];
+  const profiles = rawProfiles.map((p, i) => {
+    const normalized = normalizeProfile(p, i);
+    const authProfile = authStore?.profiles?.[normalized.id];
+    if (authProfile?.name) {
+      if (!normalized.skinName) normalized.skinName = authProfile.name;
+      if (!normalized.microsoftAccount) normalized.microsoftAccount = authProfile.name;
+      if (normalized.localName === 'Player') normalized.localName = authProfile.name;
+    }
+    return normalized;
+  });
   return {
-    profiles: Array.isArray(state.profiles) ? state.profiles : [],
+    profiles,
+    activeProfileId: typeof state.activeProfileId === 'string' && state.activeProfileId ? state.activeProfileId : (profiles[0]?.id || 'default'),
     mods: Array.isArray(state.mods) ? state.mods : [],
     logs: Array.isArray(state.logs) ? state.logs : [],
     versions: Array.isArray(state.versions) ? state.versions : [],
@@ -68,8 +110,10 @@ export async function loadLauncherState(storageDir) {
 }
 
 export async function saveLauncherState(storageDir, state) {
+  const profiles = Array.isArray(state?.profiles) ? state.profiles.map((p, i) => normalizeProfile(p, i)) : [];
   const normalizedState = {
-    profiles: Array.isArray(state?.profiles) ? state.profiles : [],
+    profiles,
+    activeProfileId: typeof state?.activeProfileId === 'string' && state.activeProfileId ? state.activeProfileId : (profiles[0]?.id || 'default'),
     mods: Array.isArray(state?.mods) ? state.mods : [],
     logs: Array.isArray(state?.logs) ? state.logs : [],
     versions: Array.isArray(state?.versions) ? state.versions : [],

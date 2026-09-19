@@ -1,43 +1,104 @@
 <p align="center">
-  <img width="100px" src="public/icon.webp" align="center" alt="OpenLauncher" />
-  <h2 align="center">OpenLauncher</h2>
-  <p align="center">An open-source Minecraft launcher for Windows and Linux built with Electron.</p>
+  <img width="96px" src="public/icon.webp" alt="OpenLauncher" />
+  <h1 align="center">OpenLauncher</h1>
+  <p align="center">
+    A fast, modern, and open-source Minecraft launcher built with <b>React</b> and <b>Electron</b> for <b>Windows</b>, <b>macOS</b>, and <b>Linux</b>.
+  </p>
 </p>
 
 <p align="center">
-    <img alt="Electron" src="https://img.shields.io/badge/Electron-0078d4?style=flat&logo=electron&logoColor=white" />
-    <img alt="React" src="https://img.shields.io/badge/React-0078d4?style=flat&logo=react&logoColor=white" />
-    <img alt="Windows" src="https://img.shields.io/badge/Windows-0078d4?style=flat&logo=windows&logoColor=white" />
-    <img alt="Linux" src="https://img.shields.io/badge/Linux-0078d4?style=flat&logo=linux&logoColor=white" />
-    <img alt="GitHub Stars" src="https://img.shields.io/github/stars/CesarGarza55/OpenLauncher?style=flat&logo=github&labelColor=0078d4&color=0078d4" />
+  <a href="https://github.com/CesarGarza55/OpenLauncher/releases"><img alt="Latest Release" src="https://img.shields.io/github/v/release/CesarGarza55/OpenLauncher?style=flat&color=3b82f6" /></a>
+  <img alt="License" src="https://img.shields.io/badge/License-GPL--2.0-blue.svg?style=flat" />
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-33+-47848F?style=flat&logo=electron&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-19+-61DAFB?style=flat&logo=react&logoColor=black" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-6+-646CFF?style=flat&logo=vite&logoColor=white" />
+  <img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-22c55e?style=flat" />
+  <a href="https://github.com/CesarGarza55/OpenLauncher/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/CesarGarza55/OpenLauncher?style=flat&color=eab308" /></a>
 </p>
-<br>
 
-**Note**: Currently, OpenLauncher is designed only for Windows and Linux.
+---
 
-## 📢 Legacy Python Version
+## Legacy Python Version
 
 The previous Python-based version of OpenLauncher (legacy) is still available for download in the [Releases](https://github.com/CesarGarza55/OpenLauncher/releases) section. The last version of the legacy system was **Beta-1.7.4**.
 
 The new Electron-based version represents a complete rewrite with improved performance, better cross-platform compatibility, and a modern architecture.
 
-## 🚀 Features
+---
 
-- **Microsoft Account Login**: Supports logging in with an official Microsoft account.
-- **Modern Interface**: Built with React and Electron for a modern and customizable look.
-- **Minecraft Compatibility**: Manages Minecraft versions using custom implementation.
-- **Open Source**: Easily extendable and modifiable by the community.
-- **Multiplatform**: Available for Windows and Linux operating systems.
-- **Multilanguage Support**: Supports multiple languages for a better user experience.
-- **Auto-updater**: Built-in update system for seamless updates.
+## Features
 
-## 📋 Requirements
+- **Microsoft Account Login**: Supports logging in with an official Microsoft account as well as custom local offline profiles.
+- **Modern Interface**: Built with React and Electron for a sleek, responsive, and customizable look.
+- **Modrinth Ecosystem Integration**: Search, explore, and install mods directly from Modrinth with full dependency resolution.
+- **Smart Mod Updates**: Automatically checks installed mods against Modrinth using file hashes to offer 1-click updates.
+- **Fabric Crash & Conflict Assistant**: Intelligently diagnoses incompatibility errors and missing dependencies on launch.
+- **Minecraft Compatibility**: Manages Vanilla, Fabric, and Forge versions with custom launch implementations.
+- **Per-Profile Configuration**: Custom RAM, JVM arguments, and Java paths saved independently per profile.
+- **Official Minecraft News**: Integrated news feed directly from Minecraft.net.
+- **Multiplatform & Multilanguage**: Available for Windows, macOS, and Linux with full internationalization (EN, ES, FR).
+- **Auto-updater**: Built-in update system for seamless background updates.
+- **Open Source**: Easily extensible and modifiable by the community.
 
-- Node.js 18 or higher
-- npm (Node.js package manager)
-- Java (for running Minecraft)
+---
 
-## 🛠️ Compilation
+## Requirements
+
+- **Node.js** 18 or higher
+- **npm** or **pnpm** (Node.js package manager)
+- **Java** (JDK 17+ recommended for modern Minecraft versions)
+
+---
+
+## Compilation & Installation from Source
+
+<details>
+<summary><b>macOS Build Instructions</b></summary>
+
+### Compilation for macOS
+
+> [!NOTE]
+> The official macOS releases are compiled only for **Apple Silicon (ARM64)** and require a Mac with an M1, M2, M3, or M4 chip.
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/CesarGarza55/OpenLauncher.git
+   cd OpenLauncher
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Compile:
+   Execute the macOS build script:
+   ```bash
+   chmod +x compile-mac.sh
+   ./compile-mac.sh
+   ```
+
+   You can choose between:
+   - **Apple Silicon (ARM64)**: For M1/M2/M3/M4 Macs.
+   - **Intel (x64)**: For Intel Macs.
+   - **Universal**: For all Macs.
+
+   This will generate:
+   - `OpenLauncher-mac-<arch>.dmg` (DMG installer)
+   - `OpenLauncher-mac-<arch>.zip` (Portable ZIP archive)
+
+   The automated GitHub release build provides **ARM64** packages only.
+
+4. If macOS blocks the application after copying it to Applications, authorize it from Terminal:
+   ```bash
+   xattr -cr /Applications/OpenLauncher.app
+   ```
+
+5. Make sure Java is installed:
+   ```bash
+   brew install openjdk
+   ```
+</details>
 
 <details>
 <summary><b>Windows Build Instructions</b></summary>
@@ -45,32 +106,31 @@ The new Electron-based version represents a complete rewrite with improved perfo
 ### Compilation for Windows
 
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/CesarGarza55/OpenLauncher.git
-    cd OpenLauncher
-    ```
+   ```bash
+   git clone https://github.com/CesarGarza55/OpenLauncher.git
+   cd OpenLauncher
+   ```
 
 2. Install dependencies:
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 3. Compile:
-    Run the `compile-windows.bat` script to compile the project.
+   Run the `compile-windows.bat` script to compile the project:
+   ```cmd
+   compile-windows.bat
+   ```
 
-    ```bash
-    compile-windows.bat
-    ```
+   This will generate:
+   - `OpenLauncher.exe` (NSIS installer)
+   - `OpenLauncher-Portable-Windows.exe` (Portable version)
 
-    This will generate:
-    - `OpenLauncher.exe` (NSIS installer)
-    - `OpenLauncher-Portable-Windows.exe` (portable version)
+   > [!NOTE]
+   > The installer script requires [NSIS](https://nsis.sourceforge.io/Download) to be installed on your system.
 
-    **Note**: The script requires NSIS to be installed for the installer. You can download NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download).
-
-4. You need to install Java to be able to play:
-
-    [https://www.java.com/es/download/](https://www.java.com/es/download/)
+4. Make sure Java is installed:
+   [https://www.java.com/download/](https://www.java.com/download/)
 </details>
 
 <details>
@@ -79,174 +139,205 @@ The new Electron-based version represents a complete rewrite with improved perfo
 ### Compilation for Linux
 
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/CesarGarza55/OpenLauncher.git
-    cd OpenLauncher
-    ```
+   ```bash
+   git clone https://github.com/CesarGarza55/OpenLauncher.git
+   cd OpenLauncher
+   ```
 
 2. Install dependencies:
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 3. Compile:
-    Execute the script to start the compilation process:
+   Execute the script to start the compilation process:
+   ```bash
+   chmod +x compile-linux.sh
+   ./compile-linux.sh
+   ```
 
-    ```bash
-    chmod +x compile-linux.sh
-    ./compile-linux.sh
-    ```
-
-    This will generate:
-    - `OpenLauncher.deb` (for Debian/Ubuntu-based systems)
-    - `OpenLauncher-Portable-Linux.tar.gz` (for Arch/Fedora/Other distributions)
+   This will generate:
+   - `OpenLauncher.deb` (for Debian/Ubuntu-based distributions)
+   - `OpenLauncher-Portable-Linux.tar.gz` (for Arch/Fedora/other distributions)
 
 4. Install:
-   1. For Debian/Ubuntu-based systems:
-   ```bash
-   sudo dpkg -i OpenLauncher.deb
-   ```
-
-   2. For Arch/Fedora/Other distributions:
-   ```bash
-   tar -xzf OpenLauncher-Portable-Linux.tar.gz
-   cd OpenLauncher
-   ./OpenLauncher
-   ```
+   - **For Debian/Ubuntu-based systems:**
+     ```bash
+     sudo dpkg -i OpenLauncher.deb
+     ```
+   - **For Arch/Fedora/other systems:**
+     ```bash
+     tar -xzf OpenLauncher-Portable-Linux.tar.gz
+     cd OpenLauncher
+     ./OpenLauncher
+     ```
 </details>
 
-## 📥 Download options
+---
 
-- Windows Installer: `OpenLauncher.exe`
-- Windows Portable: `OpenLauncher-Portable-Windows.exe`
-- Linux Installer (Debian/Ubuntu): `OpenLauncher.deb`
-- Linux Portable (Arch/Fedora/Other): `OpenLauncher-Portable-Linux.tar.gz`
+## Download Options
 
+Pre-built binaries are available in the **[Releases](https://github.com/CesarGarza55/OpenLauncher/releases)** section:
 
-## 🕹️ Usage
+| Operating System | Installer | Portable | Architecture |
+| :--- | :--- | :--- | :--- |
+| **macOS** | `OpenLauncher-mac-arm64.dmg` | `OpenLauncher-mac-arm64.zip` | ARM64 (Apple Silicon) |
+| **Windows** | `OpenLauncher.exe` | `OpenLauncher-Portable-Windows.exe` | x64 |
+| **Linux** | `OpenLauncher.deb` | `OpenLauncher-Portable-Linux.tar.gz` | x64 |
 
-The main interface shows different sections:
-You can create, edit, and switch between multiple profiles.
-Each profile can be either a local profile or linked to a Microsoft account, and it stores its own configuration.
+---
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/4f064197-0321-4b19-9f5d-e18ba4f86796" />
+## Usage & Interface Tour
 
-To install a version, use the following interface where you select the version and click install:
+### Main Interface
+The main interface provides quick access to profiles, Minecraft versions, installed mods, console output, news, and launcher controls.
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/682c078a-fa88-4f55-9e6c-3834af273b11" />
+<img width="1552" height="897" alt="main" src="https://github.com/user-attachments/assets/814f3417-294c-4a4f-83f3-f1e3f71defef" />
 
-By default the following JVM arguments are used:
+---
 
-   ```bash
-   -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M
-   ```
+### Installing Versions
+To install a version (Vanilla, Fabric, Forge), open the installation modal, choose the target game version and loader, and click install:
 
-You can view the most recent news and articles from the official Minecraft website:
+<img width="1552" height="897" alt="install" src="https://github.com/user-attachments/assets/70412866-f0d1-4c00-b54c-13a03bb142e9" />
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/3a22625d-3ff4-4682-b898-713ea15e5981" />
+---
 
-If you want to change something you need to do it from the settings window.
+### Default Optimized JVM Arguments
+By default, OpenLauncher uses modern, garbage-collection-optimized JVM arguments for smooth frame pacing:
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/b7d06554-4d3c-494f-8440-3bed928fe2f6" />
+```bash
+-Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M
+```
 
-## 🔑 Sign in with Microsoft Account
+---
 
-To log in with your official Microsoft account, follow these steps:
+### Settings
+Customize launcher behavior, Java paths, directory locations, snapshot visibility, language, and auto-updates from the Settings window:
 
-1. Open the launcher.
-2. Click on "Login with Microsoft"
-3. Enter your Microsoft account with Minecraft purchased
-4. Once the authentication process is complete, you will see your account appear in the launcher
+<img width="1552" height="897" alt="settings" src="https://github.com/user-attachments/assets/c9587697-9a6e-45f4-ae26-9d7ca701922a" />
 
-<img width="341" height="132" alt="image" src="https://github.com/user-attachments/assets/8a987d9a-061a-43c7-b5c8-f88bc50bd8df" />
+---
+
+## Sign in with Microsoft Account
+
+To log in with your official Microsoft account:
+
+1. Open OpenLauncher.
+2. Click on the **Microsoft icon** in the sidebar.
+3. Complete the login in the secure browser prompt with your Minecraft-entitled Microsoft account.
+4. Once authenticated, your profile skin and username will appear automatically in the launcher.
+
+<img width="279" height="94" alt="microsoft icon" src="https://github.com/user-attachments/assets/5f036741-7007-45f2-819e-034146bd4ba5" />
+
 
 <details>
 <summary><b>Using your own Microsoft Entra Client ID (For Forks & Developers)</b></summary>
 
-### Using your own Microsoft Entra Client ID
+### Custom Entra Client ID Setup
+The official OpenLauncher builds use a hosted authentication proxy. If you fork this repository and want to use your own Microsoft App (Client ID):
 
-The official OpenLauncher builds use a hosted authentication API (a proxy) which is not published
-as open-source. If you fork this repository and want to use your own Microsoft App (Client ID)
-instead of a hosted API, you need to implement your own authentication flow.
+1. Register an app in [Microsoft Entra ID](https://entra.microsoft.com): **App registrations** &rarr; **New registration**.
+   - Copy the Application (client) ID — this is your `CLIENT_ID`.
+   - In **Authentication**, click **Add a platform**, choose **Mobile and desktop applications**.
+   - Add Redirect URI: `http://localhost:8080/callback` (or your configured redirect URI).
+2. Implement or route the OAuth flow in your Electron main process.
+3. Ensure required permissions/scopes for Xbox Live & Minecraft are granted ([Microsoft Developer Request Form](https://forms.office.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR-ajEQ1td1ROpz00KtS8Gd5UNVpPTkVLNFVROVQxNkdRMEtXVjNQQjdXVC4u)).
+4. Launch locally and test login.
 
-Steps for forks:
-1. Register an app in Microsoft Entra [https://entra.microsoft.com](https://entra.microsoft.com): App registrations → New registration.
-    - Copy the Application (client) ID — this is your `CLIENT_ID`.
-    - On `Authentication` click on `Add a platform` and select `Mobile and desktop applications`
-    - Add Redirect URI: `http://localhost:8080/callback` (or your chosen URI).
-2. Implement the OAuth flow in your Electron main process or backend.
-3. Ensure required permissions/scopes for Xbox Live / Minecraft are granted (you need to apply to [this form](https://forms.office.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR-ajEQ1td1ROpz00KtS8Gd5UNVpPTkVLNFVROVQxNkdRMEtXVjNQQjdXVC4u))
-4. Run the launcher locally and use "Login with Microsoft".
-
-Security reminder: never commit client secrets or refresh tokens to a public repository. For
-production use, host an auth backend to store and rotate secrets securely.
-
-Troubleshooting:
-- If the browser doesn't redirect back, verify the redirect URI in the Entra Admin Panel app matches `REDIRECT_URL`.
-- If refresh tokens fail, ensure `offline_access` scope is requested.
+> [!WARNING]
+> Never commit client secrets or refresh tokens to a public repository.
 </details>
 
-## Mod Manager
+---
 
-You can install, activate and deactivate mods with the mod manager:
+## Mod Manager & Modrinth Integration (Beta)
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/854f777a-2038-430c-b683-7d91c6c427a9" />
+> [!WARNING]
+> Modrinth integration is currently a **beta/experimental feature**. Search, installation, dependency resolution, and update detection may change or behave unexpectedly while the feature is being improved.
 
-## 🧪 Testing
+The experimental Modrinth integration lets you install, enable, disable, and delete mods:
 
-<details>
-<summary><b>Tested PC Specifications & Configuration</b></summary>
+- **Browse Modrinth**: Search thousands of mods with filters by loader, version, and category.
+- **Auto-Update Checker**: Check installed mods against Modrinth and update them in 1 click.
+- **Drag & Drop**: Drag `.jar` files straight into the launcher to install them instantly.
 
-### Testing Configuration
+<img width="1552" height="897" alt="mods" src="https://github.com/user-attachments/assets/9323d0b7-3c3d-459e-9d91-e62c884d22b2" />
 
-My PC Specs:
-- CPU: AMD Ryzen 5 5600g (3.90 GHz)
-- GPU: Radeon Vega 7 Graphics
-- RAM: 32GB DDR4 DIMM 3200MT/s
-- Operating System: Windows 11 24H2 (26100.6584)
+---
 
-Tested Minecraft Version:
-- Launcher version: Release 1.0.0
-- RAM Allocated: 8GB
-- Minecraft Version: 1.21.11
-- Fabric: 0.18.4
-- Shaders: [MakeUp-UltraFast-9.1b](https://modrinth.com/shader/makeup-ultra-fast-shaders)
+<img width="1552" height="897" alt="Modrinth" src="https://github.com/user-attachments/assets/3c29ed21-c4a2-44bb-9c1c-d90a97e99f48" />
 
-<img width="1102" height="661" alt="image" src="https://github.com/user-attachments/assets/8247ecfc-2acc-4f55-a2ab-2ff21801d36c" />
-</details>
+---
 
-## 🤝 Contributing
+## Mod Incompatibility Auto-Fixer
 
-Contributions are welcome! Follow these steps to contribute:
+When Fabric detects incompatible mods, OpenLauncher analyzes the loader output and presents the recommended resolution in a dedicated conflict dialog. The auto-fixer can apply compatible mod versions and update related dependencies in one action, helping restore the profile without automatically disabling mods.
 
-- Fork the repository.
-- Create a new branch (git checkout -b feature/new-feature).
-- Make the necessary changes and commit (git commit -am 'Add new feature').
-- Push the changes to your repository (git push origin feature/new-feature).
-- Open a Pull Request on GitHub.
+If Fabric does not provide a reliable automatic fix, the launcher keeps the detected conflict details visible so you can review the affected mods and choose the appropriate solution manually.
 
-## 📜 License
+<img width="1552" height="897" alt="mod fixer" src="https://github.com/user-attachments/assets/3a0317fe-93d5-4c71-b417-e135aa184356" />
 
-This project is licensed under the GPL-2.0 License. For more details, see the [LICENSE](https://github.com/CesarGarza55/OpenLauncher/blob/main/LICENSE) file.
+---
 
-## 🙏 Credits
+## Testing & Performance
 
-OpenLauncher uses the following libraries and tools:
+### Tested PC Specifications & Configuration
 
-- Electron
-- React
-- Node.js
-- electron-builder
-- Vite
+### Hardware Specifications
+- **CPU**: Apple M1 (8-core)
+- **GPU**: Apple M1 (8-core GPU)
+- **RAM**: 8GB Unified Memory
+- **OS**: macOS Tahoe 26.x
 
-## ⚠️ Disclaimer
+### Game Benchmark Setup
+- **Launcher version**: Release 1.1.0
+- **RAM Allocated**: 4GB
+- **Minecraft Version**: 1.21.11
+- **Fabric Loader**: 0.19.5
+
+- **Shaders**: [MakeUp-UltraFast-9.5e](https://modrinth.com/shader/makeup-ultra-fast-shaders)
+
+<img width="1440" height="784" alt="test" src="https://github.com/user-attachments/assets/8b233cc4-1a1c-47c7-89e2-969f004a15e8" />
+
+---
+
+## Contributing
+
+Contributions are welcome! Follow these steps:
+
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/new-feature`).
+3. Commit your changes (`git commit -am 'Add new feature'`).
+4. Push to the branch (`git push origin feature/new-feature`).
+5. Open a Pull Request on GitHub.
+
+---
+
+## License
+
+This project is licensed under the **GPL-2.0 License**. For more details, see the [LICENSE](https://github.com/CesarGarza55/OpenLauncher/blob/main/LICENSE) file.
+
+---
+
+## Credits & Acknowledgements
+
+OpenLauncher is developed and maintained by **[Cesar Garza](https://github.com/CesarGarza55)** with modern AI-assisted engineering workflows for rapid feature iteration and code quality.
+
+OpenLauncher uses and builds upon the following open-source tools:
+- [Electron](https://www.electronjs.org/)
+- [React](https://react.dev/)
+- [Node.js](https://nodejs.org/)
+- [Vite](https://vitejs.dev/)
+- [electron-builder](https://www.electron.build/)
+- [Modrinth API](https://docs.modrinth.com/)
+
+---
+
+## Disclaimer
 
 This project is in no way related to or associated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. All trademarks and intellectual property rights mentioned in this project are the exclusive property of their respective owners. No files belonging to Mojang AB or Microsoft are hosted on servers owned by us.
 
-You can review the Terms and Conditions and the Privacy Policy regarding the use of the application at the following link:
-
-- [Terms and Conditions and Privacy Policy](https://openlauncher.codevbox.com/terms_app)
-
-By using OpenLauncher, you agree to comply with these terms and acknowledge that you have read and understood my privacy practices. I am committed to protecting your personal information and ensuring transparency in how I handle your data. For any questions or concerns, please contact me at [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Terms%20of%20Service).
+Review the [Terms and Conditions and Privacy Policy](https://openlauncher.codevbox.com/terms_app). For any questions or concerns, please contact [support@codevbox.com](mailto:support@codevbox.com?subject=OpenLauncher%20Inquiry).
 
 Thank you for using OpenLauncher!
