@@ -169,6 +169,7 @@ const Icon = ({ d, size = 14 }) => (
 const ICONS = {
   play: 'M5 3l14 9-14 9V3z',
   stop: 'M6 6h12v12H6z',
+  alertTriangle: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
   edit: 'M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z',
   download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
   settings: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
@@ -315,6 +316,33 @@ function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdate }) {
   );
 }
 
+function findModInList(mods = [], targetId = '', displayName = '') {
+  if (!Array.isArray(mods) || !targetId) return null;
+  const cleanId = String(targetId).toLowerCase().trim();
+  const cleanName = displayName ? String(displayName).toLowerCase().trim() : '';
+
+  // 1. Exact match on internal modId (from jar metadata)
+  const exactModId = mods.find(m => m.modId && String(m.modId).toLowerCase().trim() === cleanId);
+  if (exactModId) return exactModId;
+
+  // 2. Exact match on mod display name
+  if (cleanName) {
+    const exactName = mods.find(m => m.name && String(m.name).toLowerCase().trim() === cleanName);
+    if (exactName) return exactName;
+  }
+
+  // 3. Exact filename prefix match (excluding companion mods like -extra)
+  return mods.find(m => {
+    const fn = String(m.fileName || m.id || '').toLowerCase();
+    if (cleanId === 'sodium' && (fn.includes('extra') || fn.includes('reeses') || fn.includes('options'))) {
+      return false;
+    }
+    if (fn === `${cleanId}.jar` || fn === `${cleanId}.olpkg`) return true;
+    const prefixRegex = new RegExp(`^${cleanId}(?:[-_+v0-9.mc]|fabric|neoforge|forge)`, 'i');
+    return prefixRegex.test(fn);
+  }) || null;
+}
+
 function ModConflictModal({ conflict, mods = [], onClose, onResolveUpdate, onAutoFixAll, fixingAll, onOpenModsFolder }) {
   const { t } = useI18n();
   if (!conflict) return null;
@@ -323,17 +351,79 @@ function ModConflictModal({ conflict, mods = [], onClose, onResolveUpdate, onAut
     ? conflict.compatFixes
     : (conflict.suggestedUpdates || []).map(update => ({
       modId: update.modId,
+      displayName: update.displayName,
       targetVersion: update.targetVersion,
       cascade: [],
     }));
   const hasAutoFixes = autoFixes.length > 0;
+
+  const pendingUpdates = (conflict.suggestedUpdates || []).filter(rec => {
+    const installedMod = findModInList(mods, rec.modId, rec.displayName);
+    if (installedMod?.version && rec.targetVersion && String(installedMod.version).trim() === String(rec.targetVersion).trim()) {
+      return false;
+    }
+    return true;
+  });
+
+  const plannedFixes = [];
+  const seenModIds = new Set();
+
+  if (hasAutoFixes) {
+    for (const fix of autoFixes) {
+      const fixModId = String(fix.modId || '').toLowerCase();
+      const mainMod = findModInList(mods, fix.modId, fix.displayName);
+
+      const currentRaw = String(mainMod?.version || '').trim();
+      const currentClean = currentRaw.replace(/^v/i, '');
+      const targetClean = String(fix.targetVersion || '').replace(/^v/i, '').trim();
+
+      if (!seenModIds.has(fixModId) && (!currentClean || currentClean !== targetClean)) {
+        seenModIds.add(fixModId);
+        plannedFixes.push({
+          modId: fix.modId,
+          name: mainMod?.name || fix.displayName || fix.modId,
+          currentVersion: currentRaw && currentRaw !== 'installed' ? `v${currentClean}` : null,
+          targetVersion: `v${targetClean}`,
+          isPrimary: true,
+        });
+      }
+
+      if (Array.isArray(fix.cascade)) {
+        for (const item of fix.cascade) {
+          const itemModId = String(item.modId || '').toLowerCase();
+          if (seenModIds.has(itemModId)) continue;
+
+          const cascadeMod = findModInList(mods, item.modId, item.displayName);
+
+          if (cascadeMod) {
+            const cRaw = String(cascadeMod.version || '').trim();
+            const cClean = cRaw.replace(/^v/i, '');
+            const cTargetClean = String(item.targetVersion || '').replace(/^v/i, '').trim();
+
+            if (!cClean || cClean !== cTargetClean) {
+              seenModIds.add(itemModId);
+              plannedFixes.push({
+                modId: item.modId,
+                name: cascadeMod.name || item.modId,
+                currentVersion: cRaw && cRaw !== 'installed' ? `v${cClean}` : null,
+                targetVersion: `v${cTargetClean}`,
+                isPrimary: false,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const showAutoFixCard = plannedFixes.length > 0 && onAutoFixAll;
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal mod-conflict-modal">
         <div className="mod-conflict-header">
           <div className="mod-conflict-title-icon-box">
-            <span className="mod-conflict-warning-icon">⚠️</span>
+            <Icon d={ICONS.alertTriangle} size={20} />
           </div>
           <div className="mod-conflict-title-text">
             <h3 className="modal-title">{t('mods.conflictTitle')}</h3>
@@ -345,97 +435,69 @@ function ModConflictModal({ conflict, mods = [], onClose, onResolveUpdate, onAut
         </div>
 
         <div className="mod-conflict-body">
-          {onAutoFixAll && (
-            <div className="mod-conflict-autofix-banner">
-              <div className="mod-conflict-autofix-info">
-                <strong className="mod-conflict-autofix-title">
-                  {t('mods.conflictFixAllBtn')}
-                </strong>
-                <span className="mod-conflict-autofix-desc">
-                  {hasAutoFixes ? t('mods.conflictFixAllDesc') : t('mods.conflictFixUnavailable')}
-                </span>
+          {showAutoFixCard && (
+            <div className="mod-conflict-solution-card">
+              <div className="mod-conflict-solution-header">
+                <span className="mod-conflict-solution-tag">{t('mods.conflictRecommendation')}</span>
+                <span className="mod-conflict-solution-hint">{t('mods.conflictFixAllDesc')}</span>
               </div>
-              <button
-                className="btn-primary mod-conflict-autofix-btn"
-                type="button"
-                onClick={() => onAutoFixAll(autoFixes)}
-                disabled={!hasAutoFixes || fixingAll}
-              >
-                <Icon d={ICONS.sparkles || ICONS.download} size={13} className={fixingAll ? 'spin-infinite' : ''} />
-                <span>{fixingAll ? t('mods.conflictFixing') : t('mods.conflictFixAllBtn')}</span>
-              </button>
+              <div className="mod-conflict-fix-targets">
+                {plannedFixes.map((item, idx) => (
+                  <div key={idx} className="mod-conflict-target-row">
+                    <span className="mod-conflict-target-name">{item.name}</span>
+                    <div className="mod-conflict-version-diff">
+                      {item.currentVersion && (
+                        <>
+                          <span className="mod-conflict-target-ver muted">{item.currentVersion}</span>
+                          <span className="mod-conflict-target-arrow">&rarr;</span>
+                        </>
+                      )}
+                      <span className="mod-conflict-target-ver">{item.targetVersion}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {conflict.suggestedUpdates && conflict.suggestedUpdates.length > 0 && (() => {
-            const pendingUpdates = conflict.suggestedUpdates.filter(rec => {
-              const installedMod = mods.find(m =>
-                (m.id && String(m.id).toLowerCase() === String(rec.modId).toLowerCase()) ||
-                (m.name && String(m.name).toLowerCase() === String(rec.displayName || rec.modId).toLowerCase()) ||
-                (m.fileName && m.fileName.toLowerCase().startsWith(`${rec.modId}-`)) ||
-                (m.fileName && m.fileName.toLowerCase().includes(rec.modId))
-              );
-              // Hide update button if the user already has this targetVersion installed
-              if (installedMod?.version && rec.targetVersion && String(installedMod.version).trim() === String(rec.targetVersion).trim()) {
-                return false;
-              }
-              return true;
-            });
-
-            if (pendingUpdates.length === 0) return null;
-
-            return (
-              <div className="mod-conflict-recommendations-section">
-                <span className="mod-conflict-rec-header-label">{t('mods.conflictRecommendation')}:</span>
-                <div className="mod-conflict-rec-list">
-                  {pendingUpdates.map((rec, idx) => (
-                    <div key={idx} className="mod-conflict-rec-item">
-                      <div className="mod-conflict-rec-item-info">
-                        <strong className="mod-conflict-rec-name">{rec.displayName || rec.modId}</strong>
-                        <span className="mod-conflict-rec-badge">&rarr; v{rec.targetVersion}</span>
-                      </div>
-                      {onResolveUpdate && (
-                        <button
-                          className="btn-primary mod-conflict-rec-btn"
-                          type="button"
-                          onClick={() => onResolveUpdate(rec)}
-                        >
-                          <Icon d={ICONS.download} size={12} />
-                          <span>{t('mods.conflictUpdateBtn', { version: rec.targetVersion })}</span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+          {!hasAutoFixes && pendingUpdates.length > 0 && (
+            <div className="mod-conflict-solution-card">
+              <div className="mod-conflict-solution-header">
+                <span className="mod-conflict-solution-tag">{t('mods.conflictRecommendation')}</span>
               </div>
-            );
-          })()}
+              <div className="mod-conflict-rec-list">
+                {pendingUpdates.map((rec, idx) => (
+                  <div key={idx} className="mod-conflict-target-row">
+                    <span className="mod-conflict-target-name">{rec.displayName || rec.modId}</span>
+                    <span className="mod-conflict-target-ver">v{rec.targetVersion}</span>
+                    {onResolveUpdate && (
+                      <button
+                        className="btn-secondary mod-conflict-mini-btn"
+                        type="button"
+                        onClick={() => onResolveUpdate(rec)}
+                      >
+                        <Icon d={ICONS.download} size={11} />
+                        <span>{t('mods.conflictUpdateBtn', { version: rec.targetVersion })}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {conflict.conflictingMods && conflict.conflictingMods.length > 0 && (
-            <div className="mod-conflict-incompatible-section">
-              <span className="mod-conflict-rec-header-label" style={{ color: 'var(--warning)' }}>
-                {t('mods.conflictTitle')}:
-              </span>
+          {conflict.conflictingMods && conflict.conflictingMods.length > 0 && !hasAutoFixes && (
+            <div className="mod-conflict-incompatible-card">
+              <span className="mod-conflict-solution-tag">{t('mods.conflictTitle')}</span>
               <div className="mod-conflict-rec-list">
                 {conflict.conflictingMods.map((modItem, idx) => {
-                  const targetMod = mods.find(m => {
-                    const mId = String(m.id || '').toLowerCase();
-                    const mName = String(m.name || '').toLowerCase();
-                    const mFile = String(m.fileName || '').toLowerCase();
-                    const itemId = String(modItem.id || '').toLowerCase();
-                    const itemName = String(modItem.name || '').toLowerCase();
-                    return mId === itemId || mName === itemName || mFile.startsWith(`${itemId}-`) || mFile.includes(itemId);
-                  });
+                  const targetMod = findModInList(mods, modItem.id, modItem.name);
                   return (
-                    <div key={idx} className="mod-conflict-rec-item">
-                      <div className="mod-conflict-rec-item-info">
-                        <strong className="mod-conflict-rec-name">{targetMod?.name || modItem.name || modItem.id}</strong>
-                        {targetMod?.version && targetMod.version !== 'installed' && (
-                          <span className="mod-conflict-rec-badge" style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.06)' }}>
-                            v{targetMod.version}
-                          </span>
-                        )}
-                      </div>
+                    <div key={idx} className="mod-conflict-target-row">
+                      <span className="mod-conflict-target-name">{targetMod?.name || modItem.name || modItem.id}</span>
+                      {targetMod?.version && targetMod.version !== 'installed' && (
+                        <span className="mod-conflict-target-ver muted">v{targetMod.version}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -443,22 +505,38 @@ function ModConflictModal({ conflict, mods = [], onClose, onResolveUpdate, onAut
             </div>
           )}
 
-          <div className="mod-conflict-raw-box">
-            <div className="mod-conflict-raw-label">{t('mods.conflictLoaderOutput')}</div>
+          <details className="mod-conflict-details">
+            <summary className="mod-conflict-details-summary">
+              <Icon d={ICONS.chevronDown} size={12} />
+              <span>{t('mods.conflictLoaderOutput')}</span>
+            </summary>
             <pre className="mod-conflict-raw-text">
               {conflict.rawDescription || t('mods.conflictRawFallback')}
             </pre>
-          </div>
+          </details>
         </div>
 
         <div className="modal-actions mod-conflict-actions">
-          <button className="btn-secondary" type="button" onClick={onOpenModsFolder}>
+          <button className="btn-secondary mod-conflict-folder-btn" type="button" onClick={onOpenModsFolder}>
             <Icon d={ICONS.folder} size={12} />
             <span>{t('mods.conflictOpenModsFolder')}</span>
           </button>
-          <button className="btn-primary" type="button" onClick={onClose}>
-            <span>{t('mods.conflictDismiss')}</span>
-          </button>
+          <div className="mod-conflict-primary-actions">
+            <button className="btn-secondary" type="button" onClick={onClose}>
+              <span>{t('mods.conflictDismiss')}</span>
+            </button>
+            {hasAutoFixes && onAutoFixAll && (
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => onAutoFixAll(autoFixes)}
+                disabled={fixingAll}
+              >
+                <Icon d={fixingAll ? ICONS.spinner : ICONS.download} size={12} className={fixingAll ? 'spin-infinite' : ''} />
+                <span>{fixingAll ? t('mods.conflictFixing') : t('mods.conflictFixAllBtn')}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -695,14 +773,27 @@ function ModDetailModal({
   };
 
   const isVersionInstalled = (ver) => {
+    if (!ver || !Array.isArray(mods)) return false;
     const file = ver.files?.find(f => f.primary) || ver.files?.[0];
-    if (!file) return false;
-    const fn = (file.filename || '').toLowerCase();
-    const verNum = (ver.version_number || '').toLowerCase();
+    const fn = (file?.filename || '').toLowerCase().trim();
+    const verNum = String(ver.version_number || '').toLowerCase().trim();
+    const slug = String(project?.slug || '').toLowerCase().trim();
+    const projId = String(project?.id || project?.project_id || '').toLowerCase().trim();
+
     return mods.some(m => {
-      const mFn = (m.fileName || '').toLowerCase();
-      const mVer = (m.version || '').toLowerCase();
-      return mFn === fn || (m.id.toLowerCase().includes(project.slug?.toLowerCase() || '') && mVer === verNum);
+      const mFn = String(m.fileName || '').toLowerCase().trim();
+      const mVer = String(m.version || '').toLowerCase().trim();
+      const mModId = String(m.modId || '').toLowerCase().trim();
+
+      if (fn && mFn === fn) return true;
+
+      const isSameMod = (mModId && (mModId === slug || mModId === projId)) ||
+        (slug && !mFn.includes('extra') && !mFn.includes('options') && mFn.startsWith(`${slug}-`));
+
+      if (isSameMod && mVer && verNum && (mVer === verNum || mVer.replace(/^v/i, '') === verNum.replace(/^v/i, ''))) {
+        return true;
+      }
+      return false;
     });
   };
 
@@ -2766,14 +2857,38 @@ export default function App() {
     }
   };
 
-  const isModInstalled = (project) => {
-    const slug = String(project.slug || '').toLowerCase();
-    const title = String(project.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isModInstalled = useCallback((project) => {
+    if (!project || !Array.isArray(mods) || mods.length === 0) return false;
+    const slug = String(project.slug || '').toLowerCase().trim();
+    const projId = String(project.project_id || project.id || '').toLowerCase().trim();
+    const cleanTitle = String(project.title || '').toLowerCase().trim();
+
     return mods.some(m => {
-      const mName = String(m.name || m.id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return mName.includes(slug) || (title.length > 3 && mName.includes(title));
+      const mModId = String(m.modId || '').toLowerCase().trim();
+      const mName = String(m.name || '').toLowerCase().trim();
+      const mFile = String(m.fileName || m.id || '').toLowerCase().trim();
+
+      // 1. Exact match by internal jar modId or project id
+      if (mModId && (mModId === slug || mModId === projId)) return true;
+
+      // 2. Exact match by mod title
+      if (cleanTitle && mName === cleanTitle) return true;
+
+      // 3. Exact filename prefix match
+      if (slug) {
+        if (slug === 'sodium' && (mFile.includes('extra') || mFile.includes('reeses') || mFile.includes('options'))) {
+          return false;
+        }
+        if (slug === 'iris' && mFile.includes('flawless')) {
+          return false;
+        }
+        if (mFile === `${slug}.jar` || mFile === `${slug}.olpkg`) return true;
+        const slugPrefixRegex = new RegExp(`^${slug}(?:[-_+v0-9.mc]|fabric|neoforge|forge)`, 'i');
+        if (slugPrefixRegex.test(mFile)) return true;
+      }
+      return false;
     });
-  };
+  }, [mods]);
 
   const checkingModUpdatesRef = useRef(false);
   const hasCheckedModsOnTabOpenRef = useRef(false);
@@ -2959,29 +3074,36 @@ export default function App() {
       const gameVersion = currentMcVer || '';
 
       for (const fix of compatFixes) {
-        // Install base compatible version
-        await launcher.minecraftModrinthInstall?.({
-          projectId: fix.modId,
-          versionNumber: fix.targetVersion,
-          loader,
-          gameVersion,
-        });
+        const mainMod = findModInList(mods, fix.modId, fix.displayName);
+
+        const mainCurrent = String(mainMod?.version || '').replace(/^v/i, '').trim();
+        const mainTarget = String(fix.targetVersion || '').replace(/^v/i, '').trim();
+
+        // Install base compatible version only if needed
+        if (!mainCurrent || mainCurrent !== mainTarget) {
+          await launcher.minecraftModrinthInstall?.({
+            projectId: fix.modId,
+            versionNumber: fix.targetVersion,
+            loader,
+            gameVersion,
+          });
+        }
 
         // Cascade updates/downgrades for companion mods
         if (Array.isArray(fix.cascade)) {
           for (const item of fix.cascade) {
-            const isInstalled = mods.some(m => {
-              const mId = String(m.id || '').toLowerCase();
-              const mFile = String(m.fileName || '').toLowerCase();
-              return mId === item.modId || mFile.startsWith(`${item.modId}-`);
-            });
-            if (isInstalled) {
-              await launcher.minecraftModrinthInstall?.({
-                projectId: item.modId,
-                versionNumber: item.targetVersion,
-                loader,
-                gameVersion,
-              });
+            const cascadeMod = findModInList(mods, item.modId, item.displayName);
+            if (cascadeMod) {
+              const cCurrent = String(cascadeMod.version || '').replace(/^v/i, '').trim();
+              const cTarget = String(item.targetVersion || '').replace(/^v/i, '').trim();
+              if (!cCurrent || cCurrent !== cTarget) {
+                await launcher.minecraftModrinthInstall?.({
+                  projectId: item.modId,
+                  versionNumber: item.targetVersion,
+                  loader,
+                  gameVersion,
+                });
+              }
             }
           }
         }
@@ -3014,15 +3136,21 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'mods' && isOnline) {
-      if (!hasCheckedModsOnTabOpenRef.current) {
-        hasCheckedModsOnTabOpenRef.current = true;
-        handleCheckModUpdates({ silent: true });
+    if (activeTab === 'mods') {
+      launcher.minecraftGetInstalledMods?.().then(updated => {
+        if (Array.isArray(updated)) setMods(updated);
+      }).catch(() => {});
+
+      if (isOnline) {
+        if (!hasCheckedModsOnTabOpenRef.current) {
+          hasCheckedModsOnTabOpenRef.current = true;
+          handleCheckModUpdates({ silent: true });
+        }
       }
     } else {
       hasCheckedModsOnTabOpenRef.current = false;
     }
-  }, [activeTab, isOnline]);
+  }, [activeTab, modsSubTab, isOnline]);
 
   const handleCheckForUpdates = async () => {
     addLog('info', 'Checking for launcher updates...');

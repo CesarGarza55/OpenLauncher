@@ -1322,6 +1322,7 @@ async function readInstalledMods() {
 
         installed.push({
           id: modId,
+          modId: meta?.id || null,
           name: meta?.displayName || meta?.title || modId,
           fileName,
           version: meta?.version || 'installed',
@@ -1394,8 +1395,20 @@ async function deleteMod(modId) {
   const modsDir = path.join(root, 'mods');
   const baseId = String(modId || '').replace(/\.(jar|olpkg)$/i, '').trim();
   if (!baseId) return { error: 'BadInput', message: 'Missing mod id.' };
-  const targets = [path.join(modsDir, `${baseId}.jar`), path.join(modsDir, `${baseId}.olpkg`)];
-  const existingPaths = targets.filter(existingPath => fs.existsSync(existingPath));
+  let targets = [path.join(modsDir, `${baseId}.jar`), path.join(modsDir, `${baseId}.olpkg`)];
+  let existingPaths = targets.filter(existingPath => fs.existsSync(existingPath));
+  if (existingPaths.length === 0) {
+    try {
+      const files = await fs.promises.readdir(modsDir);
+      for (const file of files) {
+        if (file.toLowerCase() === `${baseId.toLowerCase()}.jar` ||
+            file.toLowerCase() === `${baseId.toLowerCase()}.olpkg` ||
+            file.replace(/\.(jar|olpkg)$/i, '').toLowerCase() === baseId.toLowerCase()) {
+          existingPaths.push(path.join(modsDir, file));
+        }
+      }
+    } catch {}
+  }
   if (existingPaths.length === 0) return { error: 'NotFound', message: `Mod not found: ${baseId}` };
   const choice = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
@@ -1404,7 +1417,23 @@ async function deleteMod(modId) {
   });
   if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
   try {
-    for (const existingPath of existingPaths) await fs.promises.unlink(existingPath).catch(() => { });
+    const metaStore = await readModsMetadataStore();
+    let metaChanged = false;
+    for (const existingPath of existingPaths) {
+      const fn = path.basename(existingPath);
+      const fnKey = fn.toLowerCase();
+      const baseKey = fn.replace(/\.(jar|olpkg)$/i, '').toLowerCase();
+      if (metaStore[fnKey]) { delete metaStore[fnKey]; metaChanged = true; }
+      if (metaStore[baseKey]) { delete metaStore[baseKey]; metaChanged = true; }
+      await fs.promises.unlink(existingPath).catch(() => { });
+    }
+    if (metaChanged) {
+      await fs.promises.writeFile(
+        path.join(app.getPath('userData'), MODS_METADATA_FILE),
+        JSON.stringify(metaStore, null, 2),
+        'utf8'
+      ).catch(() => {});
+    }
     return { ok: true, removed: existingPaths };
   } catch (error) { return { error: 'DeleteFailed', message: error?.message || String(error) }; }
 }
@@ -1454,6 +1483,57 @@ async function importModFile(payload) {
     await fs.promises.writeFile(destinationPath, buffer);
   }
   return { ok: true, path: destinationPath, enabled: ext === '.jar' };
+}
+
+async function cleanupOldModVersions(modsDir, modId, targetFileName) {
+  if (!modsDir || !modId || !targetFileName) return;
+  const cleanModId = String(modId).toLowerCase().trim();
+  const cleanTargetFile = String(targetFileName).toLowerCase().trim();
+
+  try {
+    const files = await fs.promises.readdir(modsDir);
+    for (const file of files) {
+      const lowerFile = file.toLowerCase().trim();
+      if (lowerFile === cleanTargetFile) continue;
+
+      if (!lowerFile.endsWith('.jar') && !lowerFile.endsWith('.olpkg') && !lowerFile.endsWith('.jar.disabled')) {
+        continue;
+      }
+
+      const filePath = path.join(modsDir, file);
+      let shouldDelete = false;
+
+      // 1. Check metadata inside jar
+      try {
+        const meta = extractJarMetadata(filePath);
+        if (meta?.id && String(meta.id).toLowerCase().trim() === cleanModId) {
+          shouldDelete = true;
+        }
+      } catch {}
+
+      // 2. Strict prefix fallback if metadata is missing or inaccessible
+      if (!shouldDelete) {
+        const isCompanion = (cleanModId === 'sodium' && (lowerFile.includes('extra') || lowerFile.includes('reeses') || lowerFile.includes('options'))) ||
+                            (cleanModId === 'iris' && lowerFile.includes('flawless'));
+        if (!isCompanion) {
+          if (lowerFile.startsWith(`${cleanModId}-`) || lowerFile.startsWith(`${cleanModId}_`) || lowerFile.startsWith(`${cleanModId}+`) ||
+              lowerFile === `${cleanModId}.jar` || lowerFile === `${cleanModId}.olpkg`) {
+            shouldDelete = true;
+          }
+        }
+      }
+
+      if (shouldDelete) {
+        try {
+          await fs.promises.unlink(filePath);
+          mainWindow?.webContents.send('minecraft:run-log', {
+            type: 'info',
+            msg: `[Mod Manager] Removed older version: ${file}`,
+          });
+        } catch {}
+      }
+    }
+  } catch {}
 }
 
 async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl, fileName, gameVersion, loader }) {
@@ -1514,22 +1594,12 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
   await downloadFileToPath(downloadUrl, destPath);
 
   // Clean up older / duplicate versions of this mod in the mods folder
-  try {
-    const newMeta = extractJarMetadata(destPath);
-    const modId = newMeta?.id ? String(newMeta.id).toLowerCase() : null;
-    if (modId) {
-      const files = await fs.promises.readdir(modsDir);
-      for (const file of files) {
-        if (file !== targetFileName && (file.toLowerCase().endsWith('.jar') || file.toLowerCase().endsWith('.jar.disabled'))) {
-          const filePath = path.join(modsDir, file);
-          const existingMeta = extractJarMetadata(filePath);
-          if (existingMeta?.id && String(existingMeta.id).toLowerCase() === modId) {
-            try { await fs.promises.unlink(filePath); } catch {}
-          }
-        }
-      }
-    }
-  } catch {}
+  const detectedModId = String(projectId || '').toLowerCase().trim() ||
+    (() => { try { return extractJarMetadata(destPath)?.id?.toLowerCase()?.trim() || ''; } catch { return ''; } })();
+
+  if (detectedModId) {
+    await cleanupOldModVersions(modsDir, detectedModId, targetFileName);
+  }
 
   // Collect and persist mod metadata
   const modMetaEntries = {};
@@ -1564,6 +1634,38 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
     for (const dep of requiredDeps) {
       try {
         let depVersion = null;
+        let depProject = null;
+
+        if (dep.project_id) {
+          depProject = await getModrinthProject(dep.project_id).catch(() => null);
+        }
+
+        // Check if any version of this required mod/dependency is already present in modsDir
+        const candidateIds = new Set([
+          String(dep.project_id || '').toLowerCase().trim(),
+          String(depProject?.slug || '').toLowerCase().trim()
+        ].filter(Boolean));
+
+        let isDepAlreadyInstalled = false;
+        try {
+          const currentFiles = await fs.promises.readdir(modsDir);
+          for (const file of currentFiles) {
+            if (!file.toLowerCase().endsWith('.jar') && !file.toLowerCase().endsWith('.olpkg')) continue;
+            const checkPath = path.join(modsDir, file);
+            try {
+              const meta = extractJarMetadata(checkPath);
+              if (meta?.id && candidateIds.has(String(meta.id).toLowerCase().trim())) {
+                isDepAlreadyInstalled = true;
+                break;
+              }
+            } catch {}
+          }
+        } catch {}
+
+        if (isDepAlreadyInstalled) {
+          continue;
+        }
+
         if (dep.version_id) {
           depVersion = await getModrinthVersion(dep.version_id).catch(() => null);
         } else if (dep.project_id) {
@@ -1589,25 +1691,25 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
             await downloadFileToPath(depFile.url, depPath);
             installedDeps.push(depFileName);
 
-            if (dep.project_id) {
-              try {
-                const depProject = await getModrinthProject(dep.project_id).catch(() => null);
-                if (depProject) {
-                  const depKey = depFileName.replace(/\.jar$/i, '').toLowerCase();
-                  let depCachedIcon = null;
-                  if (depProject.icon_url) {
-                    depCachedIcon = await fetchAndCacheIconAsBase64(depProject.icon_url);
-                  }
-                  modMetaEntries[depKey] = {
-                    displayName: depProject.title,
-                    description: depProject.description,
-                    iconUrl: depCachedIcon || depProject.icon_url || null,
-                    loader: loader || '',
-                    version: depVersion?.version_number || '',
-                  };
-                  modMetaEntries[depFileName.toLowerCase()] = modMetaEntries[depKey];
-                }
-              } catch {}
+            const depDetectedId = depProject?.slug || dep.project_id || '';
+            if (depDetectedId) {
+              await cleanupOldModVersions(modsDir, depDetectedId, depFileName);
+            }
+
+            if (depProject) {
+              const depKey = depFileName.replace(/\.jar$/i, '').toLowerCase();
+              let depCachedIcon = null;
+              if (depProject.icon_url) {
+                depCachedIcon = await fetchAndCacheIconAsBase64(depProject.icon_url);
+              }
+              modMetaEntries[depKey] = {
+                displayName: depProject.title,
+                description: depProject.description,
+                iconUrl: depCachedIcon || depProject.icon_url || null,
+                loader: loader || '',
+                version: depVersion?.version_number || '',
+              };
+              modMetaEntries[depFileName.toLowerCase()] = modMetaEntries[depKey];
             }
           }
         }
@@ -2812,22 +2914,67 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
     }
   }
 
-  // Additional JVM arguments from profile
+  // Default optimized GC flags (Aikar's G1GC) for low latency, smooth FPS, and full Java 8/17/21 compatibility
+  const DEFAULT_GC_JVM_FLAGS = [
+    '-XX:+IgnoreUnrecognizedVMOptions',
+    '-XX:+UnlockExperimentalVMOptions',
+    '-XX:+UseG1GC',
+    '-XX:+ParallelRefProcEnabled',
+    '-XX:MaxGCPauseMillis=200',
+    '-XX:+DisableExplicitGC',
+    '-XX:+AlwaysPreTouch',
+    '-XX:G1NewSizePercent=30',
+    '-XX:G1MaxNewSizePercent=40',
+    '-XX:G1ReservePercent=20',
+    '-XX:G1HeapWastePercent=5',
+    '-XX:G1MixedGCCountTarget=4',
+    '-XX:InitiatingHeapOccupancyPercent=15',
+    '-XX:G1MixedGCLiveThresholdPercent=90',
+    '-XX:G1RSetUpdatingPauseTimePercent=5',
+    '-XX:SurvivorRatio=32',
+    '-XX:+PerfDisableSharedMem',
+    '-XX:MaxTenuringThreshold=1',
+  ];
+
+  // Additional JVM arguments from profile & options
+  const userArgs = [];
   if (profile?.jvmArguments) {
     const args = String(profile.jvmArguments)
       .trim()
       .split(/\s+/)
       .filter(arg => arg.length > 0);
-    jvmArgs.push(...args);
+    userArgs.push(...args);
   }
-  // Also check launch options (in case passed directly)
   if (opts?.jvmArguments) {
     const args = String(opts.jvmArguments)
       .trim()
       .split(/\s+/)
       .filter(arg => arg.length > 0);
-    jvmArgs.push(...args);
+    userArgs.push(...args);
   }
+
+  // Check if a GC was already specified by version JSON or user args
+  const allCurrentArgs = [...jvmArgs, ...userArgs];
+  const hasExplicitGC = allCurrentArgs.some(arg => /^-XX:\+(UseG1GC|UseZGC|UseParallelGC|UseSerialGC|UseConcMarkSweepGC|UseShenandoahGC)/i.test(arg));
+
+  if (!hasExplicitGC) {
+    for (const flag of DEFAULT_GC_JVM_FLAGS) {
+      if (!jvmArgs.includes(flag)) jvmArgs.push(flag);
+    }
+  }
+
+  // Push user-configured arguments (if user specifies -Xmx, override previous -Xmx)
+  const hasUserXmx = userArgs.some(arg => arg.startsWith('-Xmx'));
+  let finalJvmArgs = jvmArgs;
+  if (hasUserXmx) {
+    finalJvmArgs = jvmArgs.filter(arg => !arg.startsWith('-Xmx'));
+  }
+
+  for (const arg of userArgs) {
+    if (!finalJvmArgs.includes(arg)) finalJvmArgs.push(arg);
+  }
+  jvmArgs.length = 0;
+  jvmArgs.push(...finalJvmArgs);
 
   // macOS GLFW Requirement: GLFW must run on first thread on macOS
   if (process.platform === 'darwin' && !jvmArgs.includes('-XstartOnFirstThread')) {
@@ -3038,7 +3185,22 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
     // Don't return error, let it try anyway (might still work for some versions)
   }
 
-  const args = [...jvmArgs, '-cp', classpath, mainClass, ...gameArgs];
+  // For legacy Java (Java 8 / < 9), remove modular options like --add-opens and --add-exports
+  let sanitizedJvmArgs = [...jvmArgs];
+  if (detectedJavaMajor && detectedJavaMajor < 9) {
+    const cleaned = [];
+    for (let i = 0; i < sanitizedJvmArgs.length; i++) {
+      const current = sanitizedJvmArgs[i];
+      if (current === '--add-opens' || current === '--add-exports') {
+        i++; // skip the module mapping parameter following the flag
+        continue;
+      }
+      cleaned.push(current);
+    }
+    sanitizedJvmArgs = cleaned;
+  }
+
+  const args = [...sanitizedJvmArgs, '-cp', classpath, mainClass, ...gameArgs];
   let child;
   try {
     child = spawn(finalJavaCmd, args, { cwd: baseDir });

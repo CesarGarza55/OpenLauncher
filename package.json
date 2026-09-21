@@ -1,7 +1,7 @@
 {
   "name": "OpenLauncher",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "OpenLauncher is an open source Minecraft launcher developed by CesarGarza55",
   "author": "CesarGarza55",
   "type": "module",
@@ -139,7 +139,8 @@
       "category": "public.app-category.games",
       "icon": "script/icon.icns",
       "artifactName": "${productName}-mac-${arch}.${ext}",
-      "hardenedRuntime": true,
+      "identity": null,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false
     },
     "dmg": {
