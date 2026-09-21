@@ -17,6 +17,7 @@ import {
   logoutMicrosoft,
 } from '../src/lib/microsoftAuth.js';
 import {
+  searchModrinthProjects,
   searchModrinthMods,
   getModrinthProject,
   getModrinthProjectVersions,
@@ -1536,10 +1537,328 @@ async function cleanupOldModVersions(modsDir, modId, targetFileName) {
   } catch {}
 }
 
-async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl, fileName, gameVersion, loader }) {
+async function cleanupOldFileVersions(dir, projectId, targetFileName) {
+  if (!dir || !projectId || !targetFileName) return;
+  const cleanId = String(projectId).toLowerCase().trim();
+  const cleanTarget = String(targetFileName).toLowerCase().trim();
+  try {
+    const files = await fs.promises.readdir(dir);
+    for (const file of files) {
+      const lower = file.toLowerCase().trim();
+      if (lower === cleanTarget) continue;
+      if (
+        lower.startsWith(`${cleanId}-`) ||
+        lower.startsWith(`${cleanId}_`) ||
+        lower.startsWith(`${cleanId}+`) ||
+        lower === `${cleanId}.zip` ||
+        lower.replace(/\.zip$/i, '') === cleanId
+      ) {
+        try {
+          const fp = path.join(dir, file);
+          const stat = await fs.promises.stat(fp);
+          if (stat.isDirectory()) {
+            await fs.promises.rm(fp, { recursive: true, force: true });
+          } else {
+            await fs.promises.unlink(fp);
+          }
+          mainWindow?.webContents.send('minecraft:run-log', {
+            type: 'info',
+            msg: `[File Manager] Removed older version: ${file}`,
+          });
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
+async function readInstalledShaders() {
+  const installed = [];
+  const seen = new Set();
+  const metadataStore = await readModsMetadataStore();
+
+  for (const root of getMinecraftRoots()) {
+    const shadersDir = path.join(root, 'shaderpacks');
+    try {
+      const dirEntries = await fs.promises.readdir(shadersDir, { withFileTypes: true });
+      for (const entry of dirEntries) {
+        const fileName = entry.name;
+        if (fileName.startsWith('.') || fileName === 'desktop.ini' || fileName === 'Thumbs.db') continue;
+        const lowerName = fileName.toLowerCase();
+        const baseKey = lowerName.replace(/\.zip$/i, '');
+        if (seen.has(baseKey)) continue;
+        seen.add(baseKey);
+
+        const fullPath = path.join(shadersDir, fileName);
+        let stat = null;
+        try { stat = await fs.promises.stat(fullPath); } catch {}
+
+        const meta = metadataStore[baseKey] || metadataStore[lowerName] || null;
+
+        installed.push({
+          id: baseKey,
+          name: meta?.displayName || fileName.replace(/\.zip$/i, ''),
+          fileName,
+          version: meta?.version || '',
+          description: meta?.description || '',
+          authors: meta?.authors || '',
+          iconUrl: meta?.iconUrl || null,
+          size: stat?.size || 0,
+          isDirectory: entry.isDirectory(),
+          path: fullPath,
+        });
+      }
+    } catch {}
+  }
+  return installed;
+}
+
+async function readInstalledResourcePacks() {
+  const installed = [];
+  const seen = new Set();
+  const metadataStore = await readModsMetadataStore();
+
+  for (const root of getMinecraftRoots()) {
+    const packsDir = path.join(root, 'resourcepacks');
+    try {
+      const dirEntries = await fs.promises.readdir(packsDir, { withFileTypes: true });
+      for (const entry of dirEntries) {
+        const fileName = entry.name;
+        if (fileName.startsWith('.') || fileName === 'desktop.ini' || fileName === 'Thumbs.db') continue;
+        const lowerName = fileName.toLowerCase();
+        const baseKey = lowerName.replace(/\.zip$/i, '');
+        if (seen.has(baseKey)) continue;
+        seen.add(baseKey);
+
+        const fullPath = path.join(packsDir, fileName);
+        let stat = null;
+        try { stat = await fs.promises.stat(fullPath); } catch {}
+
+        let packMetaDesc = '';
+        let packIcon = null;
+
+        // Try extracting metadata & icon from zip if available
+        if (entry.isFile() && lowerName.endsWith('.zip')) {
+          try {
+            const zip = new AdmZip(fullPath);
+            const mcmetaEntry = zip.getEntry('pack.mcmeta');
+            if (mcmetaEntry) {
+              const text = mcmetaEntry.getData().toString('utf8');
+              const json = JSON.parse(text);
+              const desc = json?.pack?.description;
+              if (typeof desc === 'string') {
+                packMetaDesc = desc;
+              } else if (desc && typeof desc === 'object') {
+                packMetaDesc = desc.text || JSON.stringify(desc);
+              }
+            }
+            const iconEntry = zip.getEntry('pack.png');
+            if (iconEntry) {
+              packIcon = `data:image/png;base64,${iconEntry.getData().toString('base64')}`;
+            }
+          } catch {}
+        } else if (entry.isDirectory()) {
+          try {
+            const mcmetaPath = path.join(fullPath, 'pack.mcmeta');
+            if (fs.existsSync(mcmetaPath)) {
+              const text = await fs.promises.readFile(mcmetaPath, 'utf8');
+              const json = JSON.parse(text);
+              const desc = json?.pack?.description;
+              if (typeof desc === 'string') packMetaDesc = desc;
+              else if (desc && typeof desc === 'object') packMetaDesc = desc.text || JSON.stringify(desc);
+            }
+            const iconPath = path.join(fullPath, 'pack.png');
+            if (fs.existsSync(iconPath)) {
+              const buf = await fs.promises.readFile(iconPath);
+              packIcon = `data:image/png;base64,${buf.toString('base64')}`;
+            }
+          } catch {}
+        }
+
+        const meta = metadataStore[baseKey] || metadataStore[lowerName] || null;
+
+        installed.push({
+          id: baseKey,
+          name: meta?.displayName || fileName.replace(/\.zip$/i, ''),
+          fileName,
+          version: meta?.version || '',
+          description: meta?.description || packMetaDesc || '',
+          authors: meta?.authors || '',
+          iconUrl: meta?.iconUrl || packIcon || null,
+          size: stat?.size || 0,
+          isDirectory: entry.isDirectory(),
+          path: fullPath,
+        });
+      }
+    } catch {}
+  }
+  return installed;
+}
+
+async function deleteShader(fileName) {
   const root = getMinecraftRoot();
-  const modsDir = path.join(root, 'mods');
-  await fs.promises.mkdir(modsDir, { recursive: true });
+  const shadersDir = path.join(root, 'shaderpacks');
+  const targetPath = path.join(shadersDir, fileName);
+  if (!fs.existsSync(targetPath)) {
+    return { error: 'NotFound', message: `Shader pack not found: ${fileName}` };
+  }
+  const choice = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
+    title: 'Delete shader?', message: `Delete ${fileName}?`,
+    detail: 'This will remove the shader pack from your Minecraft shaderpacks folder.',
+  });
+  if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
+  try {
+    const stat = await fs.promises.stat(targetPath);
+    if (stat.isDirectory()) {
+      await fs.promises.rm(targetPath, { recursive: true, force: true });
+    } else {
+      await fs.promises.unlink(targetPath);
+    }
+    return { ok: true, removed: targetPath };
+  } catch (err) {
+    return { error: 'DeleteFailed', message: err?.message || String(err) };
+  }
+}
+
+async function deleteResourcePack(fileName) {
+  const root = getMinecraftRoot();
+  const packsDir = path.join(root, 'resourcepacks');
+  const targetPath = path.join(packsDir, fileName);
+  if (!fs.existsSync(targetPath)) {
+    return { error: 'NotFound', message: `Texture pack not found: ${fileName}` };
+  }
+  const choice = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
+    title: 'Delete texture pack?', message: `Delete ${fileName}?`,
+    detail: 'This will remove the texture pack from your Minecraft resourcepacks folder.',
+  });
+  if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
+  try {
+    const stat = await fs.promises.stat(targetPath);
+    if (stat.isDirectory()) {
+      await fs.promises.rm(targetPath, { recursive: true, force: true });
+    } else {
+      await fs.promises.unlink(targetPath);
+    }
+    return { ok: true, removed: targetPath };
+  } catch (err) {
+    return { error: 'DeleteFailed', message: err?.message || String(err) };
+  }
+}
+
+async function openContentFolder(folderType = 'mods') {
+  const root = getMinecraftRoot();
+  let subDir = 'mods';
+  if (folderType === 'shaders' || folderType === 'shaderpacks') {
+    subDir = 'shaderpacks';
+  } else if (folderType === 'texturepacks' || folderType === 'resourcepacks' || folderType === 'textures') {
+    subDir = 'resourcepacks';
+  }
+  const targetPath = path.join(root, subDir);
+  try {
+    await fs.promises.mkdir(targetPath, { recursive: true });
+    const result = await shell.openPath(targetPath);
+    if (result) {
+      return { error: 'OpenPathFailed', message: result, path: targetPath };
+    }
+    return { ok: true, path: targetPath };
+  } catch (error) {
+    return { error: 'OpenPathFailed', message: error?.message || String(error), path: targetPath };
+  }
+}
+
+async function importContentFile(payload) {
+  const { type = 'mod', sourcePath, fileName, fileBytes } = (typeof payload === 'object' ? payload : { sourcePath: payload });
+  const root = getMinecraftRoot();
+  let targetSubDir = 'mods';
+  if (type === 'shader' || type === 'shaders' || type === 'shaderpacks') targetSubDir = 'shaderpacks';
+  else if (type === 'resourcepack' || type === 'texturepack' || type === 'textures' || type === 'resourcepacks') targetSubDir = 'resourcepacks';
+
+  if (targetSubDir === 'mods') {
+    return importModFile(payload);
+  }
+
+  const destDir = path.join(root, targetSubDir);
+  await fs.promises.mkdir(destDir, { recursive: true });
+
+  const resolvedSourcePath = String(sourcePath || '').trim();
+  const sourceFileName = fileName || (resolvedSourcePath ? path.basename(resolvedSourcePath) : '');
+  if (!resolvedSourcePath && !sourceFileName) return { error: 'BadInput', message: 'Missing file name.' };
+
+  const destPath = path.join(destDir, sourceFileName);
+  if (fs.existsSync(destPath)) {
+    const choice = await dialog.showMessageBox(mainWindow || undefined, {
+      type: 'question', buttons: ['Cancel', 'Replace'], defaultId: 1, cancelId: 0, noLink: true,
+      title: 'Replace file?', message: `A file with the same name already exists: ${sourceFileName}`,
+      detail: `Do you want to replace the existing file in the Minecraft ${targetSubDir} folder?`,
+    });
+    if (choice.response !== 1) return { canceled: true, reason: 'replace-cancelled', path: destPath };
+    await fs.promises.unlink(destPath).catch(() => {});
+  }
+
+  if (resolvedSourcePath) {
+    const stats = await fs.promises.stat(resolvedSourcePath).catch(() => null);
+    if (!stats) return { error: 'NotFound', message: `File not found: ${resolvedSourcePath}` };
+    if (stats.isDirectory()) {
+      await fs.promises.cp(resolvedSourcePath, destPath, { recursive: true });
+    } else {
+      if (path.resolve(resolvedSourcePath) !== path.resolve(destPath)) {
+        await fs.promises.copyFile(resolvedSourcePath, destPath);
+      }
+    }
+  } else {
+    const buffer = Buffer.isBuffer(fileBytes) ? fileBytes : fileBytes instanceof Uint8Array ? Buffer.from(fileBytes) : Array.isArray(fileBytes) ? Buffer.from(fileBytes) : null;
+    if (!buffer || buffer.length === 0) return { error: 'BadInput', message: 'Missing file contents.' };
+    await fs.promises.writeFile(destPath, buffer);
+  }
+
+  return { ok: true, path: destPath, fileName: sourceFileName };
+}
+
+async function pickContentFiles(type = 'mod') {
+  let title = 'Select files';
+  let filters = [{ name: 'All Files', extensions: ['*'] }];
+  if (type === 'shader' || type === 'shaders' || type === 'shaderpacks') {
+    title = 'Select Shader Packs';
+    filters = [{ name: 'Shader Packs (.zip)', extensions: ['zip'] }, { name: 'All Files', extensions: ['*'] }];
+  } else if (type === 'resourcepack' || type === 'texturepack' || type === 'textures' || type === 'resourcepacks') {
+    title = 'Select Texture Packs';
+    filters = [{ name: 'Texture Packs (.zip)', extensions: ['zip'] }, { name: 'All Files', extensions: ['*'] }];
+  } else {
+    title = 'Select Mod Files';
+    filters = [{ name: 'Minecraft Mods (.jar, .olpkg)', extensions: ['jar', 'olpkg'] }, { name: 'All Files', extensions: ['*'] }];
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow || undefined, {
+    title,
+    properties: ['openFile', 'multiSelections'],
+    filters,
+  });
+  if (result.canceled) return { canceled: true, filePaths: [] };
+  return { canceled: false, filePaths: result.filePaths || [] };
+}
+
+async function installModrinthProject({
+  projectId,
+  versionId,
+  versionNumber,
+  fileUrl,
+  fileName,
+  gameVersion,
+  loader,
+  projectType = 'mod',
+}) {
+  const root = getMinecraftRoot();
+  const normalizedType = projectType === 'shader' ? 'shader' : projectType === 'resourcepack' ? 'resourcepack' : 'mod';
+
+  let targetDir = path.join(root, 'mods');
+  if (normalizedType === 'shader') {
+    targetDir = path.join(root, 'shaderpacks');
+  } else if (normalizedType === 'resourcepack') {
+    targetDir = path.join(root, 'resourcepacks');
+  }
+
+  await fs.promises.mkdir(targetDir, { recursive: true });
 
   let targetVersion = null;
   if (versionId) {
@@ -1549,7 +1868,7 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
   if (!targetVersion && projectId) {
     const versions = await getModrinthProjectVersions({
       idOrSlug: projectId,
-      loaders: loader && loader !== 'all' ? [loader.toLowerCase()] : [],
+      loaders: normalizedType === 'mod' && loader && loader !== 'all' ? [loader.toLowerCase()] : [],
       gameVersions: gameVersion && gameVersion !== 'all' ? [gameVersion] : [],
     }).catch(() => []);
 
@@ -1578,56 +1897,67 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
   }
 
   if (!downloadUrl) {
-    throw new Error('Could not resolve download URL for this mod version.');
+    throw new Error(`Could not resolve download URL for this ${normalizedType} version.`);
   }
 
-  targetFileName = normalizeModFileName(targetFileName) || `${projectId || 'mod'}.jar`;
-  const destPath = path.join(modsDir, targetFileName);
+  if (normalizedType === 'mod') {
+    targetFileName = normalizeModFileName(targetFileName) || `${projectId || 'mod'}.jar`;
+  } else {
+    targetFileName = String(targetFileName || `${projectId || normalizedType}.zip`).trim();
+  }
 
+  const destPath = path.join(targetDir, targetFileName);
+
+  const typeLabel = normalizedType === 'shader' ? 'Shader' : normalizedType === 'resourcepack' ? 'Resource Pack' : 'Mod';
   try {
     mainWindow?.webContents.send('minecraft:run-log', {
       type: 'info',
-      msg: `[Modrinth] Downloading ${targetFileName}...`,
+      msg: `[Modrinth] Downloading ${typeLabel}: ${targetFileName}...`,
     });
   } catch {}
 
   await downloadFileToPath(downloadUrl, destPath);
 
-  // Clean up older / duplicate versions of this mod in the mods folder
-  const detectedModId = String(projectId || '').toLowerCase().trim() ||
-    (() => { try { return extractJarMetadata(destPath)?.id?.toLowerCase()?.trim() || ''; } catch { return ''; } })();
+  // Clean up older / duplicate versions of this project
+  const detectedId = String(projectId || '').toLowerCase().trim() ||
+    (normalizedType === 'mod' ? (() => { try { return extractJarMetadata(destPath)?.id?.toLowerCase()?.trim() || ''; } catch { return ''; } })() : '');
 
-  if (detectedModId) {
-    await cleanupOldModVersions(modsDir, detectedModId, targetFileName);
+  if (detectedId) {
+    if (normalizedType === 'mod') {
+      await cleanupOldModVersions(targetDir, detectedId, targetFileName);
+    } else {
+      await cleanupOldFileVersions(targetDir, detectedId, targetFileName);
+    }
   }
 
-  // Collect and persist mod metadata
-  const modMetaEntries = {};
+  // Collect and persist project metadata
+  const metaEntries = {};
   if (projectId) {
     try {
       const project = await getModrinthProject(projectId).catch(() => null);
       if (project) {
-        const fileKey = targetFileName.replace(/\.jar$/i, '').toLowerCase();
+        const fileKey = targetFileName.replace(/\.(jar|zip|olpkg)$/i, '').toLowerCase();
         let cachedIcon = null;
         if (project.icon_url) {
           cachedIcon = await fetchAndCacheIconAsBase64(project.icon_url);
         }
-        modMetaEntries[fileKey] = {
+        metaEntries[fileKey] = {
           displayName: project.title,
           description: project.description,
           iconUrl: cachedIcon || project.icon_url || null,
           authors: project.team_members || project.client_side || '',
           loader: loader || (project.loaders ? project.loaders.join(', ') : ''),
           version: targetVersion?.version_number || '',
+          projectType: normalizedType,
         };
-        modMetaEntries[targetFileName.toLowerCase()] = modMetaEntries[fileKey];
+        metaEntries[targetFileName.toLowerCase()] = metaEntries[fileKey];
       }
     } catch {}
   }
 
-  // Handle required dependencies automatically
+  // Handle required dependencies automatically (only for mods)
   const installedDeps = [];
-  if (targetVersion?.dependencies && Array.isArray(targetVersion.dependencies)) {
+  if (normalizedType === 'mod' && targetVersion?.dependencies && Array.isArray(targetVersion.dependencies)) {
     const requiredDeps = targetVersion.dependencies.filter(
       d => d.dependency_type === 'required' && (d.project_id || d.version_id)
     );
@@ -1648,10 +1978,10 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
 
         let isDepAlreadyInstalled = false;
         try {
-          const currentFiles = await fs.promises.readdir(modsDir);
+          const currentFiles = await fs.promises.readdir(targetDir);
           for (const file of currentFiles) {
             if (!file.toLowerCase().endsWith('.jar') && !file.toLowerCase().endsWith('.olpkg')) continue;
-            const checkPath = path.join(modsDir, file);
+            const checkPath = path.join(targetDir, file);
             try {
               const meta = extractJarMetadata(checkPath);
               if (meta?.id && candidateIds.has(String(meta.id).toLowerCase().trim())) {
@@ -1680,7 +2010,7 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
         if (depVersion?.files?.[0]?.url) {
           const depFile = depVersion.files.find(f => f.primary) || depVersion.files[0];
           const depFileName = normalizeModFileName(depFile.filename) || 'dependency.jar';
-          const depPath = path.join(modsDir, depFileName);
+          const depPath = path.join(targetDir, depFileName);
           if (!fs.existsSync(depPath)) {
             try {
               mainWindow?.webContents.send('minecraft:run-log', {
@@ -1693,7 +2023,7 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
 
             const depDetectedId = depProject?.slug || dep.project_id || '';
             if (depDetectedId) {
-              await cleanupOldModVersions(modsDir, depDetectedId, depFileName);
+              await cleanupOldModVersions(targetDir, depDetectedId, depFileName);
             }
 
             if (depProject) {
@@ -1702,14 +2032,15 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
               if (depProject.icon_url) {
                 depCachedIcon = await fetchAndCacheIconAsBase64(depProject.icon_url);
               }
-              modMetaEntries[depKey] = {
+              metaEntries[depKey] = {
                 displayName: depProject.title,
                 description: depProject.description,
                 iconUrl: depCachedIcon || depProject.icon_url || null,
                 loader: loader || '',
                 version: depVersion?.version_number || '',
+                projectType: 'mod',
               };
-              modMetaEntries[depFileName.toLowerCase()] = modMetaEntries[depKey];
+              metaEntries[depFileName.toLowerCase()] = metaEntries[depKey];
             }
           }
         }
@@ -1719,26 +2050,38 @@ async function installModrinthMod({ projectId, versionId, versionNumber, fileUrl
     }
   }
 
-  if (Object.keys(modMetaEntries).length > 0) {
-    await saveModMetadataStore(modMetaEntries);
+  if (Object.keys(metaEntries).length > 0) {
+    await saveModMetadataStore(metaEntries);
   }
 
   try {
     mainWindow?.webContents.send('minecraft:run-log', {
       type: 'success',
-      msg: `[Modrinth] Installed ${targetFileName}${installedDeps.length > 0 ? ` (+ ${installedDeps.length} dependencies)` : ''} successfully.`,
+      msg: `[Modrinth] Installed ${typeLabel} ${targetFileName}${installedDeps.length > 0 ? ` (+ ${installedDeps.length} dependencies)` : ''} successfully.`,
     });
   } catch {}
 
-  const updatedMods = await readInstalledMods();
+  let updatedContent = null;
+  if (normalizedType === 'shader') {
+    updatedContent = await readInstalledShaders();
+  } else if (normalizedType === 'resourcepack') {
+    updatedContent = await readInstalledResourcePacks();
+  } else {
+    updatedContent = await readInstalledMods();
+  }
+
   return {
     ok: true,
     fileName: targetFileName,
     path: destPath,
+    projectType: normalizedType,
     installedDependencies: installedDeps,
-    mods: updatedMods,
+    items: updatedContent,
+    mods: updatedContent,
   };
 }
+
+const installModrinthMod = installModrinthProject;
 
 async function getFileSha512(filePath) {
   const fileBuffer = await fs.promises.readFile(filePath);
@@ -2009,10 +2352,13 @@ ipcMain.handle('minecraft:get-catalog', async (_, options) => {
   const currentState = await loadLauncherState(app.getPath('userData'));
   const includeSnapshots = options?.includeSnapshots !== undefined
     ? Boolean(options.includeSnapshots)
-    : currentState.settings?.showSnapshots === true;
+    : (options?.showSnapshots !== undefined
+      ? Boolean(options.showSnapshots)
+      : currentState.settings?.showSnapshots === true);
   const catalog = await loadLauncherCatalog({ includeSnapshots });
   try {
-    await saveLauncherState(app.getPath('userData'), { ...currentState, versions: catalog.versions, installTargets: catalog.installTargets, latest: catalog.latest });
+    const nextSettings = { ...(currentState.settings || {}), showSnapshots: includeSnapshots };
+    await saveLauncherState(app.getPath('userData'), { ...currentState, settings: nextSettings, versions: catalog.versions, installTargets: catalog.installTargets, latest: catalog.latest });
   } catch { }
   return catalog;
 });
@@ -2020,6 +2366,8 @@ ipcMain.handle('minecraft:get-state', async () => { const state = await loadLaun
 ipcMain.handle('minecraft:get-root', async () => { return { root: getMinecraftRoot() }; });
 ipcMain.handle('minecraft:get-installed-versions', async () => { return readInstalledVersions(); });
 ipcMain.handle('minecraft:get-installed-mods', async () => { return readInstalledMods(); });
+ipcMain.handle('minecraft:get-installed-shaders', async () => { return readInstalledShaders(); });
+ipcMain.handle('minecraft:get-installed-resourcepacks', async () => { return readInstalledResourcePacks(); });
 ipcMain.handle('minecraft:get-news', async (_, options = {}) => {
   try {
     const limit = Number(options?.limit) > 0 ? Number(options.limit) : 24;
@@ -2031,11 +2379,15 @@ ipcMain.handle('minecraft:get-news', async (_, options = {}) => {
 ipcMain.handle('minecraft:toggle-mod', async (_, { modId, enable }) => { return toggleMod(modId, enable); });
 ipcMain.handle('minecraft:set-all-mods-enabled', async (_, { enable }) => { return setAllModsEnabled(Boolean(enable)); });
 ipcMain.handle('minecraft:delete-mod', async (_, { modId }) => { return deleteMod(modId); });
+ipcMain.handle('minecraft:delete-shader', async (_, { fileName }) => { return deleteShader(fileName); });
+ipcMain.handle('minecraft:delete-resourcepack', async (_, { fileName }) => { return deleteResourcePack(fileName); });
+ipcMain.handle('minecraft:open-content-folder', async (_, folderType) => { return openContentFolder(folderType); });
 ipcMain.handle('minecraft:install-mod-file', async (_, { sourcePath }) => { return importModFile(sourcePath); });
-ipcMain.handle('minecraft:modrinth-search', async (_, params) => { return searchModrinthMods(params); });
+ipcMain.handle('minecraft:import-content-file', async (_, payload) => { return importContentFile(payload); });
+ipcMain.handle('minecraft:modrinth-search', async (_, params) => { return searchModrinthProjects(params); });
 ipcMain.handle('minecraft:modrinth-get-project', async (_, idOrSlug) => { return getModrinthProject(idOrSlug); });
 ipcMain.handle('minecraft:modrinth-get-versions', async (_, params) => { return getModrinthProjectVersions(params); });
-ipcMain.handle('minecraft:modrinth-install', async (_, payload) => { return installModrinthMod(payload); });
+ipcMain.handle('minecraft:modrinth-install', async (_, payload) => { return installModrinthProject(payload); });
 ipcMain.handle('minecraft:check-mod-updates', async (_, params) => { return checkInstalledModsUpdates(params); });
 ipcMain.handle('minecraft:pick-mod-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow || undefined, {
@@ -2045,6 +2397,7 @@ ipcMain.handle('minecraft:pick-mod-files', async () => {
   if (result.canceled) return { canceled: true, filePaths: [] };
   return { canceled: false, filePaths: result.filePaths || [] };
 });
+ipcMain.handle('minecraft:pick-content-files', async (_, type) => { return pickContentFiles(type); });
 
 ipcMain.handle('minecraft:save-state', async (_, state) => {
   if (state.settings && typeof state.settings === 'object') {

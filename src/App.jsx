@@ -12,6 +12,7 @@ import {
 } from './lib/minecraftLauncher';
 import { loadMinecraftNews } from './lib/minecraftNews';
 import {
+  searchModrinthProjects,
   searchModrinthMods,
   getModrinthProject,
   getModrinthProjectVersions,
@@ -201,6 +202,9 @@ const ICONS = {
   chevronDown: 'M19 9l-7 7-7-7',
   chevronUp: 'M5 15l7-7 7 7',
   info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  sun: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+  layers: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  compass: 'M12 2a10 10 0 100 20 10 10 0 000-20zm3.59 6.41l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z',
 };
 
 // ── Sub-components ───────────────────────────────────────────────────────────
@@ -687,7 +691,10 @@ function ModDetailModal({
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [versions, setVersions] = useState([]);
   const [loadingVersions, setLoadingVersions] = useState(true);
-  const [loaderFilter, setLoaderFilter] = useState(currentLoader || 'all');
+  const projectType = project?.project_type || projectDetails?.project_type || 'mod';
+  const isMod = projectType === 'mod';
+  const initialLoader = (isMod && currentLoader && currentLoader !== 'vanilla') ? currentLoader : 'all';
+  const [loaderFilter, setLoaderFilter] = useState(initialLoader);
   const [mcVersionFilter, setMcVersionFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [expandedChangelog, setExpandedChangelog] = useState({});
@@ -741,6 +748,10 @@ function ModDetailModal({
         }
         if (isMounted && Array.isArray(vers)) {
           setVersions(vers);
+          const allLoaders = Array.from(new Set(vers.flatMap(v => v.loaders || []).map(l => l.toLowerCase())));
+          if (loaderFilter !== 'all' && !allLoaders.includes(loaderFilter.toLowerCase())) {
+            setLoaderFilter('all');
+          }
         }
       } catch (e) {
         console.warn('Failed to load project versions:', e);
@@ -984,19 +995,21 @@ function ModDetailModal({
             <div className="mod-versions-content">
               {/* Version Filters */}
               <div className="mod-versions-filters">
-                <div className="modrinth-filter-select-wrapper">
-                  <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
-                  <select
-                    className="select-input modrinth-filter-select"
-                    value={loaderFilter}
-                    onChange={e => setLoaderFilter(e.target.value)}
-                  >
-                    <option value="all">{t('mods.allLoaders')}</option>
-                    {availableLoaders.map(l => (
-                      <option key={l} value={l}>{l.toUpperCase()}</option>
-                    ))}
-                  </select>
-                </div>
+                {(!['resourcepack'].includes(projectType) && availableLoaders.filter(l => l.toLowerCase() !== 'minecraft').length > 0) && (
+                  <div className="modrinth-filter-select-wrapper">
+                    <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
+                    <select
+                      className="select-input modrinth-filter-select"
+                      value={loaderFilter}
+                      onChange={e => setLoaderFilter(e.target.value)}
+                    >
+                      <option value="all">{t('mods.allLoaders')}</option>
+                      {availableLoaders.map(l => (
+                        <option key={l} value={l}>{l.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="modrinth-filter-select-wrapper">
                   <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
@@ -1475,46 +1488,59 @@ function ProfileModal({ mode = 'new', profile, versions, systemTotalRam: initial
   );
 }
 
-function InstallModal({ type, installTargets, showSnapshots = false, onClose, onInstall, onCatalogLoaded }) {
+function InstallModal({ initialType = 'minecraft', installTargets, showSnapshots = false, onToggleSnapshots, onClose, onInstall, onCatalogLoaded }) {
   const { t } = useI18n();
+  const [selectedType, setSelectedType] = useState(initialType);
   const [loading, setLoading] = useState(false);
-  const info = getInstallInfo(type, installTargets);
-  const usesGameAndLoader = type === 'fabric' || type === 'forge';
+  const info = getInstallInfo(selectedType, installTargets);
+  const usesGameAndLoader = selectedType === 'fabric' || selectedType === 'forge';
   const hasVersions = usesGameAndLoader ? (info.gameVersions?.length > 0) : (info.versions?.length > 0);
+
+  const fetchCatalogForSnapshots = useCallback(async (snapshotsEnabled) => {
+    setLoading(true);
+    try {
+      const fetchFn = launcher.minecraftGetCatalog
+        ? () => launcher.minecraftGetCatalog({ includeSnapshots: snapshotsEnabled, showSnapshots: snapshotsEnabled })
+        : () => loadLauncherCatalog({ includeSnapshots: snapshotsEnabled });
+
+      const catalog = await fetchFn();
+      if (catalog && onCatalogLoaded) {
+        onCatalogLoaded(catalog);
+      }
+    } catch (err) {
+      console.error('Failed to load catalog:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [onCatalogLoaded]);
 
   useEffect(() => {
     if (!hasVersions && !loading) {
-      setLoading(true);
-      const fetchCatalog = launcher.minecraftGetCatalog
-        ? () => launcher.minecraftGetCatalog({ includeSnapshots: showSnapshots })
-        : () => loadLauncherCatalog({ includeSnapshots: showSnapshots });
-
-      fetchCatalog()
-        .then(catalog => {
-          if (catalog && onCatalogLoaded) {
-            onCatalogLoaded(catalog);
-          }
-        })
-        .catch(err => console.error('Failed to load catalog:', err))
-        .finally(() => setLoading(false));
+      fetchCatalogForSnapshots(showSnapshots);
     }
-  }, [hasVersions, loading, showSnapshots, onCatalogLoaded]);
+  }, [hasVersions, loading, showSnapshots, fetchCatalogForSnapshots]);
 
   const [gameVersion, setGameVersion] = useState(usesGameAndLoader ? (info.gameVersions?.[0] || '') : (info.versions?.[0] || ''));
   const [loaderVersion, setLoaderVersion] = useState(usesGameAndLoader ? ((info.loadersByGameVersion?.[info.gameVersions?.[0] || ''] || [])[0] || '') : '');
 
   useEffect(() => {
     if (usesGameAndLoader) {
-      const nextGameVersion = info.gameVersions?.[0] || '';
-      const nextLoaderVersion = (info.loadersByGameVersion?.[nextGameVersion] || [])[0] || '';
-      setGameVersion(nextGameVersion);
-      setLoaderVersion(nextLoaderVersion);
+      const available = info.gameVersions || [];
+      if (!available.includes(gameVersion)) {
+        const nextGameVersion = available[0] || '';
+        const nextLoaderVersion = (info.loadersByGameVersion?.[nextGameVersion] || [])[0] || '';
+        setGameVersion(nextGameVersion);
+        setLoaderVersion(nextLoaderVersion);
+      }
       return;
     }
 
-    setGameVersion(info.versions?.[0] || '');
-    setLoaderVersion('');
-  }, [info.gameVersions, info.loadersByGameVersion, info.versions, usesGameAndLoader]);
+    const available = info.versions || [];
+    if (!available.includes(gameVersion)) {
+      setGameVersion(available[0] || '');
+      setLoaderVersion('');
+    }
+  }, [selectedType, info.gameVersions, info.loadersByGameVersion, info.versions, usesGameAndLoader, gameVersion]);
 
   useEffect(() => {
     if (!usesGameAndLoader) return;
@@ -1525,17 +1551,39 @@ function InstallModal({ type, installTargets, showSnapshots = false, onClose, on
     }
   }, [gameVersion, info.loadersByGameVersion, usesGameAndLoader, loaderVersion]);
 
+  const handleToggle = async () => {
+    const nextVal = !showSnapshots;
+    onToggleSnapshots?.(nextVal);
+    await fetchCatalogForSnapshots(nextVal);
+  };
+
   const loaderOptions = usesGameAndLoader ? (info.loadersByGameVersion?.[gameVersion] || []) : [];
   const canInstall = usesGameAndLoader ? Boolean(gameVersion && loaderVersion) : Boolean(gameVersion);
 
+  const loaderTabs = [
+    { id: 'minecraft', label: 'Vanilla', icon: ICONS.cube },
+    { id: 'fabric', label: 'Fabric', icon: ICONS.layers },
+    { id: 'forge', label: 'Forge', icon: ICONS.wrench },
+  ];
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-title">{info.title}</div>
-        <div className="modal-subtitle">
-          {usesGameAndLoader
-            ? (type === 'forge' ? t('install.selectGameAndForgeRelease') : t('install.selectLoaderAndVersion'))
-            : t('install.selectVersion')}
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-title">{t('install.title')}</div>
+        <div className="modal-subtitle">{t('install.subtitle')}</div>
+
+        <div className="install-type-selector">
+          {loaderTabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`install-type-btn ${selectedType === tab.id ? 'active' : ''}`}
+              onClick={() => setSelectedType(tab.id)}
+            >
+              <Icon d={tab.icon} size={14} />
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         {usesGameAndLoader ? (
@@ -1544,28 +1592,28 @@ function InstallModal({ type, installTargets, showSnapshots = false, onClose, on
               <label className="modal-label">{t('install.gameVersion')}</label>
               {info.gameVersions?.length > 0 ? (
                 <select className="modal-select" value={gameVersion} onChange={e => setGameVersion(e.target.value)}>
-                  {info.gameVersions.map(version => (
-                    <option key={version} value={version}>{version}</option>
+                  {info.gameVersions.map(v => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               ) : (
                 <div className="modal-input" style={{ display: 'flex', alignItems: 'center', minHeight: 34, color: 'var(--text-muted)' }}>
-                  {loading ? 'Cargando versiones...' : t('install.noVersionsAvailable')}
+                  {loading ? t('install.loadingVersions') : t('install.noVersionsAvailable')}
                 </div>
               )}
             </div>
 
             <div className="modal-field">
-              <label className="modal-label">{type === 'forge' ? t('install.forgeRelease') : t('install.loader')}</label>
+              <label className="modal-label">{selectedType === 'forge' ? t('install.forgeRelease') : t('install.loader')}</label>
               {loaderOptions.length > 0 ? (
                 <select className="modal-select" value={loaderVersion} onChange={e => setLoaderVersion(e.target.value)}>
-                  {loaderOptions.map(version => (
-                    <option key={version} value={version}>{version}</option>
+                  {loaderOptions.map(v => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               ) : (
                 <div className="modal-input" style={{ display: 'flex', alignItems: 'center', minHeight: 34, color: 'var(--text-muted)' }}>
-                  {loading ? 'Cargando loaders...' : t('install.noLoadersAvailable')}
+                  {loading ? t('install.loadingLoaders') : t('install.noLoadersAvailable')}
                 </div>
               )}
             </div>
@@ -1575,33 +1623,45 @@ function InstallModal({ type, installTargets, showSnapshots = false, onClose, on
             <label className="modal-label">{t('install.version')}</label>
             {info.versions?.length > 0 ? (
               <select className="modal-select" value={gameVersion} onChange={e => setGameVersion(e.target.value)}>
-                {info.versions.map(version => (
-                  <option key={version} value={version}>{version}</option>
+                {info.versions.map(v => (
+                  <option key={v} value={v}>{v}</option>
                 ))}
               </select>
             ) : (
               <div className="modal-input" style={{ display: 'flex', alignItems: 'center', minHeight: 34, color: 'var(--text-muted)' }}>
-                {loading ? 'Cargando versiones...' : t('install.noVersionsAvailable')}
+                {loading ? t('install.loadingVersions') : t('install.noVersionsAvailable')}
               </div>
             )}
           </div>
         )}
 
-        <div className="modal-actions">
-          <button className="btn-ghost" onClick={onClose}>{t('profile.cancel')}</button>
+        {selectedType !== 'forge' && (
+          <div className="install-snapshot-row">
+            <div className="install-snapshot-copy">
+              <span className="install-snapshot-title">{t('settings.showSnapshots')}</span>
+              <span className="install-snapshot-desc">{t('settings.showSnapshotsDesc')}</span>
+            </div>
+            <Toggle on={showSnapshots} onToggle={handleToggle} />
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ marginTop: 16 }}>
+          <button className="btn-ghost" type="button" onClick={onClose}>{t('profile.cancel')}</button>
           <button
             className="btn-primary"
-            disabled={!canInstall}
+            type="button"
+            disabled={!canInstall || loading}
             onClick={() => {
               if (usesGameAndLoader) {
-                onInstall(type, { gameVersion, loaderVersion });
+                onInstall(selectedType, { gameVersion, loaderVersion });
               } else {
-                onInstall(type, { version: gameVersion });
+                onInstall(selectedType, { version: gameVersion });
               }
               onClose();
             }}
           >
-            {t('install.install')}
+            <Icon d={ICONS.download} size={13} />
+            <span>{t('install.install')}</span>
           </button>
         </div>
       </div>
@@ -1800,17 +1860,39 @@ export default function App() {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [stateHydrated, setStateHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState('news');
+  const [exploreType, setExploreType] = useState('mods'); // 'mods' | 'shaders' | 'resourcepacks'
   const [modSearch, setModSearch] = useState('');
+  const [shaderSearch, setShaderSearch] = useState('');
+  const [resourcePackSearch, setResourcePackSearch] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
   const [logFilter, setLogFilter] = useState('all');
   const [versionCatalog, setVersionCatalog] = useState([]);
   const [installedVersions, setInstalledVersions] = useState([]);
   const [installTargets, setInstallTargets] = useState(INSTALL_TARGETS);
   const [mods, setMods] = useState([]);
-  const [modsSubTab, setModsSubTab] = useState('installed'); // 'installed' | 'browse'
-  const [modrinthQuery, setModrinthQuery] = useState('');
+  const [shaders, setShaders] = useState([]);
+  const [resourcePacks, setResourcePacks] = useState([]);
+  const [modrinthQueries, setModrinthQueries] = useState({ mods: '', shaders: '', resourcepacks: '' });
+  const [modrinthCategories, setModrinthCategories] = useState({ mods: 'all', shaders: 'all', resourcepacks: 'all' });
+
+  const modrinthQuery = modrinthQueries[exploreType] || '';
+  const modrinthCategory = modrinthCategories[exploreType] || 'all';
+
+  const setModrinthQuery = (val) => {
+    setModrinthQueries(prev => ({
+      ...prev,
+      [exploreType]: typeof val === 'function' ? val(prev[exploreType] || '') : val,
+    }));
+  };
+
+  const setModrinthCategory = (val) => {
+    setModrinthCategories(prev => ({
+      ...prev,
+      [exploreType]: typeof val === 'function' ? val(prev[exploreType] || 'all') : val,
+    }));
+  };
+
   const [modrinthSort, setModrinthSort] = useState('relevance');
-  const [modrinthCategory, setModrinthCategory] = useState('all');
   const [modrinthLoaderFilter, setModrinthLoaderFilter] = useState('auto');
   const [modrinthVersionFilter, setModrinthVersionFilter] = useState('auto');
   const [modrinthResults, setModrinthResults] = useState([]);
@@ -1841,6 +1923,7 @@ export default function App() {
   const [account, setAccount] = useState({ name: '', loggedIn: false, profileKey: 'default', kind: 'none', session: null });
   const [authRefreshing, setAuthRefreshing] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showBetaInfo, setShowBetaInfo] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [systemTotalRam, setSystemTotalRam] = useState(
     typeof launcher?.systemTotalRamGb === 'number' && launcher.systemTotalRamGb > 0
@@ -1853,9 +1936,28 @@ export default function App() {
   });
   const consoleRef = useRef(null);
   const modrinthSentinelRef = useRef(null);
+  const betaInfoRef = useRef(null);
   const gameTimerRef = useRef(null);
   const toastTimersRef = useRef(new Map());
   const loginAbortControllerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showBetaInfo) return;
+    const handleClickOutside = (e) => {
+      if (betaInfoRef.current && !betaInfoRef.current.contains(e.target)) {
+        setShowBetaInfo(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setShowBetaInfo(false);
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showBetaInfo]);
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0] || null;
   const activeProfileVersion = activeProfile?.version
@@ -2431,14 +2533,14 @@ export default function App() {
         const refreshCatalog = async () => {
           let catalog = null;
           if (launcher.minecraftGetCatalog) {
-            catalog = await launcher.minecraftGetCatalog({ showSnapshots: Boolean(val) });
+            catalog = await launcher.minecraftGetCatalog({ includeSnapshots: Boolean(val), showSnapshots: Boolean(val) });
           } else {
-            catalog = await fetchVersionCatalog(Boolean(val));
+            catalog = await loadLauncherCatalog({ includeSnapshots: Boolean(val) });
           }
           if (catalog?.versions) setVersionCatalog(catalog.versions);
           if (catalog?.installTargets) setInstallTargets(catalog.installTargets);
         };
-        refreshCatalog().catch(() => { });
+        refreshCatalog().catch((err) => console.error('Failed to refresh catalog on setting change:', err));
       }
       return next;
     });
@@ -2635,18 +2737,122 @@ export default function App() {
     );
     if (files.length === 0) return;
 
+    const targetType = activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : (activeTab === 'explore' ? exploreType : 'mods');
+
     addLog('info', t('mods.importingCount', { count: files.length }));
     try {
-      for (const file of files) {
-        const filePath = file.path || file.name;
-        await launcher.minecraftInstallModFile(filePath);
+      if (targetType === 'shaders') {
+        let imported = 0;
+        for (const file of files) {
+          if (!file.name.toLowerCase().endsWith('.zip')) continue;
+          const filePath = file.path || file.name;
+          const res = await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: filePath, fileName: file.name });
+          if (res?.ok) imported++;
+        }
+        if (imported > 0) {
+          loadShaders();
+          pushToast({ tone: 'success', title: t('mods.contentTypeShaders'), message: t('mods.shadersImportedSuccess', { count: imported }) });
+        }
+      } else if (targetType === 'resourcepacks') {
+        let imported = 0;
+        for (const file of files) {
+          if (!file.name.toLowerCase().endsWith('.zip')) continue;
+          const filePath = file.path || file.name;
+          const res = await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: filePath, fileName: file.name });
+          if (res?.ok) imported++;
+        }
+        if (imported > 0) {
+          loadResourcePacks();
+          pushToast({ tone: 'success', title: t('mods.contentTypeResourcePacks'), message: t('mods.resourcePacksImportedSuccess', { count: imported }) });
+        }
+      } else {
+        for (const file of files) {
+          const filePath = file.path || file.name;
+          await launcher.minecraftInstallModFile(filePath);
+        }
+        loadMods();
+        pushToast({ tone: 'success', title: t('sidebar.modManager'), message: t('mods.modsImportedSuccess', { count: files.length }) });
       }
-      const updated = await launcher.minecraftGetInstalledMods?.();
-      if (Array.isArray(updated)) setMods(updated);
-      pushToast({ tone: 'success', title: t('sidebar.modManager'), message: t('mods.modsImportedSuccess', { count: files.length }) });
-      setActiveTab('mods');
     } catch (err) {
-      addLog('error', `Error importing mod files: ${err?.message || err}`);
+      addLog('error', `Error importing files: ${err?.message || err}`);
+    }
+  };
+
+  // ── Load installed content ──
+  const loadMods = useCallback(async () => {
+    try {
+      const list = await launcher.minecraftGetInstalledMods?.();
+      if (Array.isArray(list)) setMods(list);
+    } catch {}
+  }, []);
+
+  const loadShaders = useCallback(async () => {
+    try {
+      const list = await launcher.minecraftGetInstalledShaders?.();
+      if (Array.isArray(list)) setShaders(list);
+    } catch {}
+  }, []);
+
+  const loadResourcePacks = useCallback(async () => {
+    try {
+      const list = await launcher.minecraftGetInstalledResourcePacks?.();
+      if (Array.isArray(list)) setResourcePacks(list);
+    } catch {}
+  }, []);
+
+  const handleDeleteShader = async (shader) => {
+    try {
+      const res = await launcher.minecraftDeleteShader?.(shader.fileName);
+      if (res?.ok) {
+        loadShaders();
+        pushToast({ tone: 'success', title: t('mods.deleteShader'), message: `${shader.name || shader.fileName} removed.` });
+      }
+    } catch (err) {
+      pushToast({ tone: 'error', title: t('mods.deleteShader'), message: err?.message || 'Delete failed.' });
+    }
+  };
+
+  const handleDeleteResourcePack = async (pack) => {
+    try {
+      const res = await launcher.minecraftDeleteResourcePack?.(pack.fileName);
+      if (res?.ok) {
+        loadResourcePacks();
+        pushToast({ tone: 'success', title: t('mods.deleteResourcePack'), message: `${pack.name || pack.fileName} removed.` });
+      }
+    } catch (err) {
+      pushToast({ tone: 'error', title: t('mods.deleteResourcePack'), message: err?.message || 'Delete failed.' });
+    }
+  };
+
+  const handleOpenContentFolder = async (type) => {
+    try {
+      const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : 'mods');
+      await launcher.minecraftOpenContentFolder?.(targetType);
+    } catch {}
+  };
+
+  const handleAddContentClick = async (type) => {
+    const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : 'mods');
+    if (targetType === 'shaders' || targetType === 'shader') {
+      const res = await launcher.minecraftPickContentFiles?.('shader');
+      if (res?.filePaths?.length > 0) {
+        for (const fp of res.filePaths) {
+          await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: fp });
+        }
+        loadShaders();
+        pushToast({ tone: 'success', title: t('mods.contentTypeShaders'), message: t('mods.shadersImportedSuccess', { count: res.filePaths.length }) });
+      }
+    } else if (targetType === 'resourcepacks' || targetType === 'resourcepack') {
+      const res = await launcher.minecraftPickContentFiles?.('resourcepack');
+      if (res?.filePaths?.length > 0) {
+        for (const fp of res.filePaths) {
+          await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: fp });
+        }
+        loadResourcePacks();
+        pushToast({ tone: 'success', title: t('mods.contentTypeResourcePacks'), message: t('mods.resourcePacksImportedSuccess', { count: res.filePaths.length }) });
+      }
+    } else {
+      handleAddModClick();
     }
   };
 
@@ -2673,13 +2879,15 @@ export default function App() {
     }
 
     const currentOffset = isLoadMore ? modrinthResults.length : 0;
+    const projectType = exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod';
 
     try {
       let data;
       if (typeof window !== 'undefined' && window.launcher?.minecraftModrinthSearch) {
         data = await window.launcher.minecraftModrinthSearch({
+          projectType,
           query: modrinthQuery,
-          loader: effectiveLoader,
+          loader: projectType === 'mod' ? effectiveLoader : '',
           gameVersion: effectiveMcVer,
           category: modrinthCategory === 'all' ? '' : modrinthCategory,
           sortBy: modrinthSort,
@@ -2687,9 +2895,10 @@ export default function App() {
           limit: 24,
         });
       } else {
-        data = await searchModrinthMods({
+        data = await searchModrinthProjects({
+          projectType,
           query: modrinthQuery,
-          loader: effectiveLoader,
+          loader: projectType === 'mod' ? effectiveLoader : '',
           gameVersion: effectiveMcVer,
           category: modrinthCategory === 'all' ? '' : modrinthCategory,
           sortBy: modrinthSort,
@@ -2712,7 +2921,7 @@ export default function App() {
     } catch (e) {
       console.error('Modrinth search failed:', e);
       if (!isLoadMore) {
-        pushToast({ tone: 'error', title: 'Modrinth', message: e?.message || 'Failed to search mods.' });
+        pushToast({ tone: 'error', title: 'Modrinth', message: e?.message || 'Failed to search.' });
       }
     } finally {
       if (isLoadMore) {
@@ -2721,22 +2930,27 @@ export default function App() {
         setModrinthLoading(false);
       }
     }
-  }, [isOnline, modrinthQuery, effectiveLoader, effectiveMcVer, modrinthCategory, modrinthSort, modrinthLoading, modrinthLoadingMore, modrinthResults.length, pushToast]);
+  }, [isOnline, exploreType, modrinthQuery, effectiveLoader, effectiveMcVer, modrinthCategory, modrinthSort, modrinthLoading, modrinthLoadingMore, modrinthResults.length, pushToast]);
 
   useEffect(() => {
-    if (activeTab === 'mods' && modsSubTab === 'browse') {
+    setModrinthResults([]);
+    setModrinthTotalHits(0);
+  }, [exploreType]);
+
+  useEffect(() => {
+    if (activeTab === 'explore') {
       if (!isOnline) return;
       const timer = setTimeout(() => {
         executeModrinthSearch(false);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [activeTab, modsSubTab, isOnline, modrinthQuery, effectiveLoader, effectiveMcVer, modrinthCategory, modrinthSort]);
+  }, [activeTab, exploreType, isOnline, modrinthQuery, effectiveLoader, effectiveMcVer, modrinthCategory, modrinthSort]);
 
   const hasMoreModrinth = modrinthResults.length < modrinthTotalHits;
 
   useEffect(() => {
-    if (activeTab !== 'mods' || modsSubTab !== 'browse') return;
+    if (activeTab !== 'explore') return;
     if (!isOnline || !hasMoreModrinth || modrinthLoading || modrinthLoadingMore) return;
 
     const sentinel = modrinthSentinelRef.current;
@@ -2750,7 +2964,7 @@ export default function App() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [activeTab, modsSubTab, isOnline, hasMoreModrinth, modrinthLoading, modrinthLoadingMore, executeModrinthSearch]);
+  }, [activeTab, isOnline, hasMoreModrinth, modrinthLoading, modrinthLoadingMore, executeModrinthSearch]);
 
   const handleInstallModrinthMod = async (project) => {
     if (!isOnline) {
@@ -2762,24 +2976,35 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug;
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
     setModrinthInstalling(prev => ({ ...prev, [projectId]: true }));
-    addLog('info', `Installing mod '${project.title || projectId}' from Modrinth...`);
+    addLog('info', `Installing ${projectType} '${project.title || projectId}' from Modrinth...`);
 
     try {
       let res;
       if (typeof window !== 'undefined' && window.launcher?.minecraftModrinthInstall) {
         res = await window.launcher.minecraftModrinthInstall({
           projectId,
+          projectType,
           gameVersion: effectiveMcVer || currentMcVer,
-          loader: effectiveLoader || currentLoader,
+          loader: projectType === 'mod' ? (effectiveLoader || currentLoader) : undefined,
         });
       } else {
-        res = { ok: true, fileName: `${projectId}.jar`, mods };
+        res = { ok: true, fileName: `${projectId}.zip` };
       }
 
       if (res?.ok) {
-        if (Array.isArray(res.mods)) setMods(res.mods);
-        addLog('success', `Mod '${project.title || projectId}' installed.`);
+        if (projectType === 'shader') {
+          if (Array.isArray(res.items)) setShaders(res.items);
+          else loadShaders();
+        } else if (projectType === 'resourcepack') {
+          if (Array.isArray(res.items)) setResourcePacks(res.items);
+          else loadResourcePacks();
+        } else {
+          if (Array.isArray(res.mods || res.items)) setMods(res.mods || res.items);
+          else loadMods();
+        }
+        addLog('success', `${projectType === 'shader' ? 'Shader' : projectType === 'resourcepack' ? 'Texture pack' : 'Mod'} '${project.title || projectId}' installed.`);
         pushToast({
           tone: 'success',
           title: t('mods.install'),
@@ -2814,6 +3039,7 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug || project.id;
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
     setInstallingVersionId(version.id);
     const primaryFile = version.files?.find(f => f.primary) || version.files?.[0];
     const verNumber = version.version_number || version.name || '';
@@ -2824,19 +3050,29 @@ export default function App() {
       if (typeof window !== 'undefined' && window.launcher?.minecraftModrinthInstall) {
         res = await window.launcher.minecraftModrinthInstall({
           projectId,
+          projectType,
           versionId: version.id,
           fileUrl: primaryFile?.url,
           fileName: primaryFile?.filename,
           gameVersion: version.game_versions?.[0] || effectiveMcVer || currentMcVer,
-          loader: version.loaders?.[0] || effectiveLoader || currentLoader,
+          loader: projectType === 'mod' ? (version.loaders?.[0] || effectiveLoader || currentLoader) : undefined,
         });
       } else {
-        res = { ok: true, fileName: primaryFile?.filename || `${projectId}.jar`, mods };
+        res = { ok: true, fileName: primaryFile?.filename || `${projectId}.zip` };
       }
 
       if (res?.ok) {
-        if (Array.isArray(res.mods)) setMods(res.mods);
-        addLog('success', `[Modrinth] Mod '${project.title || projectId}' (v${verNumber}) installed.`);
+        if (projectType === 'shader') {
+          if (Array.isArray(res.items)) setShaders(res.items);
+          else loadShaders();
+        } else if (projectType === 'resourcepack') {
+          if (Array.isArray(res.items)) setResourcePacks(res.items);
+          else loadResourcePacks();
+        } else {
+          if (Array.isArray(res.mods || res.items)) setMods(res.mods || res.items);
+          else loadMods();
+        }
+        addLog('success', `[Modrinth] '${project.title || projectId}' (v${verNumber}) installed.`);
         pushToast({
           tone: 'success',
           title: t('mods.install'),
@@ -2858,10 +3094,33 @@ export default function App() {
   };
 
   const isModInstalled = useCallback((project) => {
-    if (!project || !Array.isArray(mods) || mods.length === 0) return false;
+    if (!project) return false;
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
     const slug = String(project.slug || '').toLowerCase().trim();
     const projId = String(project.project_id || project.id || '').toLowerCase().trim();
     const cleanTitle = String(project.title || '').toLowerCase().trim();
+
+    if (projectType === 'shader') {
+      if (!Array.isArray(shaders) || shaders.length === 0) return false;
+      return shaders.some(s => {
+        const sId = String(s.id || '').toLowerCase().trim();
+        const sName = String(s.name || '').toLowerCase().trim();
+        const sFile = String(s.fileName || '').toLowerCase().trim();
+        return (slug && (sId === slug || sFile.startsWith(slug))) || (projId && sId === projId) || (cleanTitle && sName === cleanTitle);
+      });
+    }
+
+    if (projectType === 'resourcepack') {
+      if (!Array.isArray(resourcePacks) || resourcePacks.length === 0) return false;
+      return resourcePacks.some(p => {
+        const pId = String(p.id || '').toLowerCase().trim();
+        const pName = String(p.name || '').toLowerCase().trim();
+        const pFile = String(p.fileName || '').toLowerCase().trim();
+        return (slug && (pId === slug || pFile.startsWith(slug))) || (projId && pId === projId) || (cleanTitle && pName === cleanTitle);
+      });
+    }
+
+    if (!Array.isArray(mods) || mods.length === 0) return false;
 
     return mods.some(m => {
       const mModId = String(m.modId || '').toLowerCase().trim();
@@ -2888,7 +3147,7 @@ export default function App() {
       }
       return false;
     });
-  }, [mods]);
+  }, [exploreType, mods, shaders, resourcePacks]);
 
   const checkingModUpdatesRef = useRef(false);
   const hasCheckedModsOnTabOpenRef = useRef(false);
@@ -3136,12 +3395,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'mods') {
-      launcher.minecraftGetInstalledMods?.().then(updated => {
-        if (Array.isArray(updated)) setMods(updated);
-      }).catch(() => {});
+    if (activeTab === 'mods' || activeTab === 'shaders' || activeTab === 'resourcepacks' || activeTab === 'explore') {
+      loadMods();
+      loadShaders();
+      loadResourcePacks();
 
-      if (isOnline) {
+      if (activeTab === 'mods' && isOnline) {
         if (!hasCheckedModsOnTabOpenRef.current) {
           hasCheckedModsOnTabOpenRef.current = true;
           handleCheckModUpdates({ silent: true });
@@ -3150,7 +3409,7 @@ export default function App() {
     } else {
       hasCheckedModsOnTabOpenRef.current = false;
     }
-  }, [activeTab, modsSubTab, isOnline]);
+  }, [activeTab, isOnline, loadMods, loadShaders, loadResourcePacks]);
 
   const handleCheckForUpdates = async () => {
     addLog('info', 'Checking for launcher updates...');
@@ -3310,8 +3569,9 @@ export default function App() {
               </button>
             </div>
 
+            {/* ── DISCOVER ── */}
             <div className="sidebar-heading" style={{ marginTop: 10 }}>
-              <span className="sidebar-title">{t('sidebar.navigation')}</span>
+              <span className="sidebar-title">{t('sidebar.discover')}</span>
             </div>
 
             <div className="sidebar-nav">
@@ -3323,13 +3583,52 @@ export default function App() {
                 <span>{t('sidebar.news')}</span>
               </div>
               <div
+                className={`nav-item ${activeTab === 'explore' ? 'active' : ''}`}
+                onClick={() => setActiveTab('explore')}
+              >
+                <span className="nav-icon"><Icon d={ICONS.compass} size={14} /></span>
+                <span>{t('sidebar.explore')}</span>
+              </div>
+            </div>
+
+            {/* ── MY LIBRARY ── */}
+            <div className="sidebar-heading" style={{ marginTop: 12 }}>
+              <span className="sidebar-title">{t('sidebar.library')}</span>
+            </div>
+
+            <div className="sidebar-nav">
+              <div
                 className={`nav-item ${activeTab === 'mods' ? 'active' : ''}`}
                 onClick={() => setActiveTab('mods')}
               >
                 <span className="nav-icon"><Icon d={ICONS.cube} size={14} /></span>
-                <span>{t('sidebar.modManager')}</span>
+                <span>{t('sidebar.mods')}</span>
                 <span className="nav-counter">{mods.filter(m => m.enabled).length}</span>
               </div>
+              <div
+                className={`nav-item ${activeTab === 'shaders' ? 'active' : ''}`}
+                onClick={() => setActiveTab('shaders')}
+              >
+                <span className="nav-icon"><Icon d={ICONS.sun} size={14} /></span>
+                <span>{t('sidebar.shaders')}</span>
+                <span className="nav-counter">{shaders.length}</span>
+              </div>
+              <div
+                className={`nav-item ${activeTab === 'resourcepacks' ? 'active' : ''}`}
+                onClick={() => setActiveTab('resourcepacks')}
+              >
+                <span className="nav-icon"><Icon d={ICONS.layers} size={14} /></span>
+                <span>{t('sidebar.resourcePacks')}</span>
+                <span className="nav-counter">{resourcePacks.length}</span>
+              </div>
+            </div>
+
+            {/* ── SYSTEM ── */}
+            <div className="sidebar-heading" style={{ marginTop: 12 }}>
+              <span className="sidebar-title">{t('sidebar.system')}</span>
+            </div>
+
+            <div className="sidebar-nav">
               <div
                 className={`nav-item ${activeTab === 'console' ? 'active' : ''}`}
                 onClick={() => setActiveTab('console')}
@@ -3388,27 +3687,63 @@ export default function App() {
           {/* Top Action Toolbar */}
           <div className="action-bar">
             <div className="action-bar-tabs">
-              <button
-                className={`tab-btn ${activeTab === 'news' ? 'active' : ''}`}
-                onClick={() => setActiveTab('news')}
-              >
-                <Icon d={ICONS.news} size={13} />
-                <span>{t('sidebar.news')}</span>
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
-                onClick={() => setActiveTab('mods')}
-              >
-                <Icon d={ICONS.cube} size={13} />
-                <span>{t('sidebar.modManager')}</span>
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
-                onClick={() => setActiveTab('console')}
-              >
-                <Icon d={ICONS.console} size={13} />
-                <span>{t('sidebar.console')}</span>
-              </button>
+              {/* Discover Group */}
+              <div className="tab-group">
+                <button
+                  className={`tab-btn ${activeTab === 'news' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('news')}
+                >
+                  <Icon d={ICONS.news} size={13} />
+                  <span>{t('sidebar.news')}</span>
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'explore' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('explore')}
+                >
+                  <Icon d={ICONS.compass} size={13} />
+                  <span>{t('sidebar.explore')}</span>
+                </button>
+              </div>
+
+              <div className="tab-group-divider" />
+
+              {/* Library Group */}
+              <div className="tab-group">
+                <button
+                  className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('mods')}
+                >
+                  <Icon d={ICONS.cube} size={13} />
+                  <span>{t('sidebar.mods')}</span>
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'shaders' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('shaders')}
+                >
+                  <Icon d={ICONS.sun} size={13} />
+                  <span>{t('sidebar.shaders')}</span>
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'resourcepacks' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('resourcepacks')}
+                >
+                  <Icon d={ICONS.layers} size={13} />
+                  <span>{t('sidebar.resourcePacks')}</span>
+                </button>
+              </div>
+
+              <div className="tab-group-divider" />
+
+              {/* System Group */}
+              <div className="tab-group">
+                <button
+                  className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('console')}
+                >
+                  <Icon d={ICONS.console} size={13} />
+                  <span>{t('sidebar.console')}</span>
+                </button>
+              </div>
             </div>
 
             <div className="action-bar-actions">
@@ -3419,31 +3754,14 @@ export default function App() {
                 </div>
               )}
               <button
-                className="btn-secondary"
-                onClick={() => setModal('install-minecraft')}
+                className="btn-primary"
+                onClick={() => setModal('install')}
                 disabled={gameState === 'running'}
-                title={t('install.minecraft')}
+                title={t('install.installVersion')}
+                style={{ gap: 6, padding: '7px 14px' }}
               >
-                <Icon d={ICONS.download} size={12} />
-                <span>{t('install.minecraft')}</span>
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={() => setModal('install-fabric')}
-                disabled={gameState === 'running'}
-                title={t('install.fabric')}
-              >
-                <Icon d={ICONS.download} size={12} />
-                <span>{t('install.fabric')}</span>
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={() => setModal('install-forge')}
-                disabled={gameState === 'running'}
-                title={t('install.forge')}
-              >
-                <Icon d={ICONS.download} size={12} />
-                <span>{t('install.forge')}</span>
+                <Icon d={ICONS.download} size={13} />
+                <span>{t('install.installVersion')}</span>
               </button>
               <button
                 className="btn-secondary"
@@ -3549,7 +3867,269 @@ export default function App() {
             )}
           </div>
 
-          {/* ── TAB: MODS ── */}
+          {/* ── TAB: EXPLORE (MODRINTH CATALOG) ── */}
+          <div
+            className="tab-panel"
+            style={{ display: activeTab === 'explore' ? 'flex' : 'none', position: 'relative' }}
+          >
+            <div className="explore-header">
+              <div>
+                <h2 className="explore-title" style={{ display: 'flex', alignItems: 'center' }}>
+                  {t('explore.title')}
+                  <div className="explore-beta-wrapper" ref={betaInfoRef}>
+                    <button
+                      type="button"
+                      className={`explore-beta-tag ${showBetaInfo ? 'active' : ''}`}
+                      onClick={() => setShowBetaInfo(prev => !prev)}
+                      title={t('mods.modrinthBetaTitle')}
+                    >
+                      <span>BETA</span>
+                      <Icon d={ICONS.info} size={11} style={{ opacity: 0.85 }} />
+                    </button>
+                    {showBetaInfo && (
+                      <div className="explore-beta-popover">
+                        <div className="explore-beta-popover-header">
+                          <div className="explore-beta-popover-title">
+                            <Icon d={ICONS.compass} size={14} style={{ color: 'var(--accent-light, #60a5fa)' }} />
+                            <span>{t('mods.modrinthBetaTitle')}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="explore-beta-popover-close"
+                            onClick={() => setShowBetaInfo(false)}
+                          >
+                            <Icon d={ICONS.x} size={11} />
+                          </button>
+                        </div>
+                        <div className="explore-beta-popover-body">
+                          {t('mods.modrinthBetaDescription')}
+                        </div>
+                        <div className="explore-beta-popover-footer">
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: '4px 8px', height: 'auto', textDecoration: 'none' }}
+                            onClick={() => {
+                              launcher.openExternal?.('https://modrinth.com').catch(() => {});
+                            }}
+                          >
+                            <Icon d={ICONS.external} size={11} />
+                            <span>Modrinth.com</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </h2>
+                <div className="explore-subtitle">{t('explore.subtitle')}</div>
+              </div>
+              <div className="explore-type-selector">
+                <button
+                  type="button"
+                  className={`explore-type-pill ${exploreType === 'mods' ? 'active' : ''}`}
+                  onClick={() => setExploreType('mods')}
+                >
+                  <Icon d={ICONS.cube} size={15} />
+                  <span>{t('explore.tabMods')}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`explore-type-pill ${exploreType === 'shaders' ? 'active' : ''}`}
+                  onClick={() => setExploreType('shaders')}
+                >
+                  <Icon d={ICONS.sun} size={15} />
+                  <span>{t('explore.tabShaders')}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`explore-type-pill ${exploreType === 'resourcepacks' ? 'active' : ''}`}
+                  onClick={() => setExploreType('resourcepacks')}
+                >
+                  <Icon d={ICONS.layers} size={15} />
+                  <span>{t('explore.tabResourcePacks')}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="modrinth-browser">
+              <div className="modrinth-controls-bar">
+                <div className="mods-search-box modrinth-search-box">
+                  <Icon d={ICONS.search} size={14} />
+                  <input
+                    type="text"
+                    className="mods-search-input"
+                    placeholder={
+                      exploreType === 'shaders'
+                        ? t('mods.searchModrinthShadersPlaceholder')
+                        : exploreType === 'resourcepacks'
+                          ? t('mods.searchModrinthResourcePacksPlaceholder')
+                          : t('mods.searchModrinthPlaceholder')
+                    }
+                    value={modrinthQuery}
+                    onChange={e => setModrinthQuery(e.target.value)}
+                  />
+                  {modrinthQuery && (
+                    <button className="search-clear-btn" onClick={() => setModrinthQuery('')}>
+                      <Icon d={ICONS.x} size={11} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="modrinth-filters-row">
+                  <div className="modrinth-filter-select-wrapper">
+                    <span className="modrinth-filter-label">{t('mods.filterSort')}:</span>
+                    <select
+                      className="select-input modrinth-filter-select"
+                      value={modrinthSort}
+                      onChange={e => setModrinthSort(e.target.value)}
+                    >
+                      <option value="relevance">{t('mods.sortRelevance')}</option>
+                      <option value="downloads">{t('mods.sortDownloads')}</option>
+                      <option value="follows">{t('mods.sortFollows')}</option>
+                      <option value="newest">{t('mods.sortNewest')}</option>
+                      <option value="updated">{t('mods.sortUpdated')}</option>
+                    </select>
+                  </div>
+
+                  {exploreType === 'mods' && (
+                    <div className="modrinth-filter-select-wrapper">
+                      <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
+                      <select
+                        className="select-input modrinth-filter-select"
+                        value={modrinthLoaderFilter}
+                        onChange={e => setModrinthLoaderFilter(e.target.value)}
+                      >
+                        <option value="auto">
+                          {currentLoader ? `Auto (${currentLoader.toUpperCase()})` : t('mods.allLoaders')}
+                        </option>
+                        <option value="fabric">Fabric</option>
+                        <option value="forge">Forge</option>
+                        <option value="all">{t('mods.allLoaders')}</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="modrinth-filter-select-wrapper">
+                    <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
+                    <select
+                      className="select-input modrinth-filter-select"
+                      value={modrinthVersionFilter}
+                      onChange={e => setModrinthVersionFilter(e.target.value)}
+                    >
+                      <option value="auto">
+                        {currentMcVer ? `Auto (${currentMcVer})` : t('mods.allVersions')}
+                      </option>
+                      <option value="all">{t('mods.allVersions')}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Pills */}
+              <div className="modrinth-category-pills">
+                {(exploreType === 'shaders' ? [
+                  { id: 'all', label: t('mods.allCategories') },
+                  { id: 'fantasy', label: 'Fantasy' },
+                  { id: 'realistic', label: 'Realistic' },
+                  { id: 'performance', label: 'Performance' },
+                  { id: 'semi-realistic', label: 'Semi-Realistic' },
+                  { id: 'cinematic', label: 'Cinematic' },
+                  { id: 'vanilla-like', label: 'Vanilla-like' },
+                ] : exploreType === 'resourcepacks' ? [
+                  { id: 'all', label: t('mods.allCategories') },
+                  { id: '16x', label: '16x' },
+                  { id: '32x', label: '32x' },
+                  { id: '64x', label: '64x' },
+                  { id: '128x', label: '128x' },
+                  { id: '512x', label: '512x' },
+                  { id: 'realistic', label: 'Realistic' },
+                  { id: 'medieval', label: 'Medieval' },
+                  { id: 'vanilla-like', label: 'Vanilla-like' },
+                ] : [
+                  { id: 'all', label: t('mods.allCategories') },
+                  { id: 'optimization', label: 'Optimization' },
+                  { id: 'technology', label: 'Technology' },
+                  { id: 'adventure', label: 'Adventure' },
+                  { id: 'decoration', label: 'Decoration' },
+                  { id: 'utility', label: 'Utility' },
+                  { id: 'magic', label: 'Magic' },
+                  { id: 'worldgen', label: 'World Gen' },
+                ]).map(cat => (
+                  <button
+                    key={cat.id}
+                    className={`category-pill ${modrinthCategory === cat.id ? 'active' : ''}`}
+                    onClick={() => setModrinthCategory(cat.id)}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Modrinth Grid */}
+              {!isOnline ? (
+                <EmptyState
+                  icon={ICONS.wifiOff}
+                  title={t('offline.modrinthTitle')}
+                  description={t('offline.modrinthDesc')}
+                />
+              ) : modrinthLoading ? (
+                <div className="modrinth-loading-state">
+                  <span className="modrinth-spinner" />
+                  <span>{t('account.loading')}</span>
+                </div>
+              ) : modrinthResults.length === 0 ? (
+                <EmptyState
+                  icon={ICONS.search}
+                  title={
+                    exploreType === 'shaders'
+                      ? t('mods.noShadersMatchTitle')
+                      : exploreType === 'resourcepacks'
+                        ? t('mods.noResourcePacksMatchTitle')
+                        : t('mods.noMatchTitle')
+                  }
+                  description={
+                    exploreType === 'shaders'
+                      ? t('mods.noModrinthShadersResults')
+                      : exploreType === 'resourcepacks'
+                        ? t('mods.noModrinthResourcePacksResults')
+                        : t('mods.noModrinthResults')
+                  }
+                  actionText={t('common.clearSearch')}
+                  onAction={() => {
+                    setModrinthQuery('');
+                    setModrinthCategory('all');
+                    setModrinthLoaderFilter('auto');
+                    setModrinthVersionFilter('auto');
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="modrinth-grid">
+                    {modrinthResults.map(proj => (
+                      <ModrinthCard
+                        key={proj.project_id || proj.slug}
+                        project={proj}
+                        installed={isModInstalled(proj)}
+                        installing={Boolean(modrinthInstalling[proj.project_id || proj.slug])}
+                        onInstall={handleInstallModrinthMod}
+                        onOpenDetails={handleOpenModDetails}
+                      />
+                    ))}
+                  </div>
+                  <div ref={modrinthSentinelRef} className="modrinth-sentinel">
+                    {modrinthLoadingMore && (
+                      <div className="modrinth-load-more">
+                        <span className="modrinth-spinner small" />
+                        <span>{t('account.loading')}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ── TAB: MODS (LIBRARY) ── */}
           <div
             className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
             style={{ display: activeTab === 'mods' ? 'flex' : 'none', position: 'relative' }}
@@ -3567,280 +4147,353 @@ export default function App() {
               </div>
             )}
 
-            {/* Sub-tabs header */}
-            <div className="mods-header-row">
-              <div className="tab-pill-group">
-                <button
-                  className={`tab-pill ${modsSubTab === 'installed' ? 'active' : ''}`}
-                  onClick={() => setModsSubTab('installed')}
-                >
-                  <Icon d={ICONS.cube} size={13} />
-                  <span>{t('mods.tabInstalled')} ({mods.length})</span>
-                </button>
-                <button
-                  className={`tab-pill ${modsSubTab === 'browse' ? 'active' : ''}`}
-                  onClick={() => setModsSubTab('browse')}
-                >
-                  <Icon d={ICONS.download} size={13} />
-                  <span>{t('mods.tabBrowse')}</span>
-                </button>
+            <div className="mods-toolbar">
+              <div className="mods-search-box">
+                <Icon d={ICONS.search} size={13} />
+                <input
+                  type="text"
+                  className="mods-search-input"
+                  placeholder={t('mods.searchPlaceholder')}
+                  value={modSearch}
+                  onChange={e => setModSearch(e.target.value)}
+                />
+                {modSearch && (
+                  <button className="search-clear-btn" onClick={() => setModSearch('')}>
+                    <Icon d={ICONS.x} size={11} />
+                  </button>
+                )}
               </div>
 
-              {modsSubTab === 'installed' && (
-                <div className="mods-header-actions">
-                  <span className="mods-count-badge">
-                    {mods.filter(m => m.enabled).length}/{mods.length} {t('mods.active')}
-                  </span>
-                </div>
+              {mods.length > 0 && (
+                <span className="mods-count-badge">
+                  {mods.filter(m => m.enabled).length}/{mods.length} {t('mods.active')}
+                </span>
               )}
+
+              <div className="mods-toolbar-actions">
+                <button
+                  className="btn-secondary"
+                  onClick={() => handleCheckModUpdates({ silent: false })}
+                  disabled={checkingModUpdates}
+                  title={t('mods.checkUpdates')}
+                >
+                  <Icon d={ICONS.refresh} size={12} className={checkingModUpdates ? 'spin-infinite' : ''} />
+                  <span>{t('mods.checkUpdates')}</span>
+                </button>
+                <button className="btn-secondary" onClick={() => handleOpenContentFolder('mods')} title={t('mods.openModsFolder')}>
+                  <Icon d={ICONS.folder} size={12} />
+                  <span>{t('mods.openFolder')}</span>
+                </button>
+                <button className="btn-primary" onClick={() => handleAddContentClick('mods')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <Icon d={ICONS.plus} size={12} />
+                  {t('mods.addMod')}
+                </button>
+              </div>
             </div>
 
-            {modsSubTab === 'installed' ? (
-              <>
-                <div className="mods-toolbar">
-                  <div className="mods-search-box">
-                    <Icon d={ICONS.search} size={13} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchPlaceholder')}
-                      value={modSearch}
-                      onChange={e => setModSearch(e.target.value)}
-                    />
-                    {modSearch && (
-                      <button className="search-clear-btn" onClick={() => setModSearch('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="mods-toolbar-actions">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => handleCheckModUpdates({ silent: false })}
-                      disabled={checkingModUpdates}
-                      title={t('mods.checkUpdates')}
-                    >
-                      <Icon d={ICONS.refresh} size={12} className={checkingModUpdates ? 'spin-infinite' : ''} />
-                      <span>{checkingModUpdates ? t('mods.checkingUpdates') : t('mods.checkUpdates')}</span>
-                    </button>
-                    {Object.keys(modUpdates).filter(k => k.includes('.jar')).length > 0 && (
-                      <button
-                        className="btn-primary"
-                        onClick={handleUpdateAllMods}
-                        disabled={updatingMods.size > 0}
-                        style={{ fontSize: 12, padding: '6px 14px' }}
-                      >
-                        <Icon d={ICONS.download} size={12} />
-                        <span>{t('mods.updateAll')} ({Object.keys(modUpdates).filter(k => k.includes('.jar')).length})</span>
-                      </button>
-                    )}
-                    <button className="btn-secondary" onClick={() => handleSetAllModsEnabled(true)} disabled={mods.length === 0}>
-                      {t('mods.enableAll')}
-                    </button>
-                    <button className="btn-secondary" onClick={() => handleSetAllModsEnabled(false)} disabled={mods.length === 0}>
-                      {t('mods.disableAll')}
-                    </button>
-                    <button className="btn-primary" onClick={handleAddModClick} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      <Icon d={ICONS.plus} size={12} />
-                      {t('mods.addMod')}
-                    </button>
-                  </div>
-                </div>
-
-                {mods.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.cube}
-                    title={t('mods.emptyTitle')}
-                    description={t('mods.emptyText')}
-                    actionText={t('mods.tabBrowse')}
-                    actionIcon={ICONS.download}
-                    onAction={() => setModsSubTab('browse')}
-                    secondaryText={t('settings.openMinecraftDirectory')}
-                    onSecondary={handleOpenMinecraftDirectory}
-                  />
-                ) : (() => {
-                  const filtered = mods.filter(mod => String(mod.name || '').toLowerCase().includes(modSearch.toLowerCase()));
-                  if (filtered.length === 0) {
-                    return (
-                      <EmptyState
-                        icon={ICONS.search}
-                        title={t('mods.noMatchTitle')}
-                        description={t('mods.noMatchText')}
-                        actionText={t('common.clearSearch')}
-                        onAction={() => setModSearch('')}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="mods-grid">
-                      {filtered.map(mod => {
-                        const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
-                        const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
-                        const isUpdating = updatingMods.has(mod.fileName) || updatingMods.has(fileKey);
-                        return (
-                          <ModCard
-                            key={mod.id}
-                            mod={mod}
-                            updateInfo={updateInfo}
-                            updating={isUpdating}
-                            onToggle={handleModToggle}
-                            onDelete={handleModDelete}
-                            onUpdate={handleUpdateMod}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </>
-            ) : (
-              <div className="modrinth-browser">
-                <div className="modrinth-beta-notice" role="status">
-                  <div className="modrinth-beta-badge">{t('mods.modrinthBetaTitle')}</div>
-                  <div className="modrinth-beta-copy">{t('mods.modrinthBetaDescription')}</div>
-                </div>
-                <div className="modrinth-controls-bar">
-                  <div className="mods-search-box modrinth-search-box">
-                    <Icon d={ICONS.search} size={14} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchModrinthPlaceholder')}
-                      value={modrinthQuery}
-                      onChange={e => setModrinthQuery(e.target.value)}
-                    />
-                    {modrinthQuery && (
-                      <button className="search-clear-btn" onClick={() => setModrinthQuery('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="modrinth-filters-row">
-                    <div className="modrinth-filter-select-wrapper">
-                      <span className="modrinth-filter-label">{t('mods.filterSort')}:</span>
-                      <select
-                        className="select-input modrinth-filter-select"
-                        value={modrinthSort}
-                        onChange={e => setModrinthSort(e.target.value)}
-                      >
-                        <option value="relevance">{t('mods.sortRelevance')}</option>
-                        <option value="downloads">{t('mods.sortDownloads')}</option>
-                        <option value="follows">{t('mods.sortFollows')}</option>
-                        <option value="newest">{t('mods.sortNewest')}</option>
-                        <option value="updated">{t('mods.sortUpdated')}</option>
-                      </select>
-                    </div>
-
-                    <div className="modrinth-filter-select-wrapper">
-                      <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
-                      <select
-                        className="select-input modrinth-filter-select"
-                        value={modrinthLoaderFilter}
-                        onChange={e => setModrinthLoaderFilter(e.target.value)}
-                      >
-                        <option value="auto">
-                          {currentLoader ? `Auto (${currentLoader.toUpperCase()})` : t('mods.allLoaders')}
-                        </option>
-                        <option value="fabric">Fabric</option>
-                        <option value="forge">Forge</option>
-                        <option value="all">{t('mods.allLoaders')}</option>
-                      </select>
-                    </div>
-
-                    <div className="modrinth-filter-select-wrapper">
-                      <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
-                      <select
-                        className="select-input modrinth-filter-select"
-                        value={modrinthVersionFilter}
-                        onChange={e => setModrinthVersionFilter(e.target.value)}
-                      >
-                        <option value="auto">
-                          {currentMcVer ? `Auto (${currentMcVer})` : t('mods.allVersions')}
-                        </option>
-                        <option value="all">{t('mods.allVersions')}</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Category Pills */}
-                <div className="modrinth-category-pills">
-                  {[
-                    { id: 'all', label: t('mods.allCategories') },
-                    { id: 'optimization', label: 'Optimization' },
-                    { id: 'technology', label: 'Technology' },
-                    { id: 'adventure', label: 'Adventure' },
-                    { id: 'decoration', label: 'Decoration' },
-                    { id: 'utility', label: 'Utility' },
-                    { id: 'magic', label: 'Magic' },
-                    { id: 'worldgen', label: 'World Gen' },
-                  ].map(cat => (
-                    <button
-                      key={cat.id}
-                      className={`category-pill ${modrinthCategory === cat.id ? 'active' : ''}`}
-                      onClick={() => setModrinthCategory(cat.id)}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Modrinth Grid */}
-                {!isOnline ? (
-                  <EmptyState
-                    icon={ICONS.wifiOff}
-                    title={t('offline.modrinthTitle')}
-                    description={t('offline.modrinthDesc')}
-                    actionText={t('mods.tabInstalled')}
-                    actionIcon={ICONS.cube}
-                    onAction={() => setModsSubTab('installed')}
-                  />
-                ) : modrinthLoading ? (
-                  <div className="modrinth-loading-state">
-                    <span className="modrinth-spinner" />
-                    <span>{t('account.loading')}</span>
-                  </div>
-                ) : modrinthResults.length === 0 ? (
+            {mods.length === 0 ? (
+              <EmptyState
+                icon={ICONS.cube}
+                title={t('mods.emptyTitle')}
+                description={t('mods.emptyText')}
+                actionText={t('explore.browseMods')}
+                actionIcon={ICONS.compass}
+                onAction={() => {
+                  setExploreType('mods');
+                  setActiveTab('explore');
+                }}
+                secondaryText={t('mods.openModsFolder')}
+                onSecondary={() => handleOpenContentFolder('mods')}
+              />
+            ) : (() => {
+              const filtered = mods.filter(m =>
+                String(m.name || '').toLowerCase().includes(modSearch.toLowerCase()) ||
+                String(m.fileName || '').toLowerCase().includes(modSearch.toLowerCase())
+              );
+              if (filtered.length === 0) {
+                return (
                   <EmptyState
                     icon={ICONS.search}
                     title={t('mods.noMatchTitle')}
-                    description={t('mods.noModrinthResults')}
+                    description={t('mods.noMatchText')}
                     actionText={t('common.clearSearch')}
-                    onAction={() => {
-                      setModrinthQuery('');
-                      setModrinthCategory('all');
-                      setModrinthLoaderFilter('auto');
-                      setModrinthVersionFilter('auto');
-                    }}
+                    onAction={() => setModSearch('')}
                   />
-                ) : (
-                  <>
-                    <div className="modrinth-grid">
-                      {modrinthResults.map(proj => (
-                        <ModrinthCard
-                          key={proj.project_id || proj.slug}
-                          project={proj}
-                          installed={isModInstalled(proj)}
-                          installing={Boolean(modrinthInstalling[proj.project_id || proj.slug])}
-                          onInstall={handleInstallModrinthMod}
-                          onOpenDetails={handleOpenModDetails}
-                        />
-                      ))}
-                    </div>
-                    <div ref={modrinthSentinelRef} className="modrinth-sentinel">
-                      {modrinthLoadingMore && (
-                        <div className="modrinth-load-more">
-                          <span className="modrinth-spinner small" />
-                          <span>{t('account.loading')}</span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
+                );
+              }
+              return (
+                <div className="mods-grid">
+                  {filtered.map(mod => {
+                    const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
+                    const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
+                    const isUpdating = updatingMods.has(mod.fileName) || updatingMods.has(fileKey);
+                    return (
+                      <ModCard
+                        key={mod.id}
+                        mod={mod}
+                        updateInfo={updateInfo}
+                        updating={isUpdating}
+                        onToggle={handleModToggle}
+                        onDelete={handleModDelete}
+                        onUpdate={handleUpdateMod}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* ── TAB: SHADERS (LIBRARY) ── */}
+          <div
+            className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+            style={{ display: activeTab === 'shaders' ? 'flex' : 'none', position: 'relative' }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="dropzone-overlay">
+                <div className="dropzone-content">
+                  <Icon d={ICONS.download} size={36} />
+                  <span className="dropzone-title">{t('mods.dropzone')}</span>
+                  <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                </div>
               </div>
             )}
+
+            <div className="mods-toolbar">
+              <div className="mods-search-box">
+                <Icon d={ICONS.search} size={13} />
+                <input
+                  type="text"
+                  className="mods-search-input"
+                  placeholder={t('mods.searchShadersPlaceholder')}
+                  value={shaderSearch}
+                  onChange={e => setShaderSearch(e.target.value)}
+                />
+                {shaderSearch && (
+                  <button className="search-clear-btn" onClick={() => setShaderSearch('')}>
+                    <Icon d={ICONS.x} size={11} />
+                  </button>
+                )}
+              </div>
+
+              {shaders.length > 0 && (
+                <span className="mods-count-badge">
+                  {shaders.length} {t('sidebar.shaders')}
+                </span>
+              )}
+
+              <div className="mods-toolbar-actions">
+                <button className="btn-secondary" onClick={() => handleOpenContentFolder('shaders')} title={t('mods.openShadersFolder')}>
+                  <Icon d={ICONS.folder} size={12} />
+                  <span>{t('mods.openFolder')}</span>
+                </button>
+                <button className="btn-primary" onClick={() => handleAddContentClick('shaders')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <Icon d={ICONS.plus} size={12} />
+                  {t('mods.addShader')}
+                </button>
+              </div>
+            </div>
+
+            {shaders.length === 0 ? (
+              <EmptyState
+                icon={ICONS.sun}
+                title={t('mods.emptyShadersTitle')}
+                description={t('mods.emptyShadersText')}
+                actionText={t('explore.browseShaders')}
+                actionIcon={ICONS.compass}
+                onAction={() => {
+                  setExploreType('shaders');
+                  setActiveTab('explore');
+                }}
+                secondaryText={t('mods.openShadersFolder')}
+                onSecondary={() => handleOpenContentFolder('shaders')}
+              />
+            ) : (() => {
+              const filtered = shaders.filter(s =>
+                String(s.name || '').toLowerCase().includes(shaderSearch.toLowerCase()) ||
+                String(s.fileName || '').toLowerCase().includes(shaderSearch.toLowerCase())
+              );
+              if (filtered.length === 0) {
+                return (
+                  <EmptyState
+                    icon={ICONS.search}
+                    title={t('mods.noShadersMatchTitle')}
+                    description={t('mods.noShadersMatchText')}
+                    actionText={t('common.clearSearch')}
+                    onAction={() => setShaderSearch('')}
+                  />
+                );
+              }
+              return (
+                <div className="installed-packs-grid">
+                  {filtered.map(shader => (
+                    <div key={shader.id || shader.fileName} className="installed-pack-card">
+                      <div className="installed-pack-header">
+                        <div className="installed-pack-icon">
+                          {shader.iconUrl ? (
+                            <img src={shader.iconUrl} alt={shader.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                          ) : (
+                            <Icon d={ICONS.sun} size={20} />
+                          )}
+                        </div>
+                        <div className="installed-pack-meta">
+                          <span className="installed-pack-title" title={shader.name}>{shader.name}</span>
+                          <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
+                        </div>
+                      </div>
+                      {shader.description && (
+                        <div className="installed-pack-desc" title={shader.description}>
+                          {shader.description}
+                        </div>
+                      )}
+                      <div className="installed-pack-footer">
+                        <span className="installed-pack-size">
+                          {shader.size ? formatFileSize(shader.size) : (shader.isDirectory ? 'Folder' : '')}
+                        </span>
+                        <div className="installed-pack-actions">
+                          <button
+                            className="mod-delete-btn"
+                            onClick={() => handleDeleteShader(shader)}
+                            title={t('mods.deleteShader')}
+                          >
+                            <Icon d={ICONS.trash} size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* ── TAB: TEXTURE PACKS (LIBRARY) ── */}
+          <div
+            className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+            style={{ display: activeTab === 'resourcepacks' ? 'flex' : 'none', position: 'relative' }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="dropzone-overlay">
+                <div className="dropzone-content">
+                  <Icon d={ICONS.download} size={36} />
+                  <span className="dropzone-title">{t('mods.dropzone')}</span>
+                  <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mods-toolbar">
+              <div className="mods-search-box">
+                <Icon d={ICONS.search} size={13} />
+                <input
+                  type="text"
+                  className="mods-search-input"
+                  placeholder={t('mods.searchResourcePacksPlaceholder')}
+                  value={resourcePackSearch}
+                  onChange={e => setResourcePackSearch(e.target.value)}
+                />
+                {resourcePackSearch && (
+                  <button className="search-clear-btn" onClick={() => setResourcePackSearch('')}>
+                    <Icon d={ICONS.x} size={11} />
+                  </button>
+                )}
+              </div>
+
+              {resourcePacks.length > 0 && (
+                <span className="mods-count-badge">
+                  {resourcePacks.length} {t('sidebar.resourcePacks')}
+                </span>
+              )}
+
+              <div className="mods-toolbar-actions">
+                <button className="btn-secondary" onClick={() => handleOpenContentFolder('resourcepacks')} title={t('mods.openResourcePacksFolder')}>
+                  <Icon d={ICONS.folder} size={12} />
+                  <span>{t('mods.openFolder')}</span>
+                </button>
+                <button className="btn-primary" onClick={() => handleAddContentClick('resourcepacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <Icon d={ICONS.plus} size={12} />
+                  {t('mods.addResourcePack')}
+                </button>
+              </div>
+            </div>
+
+            {resourcePacks.length === 0 ? (
+              <EmptyState
+                icon={ICONS.layers}
+                title={t('mods.emptyResourcePacksTitle')}
+                description={t('mods.emptyResourcePacksText')}
+                actionText={t('explore.browseResourcePacks')}
+                actionIcon={ICONS.compass}
+                onAction={() => {
+                  setExploreType('resourcepacks');
+                  setActiveTab('explore');
+                }}
+                secondaryText={t('mods.openResourcePacksFolder')}
+                onSecondary={() => handleOpenContentFolder('resourcepacks')}
+              />
+            ) : (() => {
+              const filtered = resourcePacks.filter(p =>
+                String(p.name || '').toLowerCase().includes(resourcePackSearch.toLowerCase()) ||
+                String(p.fileName || '').toLowerCase().includes(resourcePackSearch.toLowerCase())
+              );
+              if (filtered.length === 0) {
+                return (
+                  <EmptyState
+                    icon={ICONS.search}
+                    title={t('mods.noResourcePacksMatchTitle')}
+                    description={t('mods.noResourcePacksMatchText')}
+                    actionText={t('common.clearSearch')}
+                    onAction={() => setResourcePackSearch('')}
+                  />
+                );
+              }
+              return (
+                <div className="installed-packs-grid">
+                  {filtered.map(pack => (
+                    <div key={pack.id || pack.fileName} className="installed-pack-card">
+                      <div className="installed-pack-header">
+                        <div className="installed-pack-icon">
+                          {pack.iconUrl ? (
+                            <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                          ) : (
+                            <Icon d={ICONS.layers} size={20} />
+                          )}
+                        </div>
+                        <div className="installed-pack-meta">
+                          <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
+                          <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
+                        </div>
+                      </div>
+                      {pack.description && (
+                        <div className="installed-pack-desc" title={pack.description}>
+                          {pack.description}
+                        </div>
+                      )}
+                      <div className="installed-pack-footer">
+                        <span className="installed-pack-size">
+                          {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
+                        </span>
+                        <div className="installed-pack-actions">
+                          <button
+                            className="mod-delete-btn"
+                            onClick={() => handleDeleteResourcePack(pack)}
+                            title={t('mods.deleteResourcePack')}
+                          >
+                            <Icon d={ICONS.trash} size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── TAB: CONSOLE ── */}
@@ -3965,7 +4618,7 @@ export default function App() {
                 className={`hero-play-btn ${gameState === 'loading' || authRefreshing ? 'loading' : gameState === 'running' ? 'running' : ''}`}
                 onClick={() => {
                   if (installedVersions.length === 0 && !activeProfile?.version) {
-                    setModal('install-minecraft');
+                    setModal('install');
                     return;
                   }
                   handlePlay();
@@ -4010,11 +4663,12 @@ export default function App() {
           onSave={handleSaveProfile}
         />
       )}
-      {(modal === 'install-minecraft' || modal === 'install-fabric' || modal === 'install-forge') && (
+      {modal === 'install' && (
         <InstallModal
-          type={modal.replace('install-', '')}
+          initialType="minecraft"
           installTargets={installTargets}
           showSnapshots={settings.showSnapshots}
+          onToggleSnapshots={(val) => handleSettingChange('showSnapshots', val)}
           onClose={() => setModal(null)}
           onInstall={handleInstall}
           onCatalogLoaded={(catalog) => {
@@ -4065,7 +4719,7 @@ export default function App() {
           initialTab={selectedModDetail.initialTab || 'overview'}
           currentLoader={currentLoader}
           currentMcVer={currentMcVer}
-          mods={mods}
+          mods={selectedModDetail?.project?.project_type === 'shader' || exploreType === 'shaders' ? shaders : selectedModDetail?.project?.project_type === 'resourcepack' || exploreType === 'resourcepacks' ? resourcePacks : mods}
           installingVersionId={installingVersionId}
           onClose={() => setSelectedModDetail(null)}
           onInstallVersion={handleInstallSpecificVersion}

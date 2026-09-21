@@ -21,9 +21,10 @@ async function fetchModrinth(endpoint, options = {}) {
 }
 
 /**
- * Search mods on Modrinth with optional gameVersion, loader, and categories filters.
+ * Search projects on Modrinth (mods, shaders, resourcepacks) with optional gameVersion, loader, and categories filters.
  */
-export async function searchModrinthMods({
+export async function searchModrinthProjects({
+  projectType = 'mod', // 'mod' | 'shader' | 'resourcepack'
   query = '',
   loader = '',
   gameVersion = '',
@@ -32,10 +33,13 @@ export async function searchModrinthMods({
   offset = 0,
   limit = 20,
 } = {}) {
-  const facets = [['project_type:mod']];
+  const typeStr = projectType === 'shader' ? 'shader' : projectType === 'resourcepack' ? 'resourcepack' : 'mod';
+  const facets = [[`project_type:${typeStr}`]];
 
-  if (loader && loader.toLowerCase() !== 'all' && loader.toLowerCase() !== 'vanilla') {
-    facets.push([`categories:${loader.toLowerCase()}`]);
+  if (typeStr === 'mod') {
+    if (loader && loader.toLowerCase() !== 'all' && loader.toLowerCase() !== 'vanilla') {
+      facets.push([`categories:${loader.toLowerCase()}`]);
+    }
   }
 
   if (gameVersion && gameVersion.toLowerCase() !== 'all') {
@@ -56,6 +60,9 @@ export async function searchModrinthMods({
 
   return fetchModrinth(`/search?${params.toString()}`);
 }
+
+// Backward-compatible alias
+export const searchModrinthMods = searchModrinthProjects;
 
 /**
  * Get project details by ID or slug.

@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftGetInstalledMods() {
     return ipcRenderer.invoke('minecraft:get-installed-mods');
   },
+  minecraftGetInstalledShaders() {
+    return ipcRenderer.invoke('minecraft:get-installed-shaders');
+  },
+  minecraftGetInstalledResourcePacks() {
+    return ipcRenderer.invoke('minecraft:get-installed-resourcepacks');
+  },
   minecraftGetNews() {
     return ipcRenderer.invoke('minecraft:get-news');
   },
@@ -30,8 +36,20 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftDeleteMod(modId) {
     return ipcRenderer.invoke('minecraft:delete-mod', { modId });
   },
+  minecraftDeleteShader(fileName) {
+    return ipcRenderer.invoke('minecraft:delete-shader', { fileName });
+  },
+  minecraftDeleteResourcePack(fileName) {
+    return ipcRenderer.invoke('minecraft:delete-resourcepack', { fileName });
+  },
+  minecraftOpenContentFolder(folderType) {
+    return ipcRenderer.invoke('minecraft:open-content-folder', folderType);
+  },
   minecraftInstallModFile(sourcePath) {
     return ipcRenderer.invoke('minecraft:install-mod-file', { sourcePath });
+  },
+  minecraftImportContentFile(payload) {
+    return ipcRenderer.invoke('minecraft:import-content-file', payload);
   },
   minecraftModrinthSearch(params) {
     return ipcRenderer.invoke('minecraft:modrinth-search', params);
@@ -50,6 +68,9 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   minecraftPickModFiles() {
     return ipcRenderer.invoke('minecraft:pick-mod-files');
+  },
+  minecraftPickContentFiles(type) {
+    return ipcRenderer.invoke('minecraft:pick-content-files', type);
   },
   minecraftSaveState(state) {
     return ipcRenderer.invoke('minecraft:save-state', state);
