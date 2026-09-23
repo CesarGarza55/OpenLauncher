@@ -45,3 +45,5 @@ build_secret.py
 .env
 /admin
 OpenLauncher-Arch.bin
+
+pre-version.json

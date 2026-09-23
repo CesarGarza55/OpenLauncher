@@ -47,9 +47,10 @@ The current Electron-based version represents a complete rewrite with improved p
 ## Features
 
 - **Microsoft & Offline Profiles**: Secure authentication via official Microsoft OAuth, plus offline local profile support.
-- **Modrinth Integration (Beta)**: Direct mod browsing, 1-click installation, auto-dependency resolution, and instant update checks.
+- **Modrinth Hub (Mods, Shaders & Texture Packs)**: Direct online browsing and 1-click installation of mods, shaders, and resource packs with auto-dependency resolution and update checks.
+- **My Library Management**: Dedicated tabs for local Mods, Shaders, and Texture Packs with live item counts and folder access.
 - **Fabric Conflict & Incompatibility Auto-Fixer**: Diagnoses Fabric crash logs and harmonizes mod versions in 1 click.
-- **Multi-Loader Support**: Native management of Vanilla, Fabric, and Forge installations.
+- **Unified Version Installer**: Fast installation of Vanilla, Fabric, and Forge versions with live Minecraft Snapshot support.
 - **Fine-Tuned Performance**: Per-profile RAM allocation, custom Java paths, and garbage-collection-optimized JVM presets.
 - **News Feed & Customization**: Integrated official Minecraft news, multi-language support (EN, ES, FR), and auto-updater.
 
