@@ -61,7 +61,7 @@ The current Electron-based version represents a complete rewrite with improved p
 ### Main Dashboard
 Quick access to profiles, version selectors, installed mods, real-time console output, official news, and launcher settings.
 
-<img width="1552" height="897" alt="OpenLauncher Main Interface" src="https://github.com/user-attachments/assets/814f3417-294c-4a4f-83f3-f1e3f71defef" />
+<img width="1552" height="897" alt="main" src="https://github.com/user-attachments/assets/a4af4e79-3d3a-4cc8-a204-c68590a3a285" />
 
 <details>
 <summary><b>View Interface Details & Screenshots (Versions, Settings, Microsoft Login, Mod Manager, Auto-Fixer)</b></summary>
@@ -69,12 +69,12 @@ Quick access to profiles, version selectors, installed mods, real-time console o
 #### Version Installation
 Install Vanilla, Fabric, Forge, NeoForge, or Quilt versions with automatic catalog loading and snapshot filters:
 
-<img width="1552" height="897" alt="Version Installer" src="https://github.com/user-attachments/assets/70412866-f0d1-4c00-b54c-13a03bb142e9" />
+<img width="1552" height="897" alt="install" src="https://github.com/user-attachments/assets/944507af-bbcd-440a-be27-e3dfc2e82222" />
 
 #### Settings & Customization
 Configure game directories, custom Java JREs, auto-updates, JVM arguments, and language options:
 
-<img width="1552" height="897" alt="Launcher Settings" src="https://github.com/user-attachments/assets/c9587697-9a6e-45f4-ae26-9d7ca701922a" />
+<img width="1552" height="897" alt="settings" src="https://github.com/user-attachments/assets/7a38ccaa-a320-4269-969e-052dcd4115a3" />
 
 #### Optimized Dynamic JVM Arguments
 OpenLauncher dynamically applies the best Garbage Collector flags based on the detected Java runtime:
@@ -97,13 +97,10 @@ Authenticate securely with your official Minecraft-entitled Microsoft account:
 
 <img width="279" height="94" alt="Microsoft Authentication" src="https://github.com/user-attachments/assets/5f036741-7007-45f2-819e-034146bd4ba5" />
 
-#### Mod Manager & Modrinth Browser (Beta)
-Browse thousands of mods, check installed mod updates against Modrinth hashes, and drag-and-drop `.jar` files:
+#### Mod, Shaders & Texture Packs Manager & Modrinth Browser (Beta)
+Browse thousands of mods, shaders and texture packs, check installed mod updates against Modrinth hashes, and drag-and-drop files:
 
-<img width="1552" height="897" alt="Mod Manager" src="https://github.com/user-attachments/assets/9323d0b7-3c3d-459e-9d91-e62c884d22b2" />
-
-<img width="1552" height="897" alt="Modrinth Browser" src="https://github.com/user-attachments/assets/8380e6b5-ce06-408c-ae42-d5334c3dfb1d" />
-
+<img width="1552" height="897" alt="Modrinth" src="https://github.com/user-attachments/assets/1cfbc784-adf3-4e34-a22a-0aa5fa1c2ee4" />
 
 #### Mod Incompatibility Auto-Fixer
 When Fabric detects conflicting mods, OpenLauncher parses the diagnostic tree and applies harmonized versions in one action:
@@ -156,8 +153,7 @@ chmod +x compile-linux.sh
 Generates `OpenLauncher.deb` (Debian/Ubuntu) and `OpenLauncher-Portable-Linux.tar.gz`.
 </details>
 
-<details>
-<summary><b>Custom Microsoft Entra Client ID (For Forks & Developers)</b></summary>
+### Custom Microsoft Entra Client ID (For Forks & Developers)
 
 1. Register an app in [Microsoft Entra ID](https://entra.microsoft.com): **App registrations** &rarr; **New registration**.
 2. Add Redirect URI: `http://localhost:8080/callback`.
@@ -166,17 +162,41 @@ Generates `OpenLauncher.deb` (Debian/Ubuntu) and `OpenLauncher-Portable-Linux.ta
 
 > [!WARNING]
 > Never commit client secrets or refresh tokens to a public repository.
-</details>
 
 ---
 
 ## Testing & Benchmarks
 
 - **Hardware**: Apple M1 (8-core CPU / 8-core GPU), 8GB Unified Memory, macOS Tahoe 26.x
-- **Setup**: OpenLauncher 1.1.0, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.19.5
+- **Setup**: OpenLauncher 1.1.2, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.19.5
 - **Shaders**: [MakeUp-UltraFast-9.5e](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-<img width="1440" height="784" alt="In-Game Test Screenshot" src="https://github.com/user-attachments/assets/8b233cc4-1a1c-47c7-89e2-969f004a15e8" />
+<img width="1440" height="752" alt="Test" src="https://github.com/user-attachments/assets/3021a02e-da62-4d22-89d9-966568702607" />
+
+---
+
+## Why Electron & Zero-Overhead Optimization
+
+OpenLauncher utilizes **Electron + React 19** to deliver a unified, cross-platform experience across macOS, Windows, and Linux—featuring fluid animations, instant Modrinth hub discovery, and secure Microsoft OAuth flows.
+
+Rather than letting Chromium consume unnecessary memory while you play, OpenLauncher is engineered specifically for maximum performance and resource efficiency:
+
+### 1. Zero-Overhead Mode (0 MB RAM / 0% CPU)
+When set to **"Close launcher completely"**, OpenLauncher terminates Electron entirely upon starting Minecraft, freeing **100% of its RAM** for your game. A native OS background supervisor (`/bin/sh` on macOS/Linux, PowerShell on Windows) monitors the game's PID with near-zero overhead (< 2 MB) and automatically relaunches OpenLauncher the moment Minecraft closes.
+
+### 2. Background Throttling & Memory Cleansing
+In **"Hide launcher"** mode, the application window is hidden, audio is muted, Chromium background throttling is enforced, and session memory caches are cleared to minimize background footprint.
+
+### 3. Modular Decoupled Architecture
+- **Vite & React 19**: Ultra-fast hot-module reloading and optimized production bundles.
+- **Context-Isolated Preload Bridge**: Secure, minimal CommonJS IPC layer (`electron/preload.cjs`).
+- **Dedicated Background Services**: Separated modules for game launching, Java detection, content downloads, and mod conflict diagnostics.
+
+### 4. Built-in Benchmark Suite
+Measure and verify resource usage on your machine in real time with our automated testing suite:
+```bash
+pnpm run test:perf
+```
 
 ---
 
