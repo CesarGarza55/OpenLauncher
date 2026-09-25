@@ -12,6 +12,7 @@ export const DEFAULT_LAUNCHER_STATE = {
   settings: {
     javaPath: '',
     keepOpen: false,
+    launchBehavior: 'hide',
     showConsole: true,
     autoUpdate: true,
     showSnapshots: false,
@@ -67,9 +68,20 @@ export function normalizeProfile(profile, index = 0) {
 }
 
 function normalizeSettings(settings, fallbackSettings = DEFAULT_LAUNCHER_STATE.settings) {
+  const rawBehavior = settings?.launchBehavior;
+  let launchBehavior = 'hide';
+  if (rawBehavior === 'keepOpen' || rawBehavior === 'hide' || rawBehavior === 'close') {
+    launchBehavior = rawBehavior;
+  } else if (settings?.keepOpen === true) {
+    launchBehavior = 'keepOpen';
+  } else if (fallbackSettings?.launchBehavior) {
+    launchBehavior = fallbackSettings.launchBehavior;
+  }
+
   return {
     javaPath: typeof settings?.javaPath === 'string' ? settings.javaPath : fallbackSettings.javaPath,
-    keepOpen: typeof settings?.keepOpen === 'boolean' ? settings.keepOpen : fallbackSettings.keepOpen,
+    keepOpen: launchBehavior === 'keepOpen',
+    launchBehavior,
     showConsole: typeof settings?.showConsole === 'boolean' ? settings.showConsole : fallbackSettings.showConsole,
     autoUpdate: typeof settings?.autoUpdate === 'boolean' ? settings.autoUpdate : fallbackSettings.autoUpdate,
     showSnapshots: typeof settings?.showSnapshots === 'boolean' ? settings.showSnapshots : fallbackSettings.showSnapshots,

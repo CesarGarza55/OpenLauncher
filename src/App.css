@@ -2362,7 +2362,12 @@ select option {
   box-shadow: 0 2px 10px rgba(59, 130, 246, 0.25);
 }
 
-.install-type-btn.active svg {
+.loader-tab-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.install-type-btn.active svg:not(.loader-tab-icon) {
   color: var(--accent-light, #60a5fa);
 }
 

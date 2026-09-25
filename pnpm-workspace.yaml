@@ -1,3 +1,2 @@
 allowBuilds:
   electron-winstaller: true
-  keytar: true

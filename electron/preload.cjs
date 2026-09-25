@@ -90,6 +90,15 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftCheckUpdate() {
     return ipcRenderer.invoke('minecraft:check-update');
   },
+  minecraftGetSettings() {
+    return ipcRenderer.invoke('minecraft:get-settings');
+  },
+  getAppLanguage() {
+    return ipcRenderer.invoke('app:get-language');
+  },
+  setAppLanguage(language) {
+    return ipcRenderer.invoke('app:set-language', language);
+  },
   getAppVersion() {
     return ipcRenderer.invoke('app:get-version');
   },

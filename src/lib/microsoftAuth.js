@@ -1,68 +1,93 @@
 import fs from 'fs/promises';
-import { readFileSync } from 'fs';
 import http from 'http';
 import path from 'path';
+import crypto from 'crypto';
+import { safeStorage } from 'electron';
 
-const DEFAULT_AUTH_API_BASE = process.env.OPENLAUNCHER_AUTH_API ?? 'https://openlauncher.api.codevbox.com';
+// OpenLauncher provides a default Microsoft client ID for convenience, but developers can override it with their own by setting the `VITE_MICROSOFT_CLIENT_ID` or `MICROSOFT_CLIENT_ID` environment variable.
+// If you are building your own launcher or application, it is recommended to register your own Microsoft application and use its client ID for authentication.
+// Please refer to https://github.com/CesarGarza55/OpenLauncher#build-from-source to learn how to register your own Microsoft application and obtain a client ID.
+export const DEFAULT_MICROSOFT_CLIENT_ID = '3f59fbe7-2c4b-4343-9a61-c03104ddaedf';
+export const MICROSOFT_CLIENT_ID = process.env.VITE_MICROSOFT_CLIENT_ID
+  || process.env.MICROSOFT_CLIENT_ID
+  || DEFAULT_MICROSOFT_CLIENT_ID;
+
 const DEFAULT_REDIRECT_URL = 'http://localhost:8080/callback';
 const LOGIN_SUCCESS_REDIRECT_URL = 'https://openlauncher.codevbox.com/login-success';
 const LOGIN_FAILED_REDIRECT_URL = 'https://openlauncher.codevbox.com/login-failed';
-const DEV_BUILD_ID = '20260601_010619';
-const DEV_BUILD_SIGNATURE = '8e024ebcb9e2c011141c09228260c9fd81932717af80003ca446ca6df2e49c9a';
-const AUTH_KEYCHAIN_SERVICE = 'OpenLauncher';
-const DEFAULT_BUILD_SECRET_FILE = process.env.OPENLAUNCHER_BUILD_SECRET_FILE
-  ?? path.resolve(process.cwd(), 'data', 'build_secret.py');
-
-let keytarModulePromise = null;
 
 // Global singleton for the callback server
 let callbackServer = null;
-let callbackResolver = null;
-let callbackRejecter = null;
 
 function authStorePath(storageDir) {
   return path.join(storageDir, 'auth-store.json');
+}
+
+function authSecureStorePath(storageDir) {
+  return path.join(storageDir, 'auth-secure.json');
 }
 
 function authAccountName(profileKey) {
   return `profile:${String(profileKey || 'default')}`;
 }
 
-async function loadKeytar() {
-  if (!keytarModulePromise) {
-    keytarModulePromise = import('keytar')
-      .then(mod => mod?.default || mod)
-      .catch(() => null);
+function isSecureStorageAvailable() {
+  try {
+    return Boolean(safeStorage && typeof safeStorage.isEncryptionAvailable === 'function' && safeStorage.isEncryptionAvailable());
+  } catch {
+    return false;
   }
-  return keytarModulePromise;
 }
 
-async function getSecureRefreshToken(profileKey) {
-  const keytar = await loadKeytar();
-  if (!keytar) return null;
+async function readSecureStore(storageDir) {
   try {
-    return await keytar.getPassword(AUTH_KEYCHAIN_SERVICE, authAccountName(profileKey));
+    const raw = await fs.readFile(authSecureStorePath(storageDir), 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function writeSecureStore(storageDir, store) {
+  await fs.mkdir(storageDir, { recursive: true });
+  await fs.writeFile(authSecureStorePath(storageDir), JSON.stringify(store, null, 2), 'utf8');
+}
+
+async function getSecureRefreshToken(profileKey, storageDir) {
+  if (!isSecureStorageAvailable() || !storageDir) return null;
+  try {
+    const secureStore = await readSecureStore(storageDir);
+    const encryptedBase64 = secureStore[authAccountName(profileKey)];
+    if (!encryptedBase64) return null;
+    const decrypted = safeStorage.decryptString(Buffer.from(encryptedBase64, 'base64'));
+    return decrypted || null;
   } catch {
     return null;
   }
 }
 
-async function setSecureRefreshToken(profileKey, token) {
-  const keytar = await loadKeytar();
-  if (!keytar) return false;
+async function setSecureRefreshToken(profileKey, token, storageDir) {
+  if (!isSecureStorageAvailable() || !storageDir) return false;
   try {
-    await keytar.setPassword(AUTH_KEYCHAIN_SERVICE, authAccountName(profileKey), String(token || ''));
+    const secureStore = await readSecureStore(storageDir);
+    const encrypted = safeStorage.encryptString(String(token || '')).toString('base64');
+    secureStore[authAccountName(profileKey)] = encrypted;
+    await writeSecureStore(storageDir, secureStore);
     return true;
   } catch {
     return false;
   }
 }
 
-async function deleteSecureRefreshToken(profileKey) {
-  const keytar = await loadKeytar();
-  if (!keytar) return false;
+async function deleteSecureRefreshToken(profileKey, storageDir) {
+  if (!storageDir) return false;
   try {
-    await keytar.deletePassword(AUTH_KEYCHAIN_SERVICE, authAccountName(profileKey));
+    const secureStore = await readSecureStore(storageDir);
+    const key = authAccountName(profileKey);
+    if (key in secureStore) {
+      delete secureStore[key];
+      await writeSecureStore(storageDir, secureStore);
+    }
     return true;
   } catch {
     return false;
@@ -83,157 +108,15 @@ async function writeAuthStore(storageDir, store) {
   await fs.writeFile(authStorePath(storageDir), JSON.stringify(store, null, 2), 'utf8');
 }
 
-export function getAuthHeaders() {
-  const directBuildId = process.env.OPENLAUNCHER_BUILD_ID ?? '';
-  const directBuildSignature = process.env.OPENLAUNCHER_BUILD_SIGNATURE ?? '';
-  if (directBuildId && directBuildSignature) {
-    return {
-      'x-launcher-id': directBuildId,
-      'x-launcher-sign': directBuildSignature,
-    };
-  }
-
-  try {
-    const text = readFileSync(DEFAULT_BUILD_SECRET_FILE, 'utf8');
-    let buildId = '';
-    let buildSignature = '';
-
-    for (const rawLine of text.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (line.startsWith('BUILD_ID') && line.includes('=')) {
-        buildId = line.split('=', 1)[1].trim().replace(/^['"]|['"]$/g, '');
-      } else if (line.startsWith('BUILD_SIGNATURE') && line.includes('=')) {
-        buildSignature = line.split('=', 1)[1].trim().replace(/^['"]|['"]$/g, '');
-      }
-    }
-
-    if (buildId && buildSignature) {
-      return {
-        'x-launcher-id': buildId,
-        'x-launcher-sign': buildSignature,
-      };
-    }
-  } catch {
-    return {
-      'x-launcher-id': DEV_BUILD_ID,
-      'x-launcher-sign': DEV_BUILD_SIGNATURE,
-    };
-  }
-
-  return {
-    'x-launcher-id': DEV_BUILD_ID,
-    'x-launcher-sign': DEV_BUILD_SIGNATURE,
-  };
-}
-
-async function requestJson(url, options = {}, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-    });
-
-    if (!response.ok) {
-      let body = null;
-      try {
-        body = await response.json();
-      } catch {
-        try {
-          body = await response.text();
-        } catch {
-          body = null;
-        }
-      }
-
-      let details = '';
-
-      if (body && typeof body === 'object') {
-        if (body.upstream_status) {
-          details = `${body.error} (Minecraft/Microsoft respondió ${body.upstream_status})`;
-        } else {
-          details = body.error || body.message || JSON.stringify(body);
-        }
-      } else {
-        details = String(body || '').trim();
-      }
-      const suffix = details ? `: ${details}` : '';
-      let error;
-      switch (response.status) {
-        case 400:
-          error = new Error(`[ERROR ${response.status}] Bad request${suffix}`);
-          break;
-        case 401:
-          error = new Error(`[ERROR ${response.status}] Unauthorized${suffix}`);
-          break;
-        case 403:
-          error = new Error(`[ERROR ${response.status}] Forbidden${suffix}`);
-          break;
-        case 404:
-          error = new Error(`[ERROR ${response.status}] Not found${suffix}`);
-          break;
-        case 500:
-          error = new Error(`[ERROR ${response.status}] Internal server error${suffix}`);
-          break;
-        case 503:
-          error = new Error(`[ERROR ${response.status}] Service unavailable${suffix}`);
-          break;
-        default:
-          error = new Error(`[ERROR ${response.status}] Request failed${suffix}`);
-          break;
-      }
-      error.status = response.status;
-      error.details = body;
-      throw error;
-    }
-
-    return await response.json();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function getStatusFromError(error) {
-  const match = String(error?.message || '').match(/status\s+(\d{3})/i);
-  return match ? Number(match[1]) : null;
-}
-
-async function requestJsonWithFallback(authApiBase, primaryPath, fallbackPath, options = {}, timeoutMs = 15000) {
-  const baseUrl = String(authApiBase || '').replace(/\/+$/, '');
-  const candidates = [primaryPath, fallbackPath].filter(Boolean);
-  let lastError = null;
-
-  for (const candidatePath of candidates) {
-    try {
-      const data = await requestJson(`${baseUrl}${candidatePath}`, options, timeoutMs);
-      return { data, path: candidatePath };
-    } catch (error) {
-      lastError = error;
-      const status = getStatusFromError(error);
-      if (![401, 403, 500].includes(status)) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError;
-}
-
 export async function loadRefreshToken(profileKey, storageDir) {
-  const secureToken = await getSecureRefreshToken(profileKey);
+  const secureToken = await getSecureRefreshToken(profileKey, storageDir);
   if (secureToken) return secureToken;
 
   const store = await readAuthStore(storageDir);
   const legacyToken = store.profiles?.[profileKey]?.refresh_token ?? null;
 
-  // Migrate legacy JSON token to secure keychain when available.
   if (legacyToken) {
-    const migrated = await setSecureRefreshToken(profileKey, legacyToken);
+    const migrated = await setSecureRefreshToken(profileKey, legacyToken, storageDir);
     if (migrated) {
       if (store.profiles?.[profileKey]) {
         delete store.profiles[profileKey].refresh_token;
@@ -249,13 +132,12 @@ export async function loadRefreshToken(profileKey, storageDir) {
 }
 
 export async function saveRefreshToken(profileKey, token, storageDir, name = '') {
-  await setSecureRefreshToken(profileKey, token);
+  const isSecure = await setSecureRefreshToken(profileKey, token, storageDir);
   const store = await readAuthStore(storageDir);
   store.profiles ??= {};
   store.profiles[profileKey] ??= {};
   if (name) store.profiles[profileKey].name = name;
-  const keytar = await loadKeytar();
-  if (!keytar) {
+  if (!isSecure) {
     store.profiles[profileKey].refresh_token = token;
   } else if (store.profiles[profileKey].refresh_token) {
     delete store.profiles[profileKey].refresh_token;
@@ -264,7 +146,7 @@ export async function saveRefreshToken(profileKey, token, storageDir, name = '')
 }
 
 export async function deleteRefreshToken(profileKey, storageDir) {
-  await deleteSecureRefreshToken(profileKey);
+  await deleteSecureRefreshToken(profileKey, storageDir);
 
   const store = await readAuthStore(storageDir);
   if (store.profiles?.[profileKey]) {
@@ -273,26 +155,136 @@ export async function deleteRefreshToken(profileKey, storageDir) {
   }
 }
 
+// ── PKCE Utilities ─────────────────────────────────────────────────────────
+function base64url(buffer) {
+  return buffer.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest();
+}
+
+// ── Direct Minecraft / Xbox Live Authentication Flow ─────────────────────────
+async function postJson(url, data, headers = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await res.json();
+      errorDetail = JSON.stringify(errJson);
+    } catch {
+      errorDetail = await res.text().catch(() => '');
+    }
+    const error = new Error(`Request to ${url} failed with status ${res.status}: ${errorDetail}`);
+    error.status = res.status;
+    throw error;
+  }
+
+  return await res.json();
+}
+
+export async function buildMinecraftAccountInfoFromAccessToken(msAccessToken, msRefreshToken) {
+  // 1. Xbox Live User Authentication
+  const xblData = await postJson('https://user.auth.xboxlive.com/user/authenticate', {
+    Properties: {
+      AuthMethod: 'RPS',
+      SiteName: 'user.auth.xboxlive.com',
+      RpsTicket: `d=${msAccessToken}`,
+    },
+    RelyingParty: 'http://auth.xboxlive.com',
+    TokenType: 'JWT',
+  }, { 'x-xbl-contract-version': '1' });
+
+  const xblToken = xblData.Token;
+  const xblUhs = xblData?.DisplayClaims?.xui?.[0]?.uhs;
+  if (!xblToken || !xblUhs) throw new Error('Xbox Live authentication failed');
+
+  // 2. XSTS Token Authentication
+  const xstsData = await postJson('https://xsts.auth.xboxlive.com/xsts/authorize', {
+    Properties: {
+      SandboxId: 'RETAIL',
+      UserTokens: [xblToken],
+    },
+    RelyingParty: 'rp://api.minecraftservices.com/',
+    TokenType: 'JWT',
+  }, { 'x-xbl-contract-version': '1' });
+
+  const xstsToken = xstsData?.Token;
+  const xstsUhs = xstsData?.DisplayClaims?.xui?.[0]?.uhs || xblUhs;
+  if (!xstsToken) throw new Error('XSTS exchange failed');
+
+  // 3. Minecraft Services Authentication
+  const identityToken = `XBL3.0 x=${xstsUhs};${xstsToken}`;
+  const mcLoginData = await postJson('https://api.minecraftservices.com/authentication/login_with_xbox', {
+    identityToken,
+  }, { 'User-Agent': 'OpenLauncher' });
+
+  const mcAccessToken = mcLoginData?.access_token;
+  if (!mcAccessToken) throw new Error('Minecraft login failed');
+
+  // 4. Minecraft Profile Details
+  const profileRes = await fetch('https://api.minecraftservices.com/minecraft/profile', {
+    headers: { Authorization: `Bearer ${mcAccessToken}` },
+  });
+
+  if (!profileRes.ok) {
+    throw new Error(`Failed to fetch Minecraft profile: ${profileRes.status}`);
+  }
+
+  const profile = await profileRes.json();
+
+  return {
+    access_token: mcAccessToken,
+    id: profile.id,
+    uuid: profile.id,
+    name: profile.name,
+    refresh_token: msRefreshToken,
+    userType: 'msa',
+  };
+}
+
 export async function refreshMicrosoftSession({
   profileKey,
   storageDir,
-  authApiBase = DEFAULT_AUTH_API_BASE,
-  authHeaders = getAuthHeaders(),
+  clientId = MICROSOFT_CLIENT_ID,
 }) {
   const refreshToken = await loadRefreshToken(profileKey, storageDir);
   if (!refreshToken) {
     throw new Error('No refresh token available');
   }
 
-  const { data: accountInfo } = await requestJsonWithFallback(
-    authApiBase,
-    '/refresh',
-    '/refresh-local',
-    {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    },
+  const params = new URLSearchParams({
+    client_id: clientId,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  });
+
+  const tokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  if (!tokenRes.ok) {
+    const errorBody = await tokenRes.text().catch(() => '');
+    const err = new Error(`Token refresh failed (HTTP ${tokenRes.status}): ${errorBody}`);
+    err.status = tokenRes.status;
+    throw err;
+  }
+
+  const tokenData = await tokenRes.json();
+  const accountInfo = await buildMinecraftAccountInfoFromAccessToken(
+    tokenData.access_token,
+    tokenData.refresh_token || refreshToken,
   );
 
   if (accountInfo?.refresh_token) {
@@ -300,45 +292,6 @@ export async function refreshMicrosoftSession({
   }
 
   return accountInfo;
-}
-
-async function forceClosePort(port) {
-  return new Promise((resolve) => {
-    const server = http.createServer();
-    server.on('error', () => {
-      // Port is in use, try to close it
-      resolve();
-    });
-    server.on('listening', () => {
-      // Port is available, close the test server
-      server.close(() => resolve());
-    });
-    server.listen(port, '127.0.0.1');
-  });
-}
-
-async function waitForPortAvailable(port, maxWaitMs = 5000) {
-  const startTime = Date.now();
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      await new Promise((resolve, reject) => {
-        const testServer = http.createServer();
-        testServer.once('error', () => {
-          testServer.close();
-          resolve(false);
-        });
-        testServer.once('listening', () => {
-          testServer.close();
-          resolve(true);
-        });
-        testServer.listen(port, '127.0.0.1');
-      });
-      return true;
-    } catch (e) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
-  return false;
 }
 
 async function waitForCallback({ port, timeoutMs, abortSignal }) {
@@ -419,35 +372,27 @@ async function waitForCallback({ port, timeoutMs, abortSignal }) {
 export async function loginMicrosoftInteractive({
   profileKey,
   storageDir,
-  authApiBase = DEFAULT_AUTH_API_BASE,
-  authHeaders = getAuthHeaders(),
+  clientId = MICROSOFT_CLIENT_ID,
   openExternal,
   redirectUrl = DEFAULT_REDIRECT_URL,
   callbackPort = 8080,
   timeoutMs = 300000,
   abortSignal,
 } = {}) {
-  const startResponse = await requestJsonWithFallback(
-    authApiBase,
-    `/start?launcher_redirect_uri=${encodeURIComponent(redirectUrl)}`,
-    `/start-local?launcher_redirect_uri=${encodeURIComponent(redirectUrl)}`,
-    {
-      method: 'GET',
-      headers: authHeaders,
-    },
-  );
+  const state = crypto.randomUUID();
+  const codeVerifier = base64url(crypto.randomBytes(64));
+  const codeChallenge = base64url(sha256(codeVerifier));
 
-  const loginUrl = startResponse?.data?.url;
-  const state = startResponse?.data?.state;
-  const useLocalEndpoints = String(startResponse?.path || '').includes('-local');
-
-  if (!loginUrl || !state) {
-    throw new Error('Authentication service returned an invalid login payload.');
-  }
+  const scope = encodeURIComponent('offline_access openid profile XboxLive.signin');
+  const authUrl = `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=${clientId}`
+    + `&response_type=code&redirect_uri=${encodeURIComponent(redirectUrl)}`
+    + `&response_mode=query&scope=${scope}&state=${state}`
+    + `&code_challenge=${encodeURIComponent(codeChallenge)}&code_challenge_method=S256&prompt=select_account`;
 
   const callbackPromise = waitForCallback({ port: callbackPort, timeoutMs, abortSignal });
+
   if (typeof openExternal === 'function') {
-    await openExternal(loginUrl);
+    await openExternal(authUrl);
   }
 
   const callback = await callbackPromise;
@@ -455,18 +400,30 @@ export async function loginMicrosoftInteractive({
     throw new Error('Invalid authentication state received from callback.');
   }
 
-  const { data: accountInfo } = await requestJsonWithFallback(
-    authApiBase,
-    useLocalEndpoints ? '/complete-local' : '/complete',
-    useLocalEndpoints ? '/complete' : '/complete-local',
-    {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        code: callback.code,
-        state: callback.state,
-      }),
-    },
+  // Direct token exchange with Microsoft using PKCE code_verifier
+  const params = new URLSearchParams({
+    client_id: clientId,
+    grant_type: 'authorization_code',
+    code: callback.code,
+    redirect_uri: redirectUrl,
+    code_verifier: codeVerifier,
+  });
+
+  const tokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  if (!tokenRes.ok) {
+    const errorBody = await tokenRes.text().catch(() => '');
+    throw new Error(`Token exchange failed with status ${tokenRes.status}: ${errorBody}`);
+  }
+
+  const tokenData = await tokenRes.json();
+  const accountInfo = await buildMinecraftAccountInfoFromAccessToken(
+    tokenData.access_token,
+    tokenData.refresh_token,
   );
 
   if (accountInfo?.refresh_token) {
@@ -479,9 +436,7 @@ export async function loginMicrosoftInteractive({
 export async function getMicrosoftAuthState({
   profileKey,
   storageDir,
-  authApiBase = DEFAULT_AUTH_API_BASE,
-  authHeaders = getAuthHeaders(),
-  openExternal,
+  clientId = MICROSOFT_CLIENT_ID,
 } = {}) {
   const store = await readAuthStore(storageDir);
   const hasStoredToken = !!store.profiles?.[profileKey]?.refresh_token;
@@ -490,8 +445,7 @@ export async function getMicrosoftAuthState({
     const accountInfo = await refreshMicrosoftSession({
       profileKey,
       storageDir,
-      authApiBase,
-      authHeaders,
+      clientId,
     });
 
     return {
@@ -503,9 +457,7 @@ export async function getMicrosoftAuthState({
   } catch (error) {
     const errorMsg = error?.message || 'Not authenticated';
 
-    // Only remove the token when the error is definitive (401 = unauthorized)
-    // Network or transient errors should NOT delete the stored token
-    if (errorMsg.includes('401') || errorMsg.includes('invalid_grant')) {
+    if (errorMsg.includes('401') || errorMsg.includes('invalid_grant') || errorMsg.includes('400')) {
       await deleteRefreshToken(profileKey, storageDir);
       return {
         loggedIn: false,
@@ -516,7 +468,6 @@ export async function getMicrosoftAuthState({
       };
     }
 
-    // Para otros errores (red, timeout, etc.), mantener el token
     return {
       loggedIn: false,
       name: '',

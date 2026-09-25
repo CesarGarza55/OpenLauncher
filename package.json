@@ -1,7 +1,7 @@
 {
   "name": "OpenLauncher",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "OpenLauncher is an open source Minecraft launcher developed by CesarGarza55",
   "author": "CesarGarza55",
   "type": "module",
@@ -19,14 +19,11 @@
     "build:mac:dmg": "npm run build && electron-builder --mac dmg",
     "build:mac:zip": "npm run build && electron-builder --mac zip",
     "build:mac:universal": "npm run build && electron-builder --mac --universal",
-    "build:mac:all": "npm run build && electron-builder --mac dmg zip"
+    "build:mac:all": "npm run build && electron-builder --mac dmg zip",
+    "test:perf": "node script/test-performance.js"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
-    "dotenv": "^17.4.2",
-    "keytar": "^7.9.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "adm-zip": "^0.6.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -37,6 +34,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^10.0.3",
+    "dotenv": "^17.4.2",
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
     "eslint": "^10.7.0",
@@ -44,6 +42,8 @@
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
     "nodemon": "^3.1.14",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "vite": "^8.1.5",
     "wait-on": "^9.0.10"
   },
@@ -55,6 +55,10 @@
     },
     "asar": true,
     "compression": "maximum",
+    "afterPack": "script/afterPack.cjs",
+    "removePackageScripts": true,
+    "removePackageKeywords": true,
+    "npmRebuild": false,
     "files": [
       "dist/**/*",
       "electron/**/*",
