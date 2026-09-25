@@ -2,6 +2,7 @@
 
 /* ── DESIGN SYSTEM TOKENS ── */
 :root {
+  color-scheme: dark;
   /* Surface colors */
   --bg-void: #06080c;
   --bg-base: #0a0d14;
@@ -38,8 +39,12 @@
 
   --fabric: #c084fc;
   --fabric-subtle: rgba(192, 132, 252, 0.14);
-  --forge: #fb923c;
-  --forge-subtle: rgba(251, 146, 60, 0.14);
+  --forge: #d64040;
+  --forge-subtle: rgba(214, 64, 64, 0.14);
+  --neoforge: #fb923c;
+  --neoforge-subtle: rgba(251, 146, 60, 0.14);
+  --quilt: #64b5f6;
+  --quilt-subtle: rgba(100, 181, 246, 0.14);
 
   /* Typography colors */
   --text-primary: #f8fafc;
@@ -108,6 +113,18 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* ── BASE FORM CONTROLS ── */
+select,
+option,
+optgroup {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #141926;
+  color: #f8fafc;
 }
 
 /* ── TOP TITLEBAR ── */
@@ -1566,6 +1583,7 @@
     opacity: 0;
     transform: translateY(-4px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1727,6 +1745,12 @@
   padding: 4px 0 !important;
   cursor: pointer;
   outline: none;
+}
+
+.modrinth-filter-select option {
+  background-color: #141926;
+  color: #f8fafc;
+  padding: 6px 10px;
 }
 
 .modrinth-category-pills {
@@ -2126,6 +2150,18 @@
   border: 1px solid rgba(251, 146, 60, 0.25);
 }
 
+.loader-badge.quilt {
+  background: var(--quilt-subtle);
+  color: var(--quilt);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+.loader-badge.neoforge {
+  background: var(--neoforge-subtle);
+  color: var(--neoforge);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+}
+
 .loader-badge.vanilla {
   background: var(--accent-subtle);
   color: var(--accent-bright);
@@ -2288,8 +2324,8 @@
 /* ── UNIFIED INSTALL MODAL LOADER SELECTOR ── */
 .install-type-selector {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
   background: rgba(0, 0, 0, 0.3);
   padding: 4px;
   border-radius: var(--radius-md);
@@ -2301,13 +2337,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 8px 10px;
+  gap: 5px;
+  padding: 7px 4px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2509,6 +2545,12 @@
 .modal-select:focus {
   border-color: var(--accent-border);
   box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.modal-select option {
+  background-color: #141926;
+  color: #f8fafc;
+  padding: 6px 10px;
 }
 
 .modal-actions {

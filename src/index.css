@@ -38,6 +38,17 @@ select {
   color: inherit;
 }
 
+select,
+option,
+optgroup {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #141926;
+  color: #f8fafc;
+}
+
 button {
   cursor: pointer;
   border: none;

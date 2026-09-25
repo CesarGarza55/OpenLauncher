@@ -20,6 +20,23 @@ async function fetchModrinth(endpoint, options = {}) {
   return res.json();
 }
 
+export function cleanMinecraftVersion(version) {
+  if (!version) return '';
+  const str = String(version).trim();
+  if (!str || str.toLowerCase() === 'all' || str.toLowerCase() === 'auto') return '';
+  const loaderMatch = str.match(/(?:fabric|quilt)-loader-[^-]+-(.+)$/i);
+  if (loaderMatch) return loaderMatch[1];
+  const spaceHyphenMatch = str.match(/(?:fabric|forge|neoforge|quilt)\s+[^\s-]+\s*-\s*(.+)/i);
+  if (spaceHyphenMatch) return spaceHyphenMatch[1];
+  const forgeMatch = str.match(/(\d+\.\d+(?:\.\d+)?)[-_](?:forge|neoforge)/i) || str.match(/(?:^|\b)(?:forge|neoforge)[-_](\d+\.\d+(?:\.\d+)?)/i);
+  if (forgeMatch) return forgeMatch[1];
+  const trailingMatch = str.match(/(?:^|[^0-9.])(\d+\.\d+(?:\.\d+)?)$/);
+  if (trailingMatch && (str.includes('-') || str.includes('_') || str.includes(' '))) {
+    return trailingMatch[1];
+  }
+  return str;
+}
+
 /**
  * Search projects on Modrinth (mods, shaders, resourcepacks) with optional gameVersion, loader, and categories filters.
  */
@@ -42,8 +59,9 @@ export async function searchModrinthProjects({
     }
   }
 
-  if (gameVersion && gameVersion.toLowerCase() !== 'all') {
-    facets.push([`versions:${gameVersion}`]);
+  const cleanGameVer = cleanMinecraftVersion(gameVersion);
+  if (cleanGameVer) {
+    facets.push([`versions:${cleanGameVer}`]);
   }
 
   if (category && category.toLowerCase() !== 'all') {
@@ -83,8 +101,9 @@ export async function getModrinthProjectVersions({
   if (loaders.length > 0) {
     params.set('loaders', JSON.stringify(loaders));
   }
-  if (gameVersions.length > 0) {
-    params.set('game_versions', JSON.stringify(gameVersions));
+  const cleanGameVersions = (gameVersions || []).map(cleanMinecraftVersion).filter(Boolean);
+  if (cleanGameVersions.length > 0) {
+    params.set('game_versions', JSON.stringify(cleanGameVersions));
   }
 
   const queryStr = params.toString();
@@ -108,6 +127,7 @@ export async function checkModrinthVersionFilesUpdate({
   gameVersions = [],
 } = {}) {
   if (!hashes || hashes.length === 0) return {};
+  const cleanGameVersions = (gameVersions || []).map(cleanMinecraftVersion).filter(Boolean);
   return fetchModrinth('/version_files/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -115,7 +135,7 @@ export async function checkModrinthVersionFilesUpdate({
       hashes,
       algorithm,
       loaders: loaders.filter(Boolean),
-      game_versions: gameVersions.filter(Boolean),
+      game_versions: cleanGameVersions,
     }),
   });
 }

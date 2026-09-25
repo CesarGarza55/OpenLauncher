@@ -7,6 +7,8 @@ import {
   getInstallInfo,
   getVersionById,
   loadLauncherCatalog,
+  resolveMinecraftVersion,
+  formatVersionLabel,
   install,
   run,
 } from './lib/minecraftLauncher';
@@ -1413,7 +1415,7 @@ function ProfileModal({ mode = 'new', profile, versions, systemTotalRam: initial
           {versions.length > 0 ? (
             <select className="modal-select" value={version} onChange={e => setVersion(e.target.value)}>
               <option value="">{t('profile.useLauncherSelector')}</option>
-              {versions.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+              {versions.map(v => <option key={v.id} value={v.id}>{formatVersionLabel(v)}</option>)}
             </select>
           ) : (
             <div className="modal-input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }}>
@@ -1493,7 +1495,7 @@ function InstallModal({ initialType = 'minecraft', installTargets, showSnapshots
   const [selectedType, setSelectedType] = useState(initialType);
   const [loading, setLoading] = useState(false);
   const info = getInstallInfo(selectedType, installTargets);
-  const usesGameAndLoader = selectedType === 'fabric' || selectedType === 'forge';
+  const usesGameAndLoader = selectedType === 'fabric' || selectedType === 'forge' || selectedType === 'quilt' || selectedType === 'neoforge';
   const hasVersions = usesGameAndLoader ? (info.gameVersions?.length > 0) : (info.versions?.length > 0);
 
   const fetchCatalogForSnapshots = useCallback(async (snapshotsEnabled) => {
@@ -1563,12 +1565,14 @@ function InstallModal({ initialType = 'minecraft', installTargets, showSnapshots
   const loaderTabs = [
     { id: 'minecraft', label: 'Vanilla', icon: ICONS.cube },
     { id: 'fabric', label: 'Fabric', icon: ICONS.layers },
+    { id: 'quilt', label: 'Quilt', icon: ICONS.layers },
     { id: 'forge', label: 'Forge', icon: ICONS.wrench },
+    { id: 'neoforge', label: 'NeoForge', icon: ICONS.wrench },
   ];
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 440 }}>
+      <div className="modal" style={{ maxWidth: 500 }}>
         <div className="modal-title">{t('install.title')}</div>
         <div className="modal-subtitle">{t('install.subtitle')}</div>
 
@@ -1604,7 +1608,7 @@ function InstallModal({ initialType = 'minecraft', installTargets, showSnapshots
             </div>
 
             <div className="modal-field">
-              <label className="modal-label">{selectedType === 'forge' ? t('install.forgeRelease') : t('install.loader')}</label>
+              <label className="modal-label">{(selectedType === 'forge' || selectedType === 'neoforge') ? t('install.forgeRelease') : t('install.loader')}</label>
               {loaderOptions.length > 0 ? (
                 <select className="modal-select" value={loaderVersion} onChange={e => setLoaderVersion(e.target.value)}>
                   {loaderOptions.map(v => (
@@ -1635,7 +1639,7 @@ function InstallModal({ initialType = 'minecraft', installTargets, showSnapshots
           </div>
         )}
 
-        {selectedType !== 'forge' && (
+        {(selectedType === 'minecraft' || selectedType === 'fabric' || selectedType === 'quilt') && (
           <div className="install-snapshot-row">
             <div className="install-snapshot-copy">
               <span className="install-snapshot-title">{t('settings.showSnapshots')}</span>
@@ -2445,6 +2449,8 @@ export default function App() {
       return;
     }
     const installPayload = typeof opts === 'string' ? { version: opts } : (opts || {});
+    setLogs([]);
+    persistState({ logs: [] });
     addLog('info', `Starting ${type} installation...`);
     setActiveTab('console');
     setProgress(0);
@@ -2783,21 +2789,21 @@ export default function App() {
     try {
       const list = await launcher.minecraftGetInstalledMods?.();
       if (Array.isArray(list)) setMods(list);
-    } catch {}
+    } catch { }
   }, []);
 
   const loadShaders = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledShaders?.();
       if (Array.isArray(list)) setShaders(list);
-    } catch {}
+    } catch { }
   }, []);
 
   const loadResourcePacks = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledResourcePacks?.();
       if (Array.isArray(list)) setResourcePacks(list);
-    } catch {}
+    } catch { }
   }, []);
 
   const handleDeleteShader = async (shader) => {
@@ -2828,7 +2834,7 @@ export default function App() {
     try {
       const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : 'mods');
       await launcher.minecraftOpenContentFolder?.(targetType);
-    } catch {}
+    } catch { }
   };
 
   const handleAddContentClick = async (type) => {
@@ -2857,9 +2863,10 @@ export default function App() {
   };
 
   // ── Modrinth Search & Install logic ──
-  const profileLoader = String(activeVersion?.type || '').toLowerCase();
-  const currentLoader = profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('forge') ? 'forge' : '';
-  const currentMcVer = activeProfileVersion?.mcVer || activeVersion?.mcVer || '';
+  const profileLoader = String(activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
+  const currentLoader = profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('neoforge') ? 'neoforge' : profileLoader.includes('forge') ? 'forge' : profileLoader.includes('quilt') ? 'quilt' : '';
+  const rawMcVer = activeProfileVersion?.inheritsFrom || activeProfileVersion?.mcVer || activeVersion?.inheritsFrom || activeVersion?.mcVer || activeProfile?.version || activeVersion?.id || '';
+  const currentMcVer = resolveMinecraftVersion(rawMcVer);
 
   const effectiveLoader = modrinthLoaderFilter === 'auto' ? currentLoader : (modrinthLoaderFilter === 'all' ? '' : modrinthLoaderFilter);
   const effectiveMcVer = modrinthVersionFilter === 'auto' ? currentMcVer : '';
@@ -2978,6 +2985,9 @@ export default function App() {
     const projectId = project.project_id || project.slug;
     const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
     setModrinthInstalling(prev => ({ ...prev, [projectId]: true }));
+    setLogs([]);
+    persistState({ logs: [] });
+    setActiveTab('console');
     addLog('info', `Installing ${projectType} '${project.title || projectId}' from Modrinth...`);
 
     try {
@@ -3043,6 +3053,9 @@ export default function App() {
     setInstallingVersionId(version.id);
     const primaryFile = version.files?.find(f => f.primary) || version.files?.[0];
     const verNumber = version.version_number || version.name || '';
+    setLogs([]);
+    persistState({ logs: [] });
+    setActiveTab('console');
     addLog('info', `[Modrinth] Installing ${project.title || projectId} (v${verNumber})...`);
 
     try {
@@ -3449,9 +3462,9 @@ export default function App() {
   const profileAvatarUrl = getMcHeadsAvatarUrl(profileAvatarName, 64);
 
   // Version Loader Type badge helper
-  const loaderType = String(activeVersion?.type || '').toLowerCase();
-  const loaderBadgeClass = loaderType.includes('fabric') ? 'fabric' : loaderType.includes('forge') ? 'forge' : 'vanilla';
-  const loaderBadgeLabel = loaderType.includes('fabric') ? 'Fabric' : loaderType.includes('forge') ? 'Forge' : 'Vanilla';
+  const loaderType = String(activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
+  const loaderBadgeClass = loaderType.includes('fabric') ? 'fabric' : loaderType.includes('neoforge') ? 'neoforge' : loaderType.includes('forge') ? 'forge' : loaderType.includes('quilt') ? 'quilt' : 'vanilla';
+  const loaderBadgeLabel = loaderType.includes('fabric') ? 'Fabric' : loaderType.includes('neoforge') ? 'NeoForge' : loaderType.includes('forge') ? 'Forge' : loaderType.includes('quilt') ? 'Quilt' : 'Vanilla';
 
   const profileToEdit = profileEditor?.mode === 'edit'
     ? profiles.find(p => p.id === profileEditor.profileId) || null
@@ -3503,7 +3516,7 @@ export default function App() {
                 const installedProfileVersion = p.version
                   ? installedVersions.find(v => v.id === p.version) || getVersionById(p.version, versionCatalog)
                   : null;
-                const profileVersionLabel = installedProfileVersion?.mcVer || 'Auto';
+                const profileVersionLabel = resolveMinecraftVersion(installedProfileVersion?.inheritsFrom || installedProfileVersion?.mcVer || p.version) || 'Auto';
                 const isSelected = p.id === activeProfileId;
                 const avatarName = (account.loggedIn && account.profileKey === p.id && account.name)
                   ? account.name
@@ -3910,7 +3923,7 @@ export default function App() {
                             className="btn-ghost"
                             style={{ fontSize: 11, padding: '4px 8px', height: 'auto', textDecoration: 'none' }}
                             onClick={() => {
-                              launcher.openExternal?.('https://modrinth.com').catch(() => {});
+                              launcher.openExternal?.('https://modrinth.com').catch(() => { });
                             }}
                           >
                             <Icon d={ICONS.external} size={11} />
@@ -3999,12 +4012,16 @@ export default function App() {
                         value={modrinthLoaderFilter}
                         onChange={e => setModrinthLoaderFilter(e.target.value)}
                       >
-                        <option value="auto">
-                          {currentLoader ? `Auto (${currentLoader.toUpperCase()})` : t('mods.allLoaders')}
-                        </option>
+                        {currentLoader && (
+                          <option value="auto">
+                            Auto ({currentLoader.toUpperCase()})
+                          </option>
+                        )}
+                        <option value="all">{t('mods.allLoaders')}</option>
                         <option value="fabric">Fabric</option>
                         <option value="forge">Forge</option>
-                        <option value="all">{t('mods.allLoaders')}</option>
+                        <option value="neoforge">NeoForge</option>
+                        <option value="quilt">Quilt</option>
                       </select>
                     </div>
                   )}
@@ -4171,6 +4188,19 @@ export default function App() {
               )}
 
               <div className="mods-toolbar-actions">
+                {mods.length > 0 && (() => {
+                  const anyEnabled = mods.some(m => m.enabled);
+                  return (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => handleSetAllModsEnabled(!anyEnabled)}
+                      title={anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}
+                    >
+                      <Icon d={anyEnabled ? ICONS.stop : ICONS.check} size={12} />
+                      <span>{anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}</span>
+                    </button>
+                  );
+                })()}
                 <button
                   className="btn-secondary"
                   onClick={() => handleCheckModUpdates({ silent: false })}
@@ -4582,7 +4612,7 @@ export default function App() {
                 >
                   {installedVersions.length > 0 ? (
                     installedVersions.map(v => (
-                      <option key={v.id} value={v.id}>{v.label || v.id}</option>
+                      <option key={v.id} value={v.id}>{formatVersionLabel(v)}</option>
                     ))
                   ) : (
                     <option value="">{t('profile.noVersionsInstalled')}</option>

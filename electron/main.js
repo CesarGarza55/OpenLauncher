@@ -444,22 +444,35 @@ function resolveMinecraftVersion(version) {
   if (!version || typeof version !== 'object') {
     const rawValue = String(version || '').trim();
     if (!rawValue) return '';
+    const fabricMatch = rawValue.match(/(?:fabric|quilt)-loader-[^-]+-(.+)$/i);
+    if (fabricMatch) return fabricMatch[1];
+    const spaceHyphenMatch = rawValue.match(/(?:fabric|forge|neoforge|quilt)\s+[^\s-]+\s*-\s*(.+)/i);
+    if (spaceHyphenMatch) return spaceHyphenMatch[1];
+    const forgeMatch = rawValue.match(/(\d+\.\d+(?:\.\d+)?)[-_](?:forge|neoforge)/i) || rawValue.match(/(?:^|\b)(?:forge|neoforge)[-_](\d+\.\d+(?:\.\d+)?)/i);
+    if (forgeMatch) return forgeMatch[1];
+    const trailingMatch = rawValue.match(/(?:^|[^0-9.])(\d+\.\d+(?:\.\d+)?)$/);
+    if (trailingMatch && (rawValue.includes('-') || rawValue.includes('_') || rawValue.includes(' '))) {
+      return trailingMatch[1];
+    }
     const rawMatch = rawValue.match(/(\d+(?:\.\d+)+(?:[-+._a-z0-9]*)?)$/i);
     return rawMatch ? rawMatch[1] : rawValue;
   }
-  const explicitCandidates = [version.mcVer, version.minecraftVersion, version.gameVersion, version.baseVersion];
+  const explicitCandidates = [version.inheritsFrom, version.mcVer, version.minecraftVersion, version.gameVersion, version.baseVersion];
   for (const candidate of explicitCandidates) {
-    if (candidate && String(candidate).trim()) return String(candidate).trim();
+    if (candidate && String(candidate).trim()) {
+      const trimmed = String(candidate).trim();
+      if (!trimmed.includes('fabric-loader') && !trimmed.includes('quilt-loader') && !trimmed.toLowerCase().includes('forge-')) {
+        return trimmed;
+      }
+      return resolveMinecraftVersion(trimmed);
+    }
   }
   const versionType = String(version.type || '').toLowerCase();
   const fallbackId = String(version.id || '').trim();
   if (versionType && versionType !== 'vanilla' && fallbackId) {
-    const idMatch = fallbackId.match(/(\d+(?:\.\d+)+(?:[-+._a-z0-9]*)?)$/i);
-    if (idMatch) return idMatch[1];
-    const labelMatch = String(version.label || '').match(/(\d+(?:\.\d+)+(?:[-+._a-z0-9]*)?)$/i);
-    if (labelMatch) return labelMatch[1];
+    return resolveMinecraftVersion(fallbackId);
   }
-  return fallbackId;
+  return resolveMinecraftVersion(fallbackId);
 }
 
 async function loadLocalVersionMetadata(versionDir) {
@@ -522,11 +535,29 @@ async function findFirstMatchingJar(rootDir, matcher) {
 function mergeVersionMetadata(baseVersionJson, customVersionJson) {
   if (!baseVersionJson) return customVersionJson || null;
   if (!customVersionJson) return baseVersionJson;
+
+  const baseGameArgs = Array.isArray(baseVersionJson.arguments?.game)
+    ? baseVersionJson.arguments.game
+    : (baseVersionJson.arguments?.game ? [baseVersionJson.arguments.game] : []);
+  const customGameArgs = Array.isArray(customVersionJson.arguments?.game)
+    ? customVersionJson.arguments.game
+    : (customVersionJson.arguments?.game ? [customVersionJson.arguments.game] : []);
+
+  const baseJvmArgs = Array.isArray(baseVersionJson.arguments?.jvm)
+    ? baseVersionJson.arguments.jvm
+    : (baseVersionJson.arguments?.jvm ? [baseVersionJson.arguments.jvm] : []);
+  const customJvmArgs = Array.isArray(customVersionJson.arguments?.jvm)
+    ? customVersionJson.arguments.jvm
+    : (customVersionJson.arguments?.jvm ? [customVersionJson.arguments.jvm] : []);
+
   return {
     ...baseVersionJson,
     ...customVersionJson,
     libraries: [...(baseVersionJson.libraries || []), ...(customVersionJson.libraries || [])],
-    arguments: { ...(baseVersionJson.arguments || {}), ...(customVersionJson.arguments || {}) },
+    arguments: {
+      game: [...baseGameArgs, ...customGameArgs],
+      jvm: [...baseJvmArgs, ...customJvmArgs],
+    },
     downloads: customVersionJson.downloads || baseVersionJson.downloads,
     assetIndex: customVersionJson.assetIndex || baseVersionJson.assetIndex,
     mainClass: customVersionJson.mainClass || baseVersionJson.mainClass,
@@ -620,12 +651,21 @@ function resolveLibraryArtifactCandidates(lib) {
   const coordinates = String(lib?.name || '').trim();
   const artifactInfo = buildMavenArtifactInfo(coordinates);
   if (!artifactInfo) return [];
-  const repositories = Array.from(new Set([
-    String(lib?.url || '').trim(),
-    'https://libraries.minecraft.net',
+  const baseUrls = [];
+  if (lib?.url) {
+    const customUrl = String(lib.url).trim();
+    if (customUrl) baseUrls.push(customUrl);
+  }
+  baseUrls.push(
+    'https://maven.quiltmc.org/repository/release',
+    'https://maven.quiltmc.org/repository/snapshot',
     'https://maven.fabricmc.net',
+    'https://maven.neoforged.net/releases',
+    'https://maven.minecraftforge.net',
+    'https://libraries.minecraft.net',
     'https://repo1.maven.org/maven2',
-  ].filter(Boolean)));
+  );
+  const repositories = Array.from(new Set(baseUrls.filter(Boolean)));
   return repositories.map(repo => `${repo.replace(/\/+$/g, '')}/${artifactInfo.relativePath}`);
 }
 
@@ -949,8 +989,8 @@ function getJarMainClass(jarPath) {
 }
 
 function rulesPassForCurrentSystem(rules, features = {}) {
-  if (!rules) return true;
-  let allow = false;
+  if (!rules || !Array.isArray(rules) || rules.length === 0) return true;
+  let allow = rules.some(r => r.action === 'allow') ? false : true;
   for (const rule of rules) {
     let match = true;
     if (rule.os && rule.os.name) {
@@ -1151,25 +1191,93 @@ async function readInstalledVersions() {
         if (!entry.isDirectory()) continue;
         const versionId = entry.name;
         const versionDir = path.join(versionsDir, versionId);
-        const versionJsonPath = path.join(versionDir, 'version.json');
+
+        // Every fabric/forge/neoforge version has a JSON file matching its folder name (<versionId>.json).
+        // It contains inheritsFrom with the Minecraft version.
+        // Fallback to version.json (OpenLauncher's descriptor).
         let descriptor = null;
-        try { const raw = await fs.promises.readFile(versionJsonPath, 'utf8'); descriptor = JSON.parse(raw); } catch { descriptor = null; }
+        const namedJsonPath = path.join(versionDir, `${versionId}.json`);
+        const fallbackJsonPath = path.join(versionDir, 'version.json');
+        try {
+          const raw = await fs.promises.readFile(namedJsonPath, 'utf8')
+            .catch(() => fs.promises.readFile(fallbackJsonPath, 'utf8'));
+          descriptor = JSON.parse(raw);
+        } catch {
+          try {
+            descriptor = await loadLocalVersionMetadata(versionDir);
+          } catch {
+            descriptor = null;
+          }
+        }
+
         const jarFiles = (await fs.promises.readdir(versionDir).catch(() => [])).filter(fileName => fileName.toLowerCase().endsWith('.jar'));
         if (!descriptor && jarFiles.length === 0) continue;
         const id = descriptor?.id || versionId;
         if (seen.has(id)) continue;
         seen.add(id);
+
         const lowerId = id.toLowerCase();
         let detectedType = descriptor?.type || 'vanilla';
         if (lowerId.includes('fabric')) detectedType = 'fabric';
-        else if (lowerId.includes('forge')) detectedType = 'forge';
         else if (lowerId.includes('neoforge') || lowerId.includes('neo forge')) detectedType = 'neoforge';
+        else if (lowerId.includes('forge')) detectedType = 'forge';
         else if (lowerId.includes('quilt')) detectedType = 'quilt';
         else if (lowerId.includes('vanilla') || descriptor?.type === 'vanilla') detectedType = 'vanilla';
+
+        let loaderVersion = descriptor?.loaderVersion || descriptor?.fabricLoaderVersion || null;
+        if (!loaderVersion) {
+          if (detectedType === 'fabric') {
+            const m = id.match(/fabric-loader-([^\s-]+)/i);
+            if (m) loaderVersion = m[1];
+          } else if (detectedType === 'quilt') {
+            const m = id.match(/quilt-loader-([^\s-]+)/i);
+            if (m) loaderVersion = m[1];
+          } else if (detectedType === 'forge') {
+            const m = id.match(/(?:^|\b|-)forge-([^\s-]+)/i) || id.match(/forge-(\d+\.\d+(?:\.\d+)?)-([^\s-]+)/i);
+            if (m) loaderVersion = m[2] || m[1];
+          } else if (detectedType === 'neoforge') {
+            const m = id.match(/(?:^|\b|-)neoforge-([^\s-]+)/i);
+            if (m) loaderVersion = m[1];
+          }
+        }
+
+        // inheritsFrom specifies the base vanilla Minecraft version in modded versions (Fabric, Forge, NeoForge, Quilt).
+        // In vanilla versions, inheritsFrom is not present and versionId is already the game version.
+        const inheritsFrom = (descriptor?.inheritsFrom || descriptor?.versionJson?.inheritsFrom)
+          ? String(descriptor.inheritsFrom || descriptor.versionJson.inheritsFrom).trim()
+          : null;
+        const resolvedMcVer = inheritsFrom || descriptor?.mcVer || descriptor?.versionJson?.mcVer || descriptor?.minecraftVersion || resolveMinecraftVersion(id);
+
+        let label = descriptor?.label;
+        if (!label || label === versionId || label === resolvedMcVer || label.startsWith('fabric-loader-') || label.startsWith('quilt-loader-')) {
+          if (detectedType === 'fabric') {
+            label = loaderVersion && resolvedMcVer
+              ? `Fabric ${loaderVersion} - ${resolvedMcVer}`
+              : `Fabric ${resolvedMcVer || versionId}`;
+          } else if (detectedType === 'neoforge') {
+            label = loaderVersion && resolvedMcVer
+              ? `NeoForge ${loaderVersion} - ${resolvedMcVer}`
+              : `NeoForge ${resolvedMcVer || versionId}`;
+          } else if (detectedType === 'forge') {
+            label = loaderVersion && resolvedMcVer
+              ? `Forge ${loaderVersion} - ${resolvedMcVer}`
+              : `Forge ${resolvedMcVer || versionId}`;
+          } else if (detectedType === 'quilt') {
+            label = loaderVersion && resolvedMcVer
+              ? `Quilt ${loaderVersion} - ${resolvedMcVer}`
+              : `Quilt ${resolvedMcVer || versionId}`;
+          } else {
+            label = `Minecraft ${resolvedMcVer || versionId}`;
+          }
+        }
+
         installed.push({
-          id, label: versionId, type: detectedType,
-          mcVer: descriptor?.mcVer || descriptor?.minecraftVersion || versionId,
-          loaderVersion: descriptor?.loaderVersion || descriptor?.fabricLoaderVersion || null,
+          id,
+          label,
+          type: detectedType,
+          mcVer: resolvedMcVer,
+          inheritsFrom,
+          loaderVersion,
           installedAt: descriptor?.installedAt || null,
           path: versionDir,
         });
@@ -1866,10 +1974,11 @@ async function installModrinthProject({
   }
 
   if (!targetVersion && projectId) {
+    const cleanGameVer = resolveMinecraftVersion(gameVersion);
     const versions = await getModrinthProjectVersions({
       idOrSlug: projectId,
       loaders: normalizedType === 'mod' && loader && loader !== 'all' ? [loader.toLowerCase()] : [],
-      gameVersions: gameVersion && gameVersion !== 'all' ? [gameVersion] : [],
+      gameVersions: cleanGameVer && cleanGameVer !== 'all' ? [cleanGameVer] : [],
     }).catch(() => []);
 
     if (versionNumber) {
@@ -2708,6 +2817,176 @@ ipcMain.handle('minecraft:install', async (_, opts) => {
       return { ok: true, path: versionJsonPath, installId };
     }
 
+    if (type === 'quilt') {
+      let resolvedLoaderVersion = String(loaderVersion || '').trim();
+      let resolvedGameVersion = String(gameVersion || '').trim();
+      if ((!resolvedLoaderVersion || !resolvedGameVersion) && version) {
+        const m = String(version).match(/(?:quilt-loader|quilt)-([^\s-]+)[\s-]*[-]?\s*(.+)/i);
+        if (m) { resolvedLoaderVersion = resolvedLoaderVersion || m[1]; resolvedGameVersion = resolvedGameVersion || m[2]; }
+        else if (String(version).includes(' - ')) {
+          const [left, right] = String(version).split(' - ');
+          const mm = left.match(/(?:quilt-loader|quilt)-([^\s-]+)/i);
+          resolvedLoaderVersion = resolvedLoaderVersion || mm?.[1] || '';
+          resolvedGameVersion = resolvedGameVersion || right;
+        }
+      }
+      if (!resolvedLoaderVersion || !resolvedGameVersion) return { error: 'BadInput', message: 'Could not resolve Quilt game and loader versions.' };
+      const minecraftRoot = getMinecraftRoot();
+
+      let installerVersion = '0.15.1';
+      let installerUrl = `https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/${installerVersion}/quilt-installer-${installerVersion}.jar`;
+      try {
+        const instRes = await fetch('https://meta.quiltmc.org/v3/versions/installer');
+        if (instRes.ok) {
+          const instData = await instRes.json();
+          if (Array.isArray(instData) && instData[0]?.version) {
+            installerVersion = instData[0].version;
+            installerUrl = instData[0].url || installerUrl;
+          }
+        }
+      } catch { }
+
+      const tempDir = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'openlauncher-quilt-'));
+      const installerPath = path.join(tempDir, 'quilt-installer.jar');
+      const installerDownload = await downloadToFile(installerUrl, installerPath, installId, `quilt-installer-${installerVersion}.jar`);
+      if (!installerDownload.ok) return { error: 'DownloadFailed', message: 'Quilt installer download failed.' };
+
+      const javaChoice = findJavaCommand(8, opts?.javaPath || '');
+      const javaCmd = javaChoice?.javaCmd || resolveJavaCommand(opts?.javaPath || '');
+      const quiltArgs = [
+        '-jar',
+        installerPath,
+        'install',
+        'client',
+        resolvedGameVersion,
+        resolvedLoaderVersion,
+        `--install-dir=${minecraftRoot}`,
+        '--no-profile',
+      ];
+      const installerResult = await runCommand(javaCmd, quiltArgs, {
+        cwd: tempDir,
+        onStdout: (text) => {
+          try { mainWindow?.webContents.send('minecraft:install-progress', { installId, loaded: 0, total: 1, percent: null }); } catch (e) { }
+          try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stdout', msg: String(text) }); } catch (e) { }
+        },
+        onStderr: (text) => { try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stderr', msg: String(text) }); } catch (e) { } },
+      });
+      if (installerResult.code !== 0) return { error: 'QuiltInstallFailed', message: `Quilt installer exited with code ${installerResult.code}. ${installerResult.stderr || installerResult.stdout || ''}`.trim() };
+
+      const vanillaVersionDir = path.join(minecraftRoot, 'versions', resolvedGameVersion);
+      let vanillaVersionJson = await loadLocalVersionMetadata(vanillaVersionDir);
+      if (!vanillaVersionJson) {
+        vanillaVersionJson = await loadMojangVersionMetadata(resolvedGameVersion);
+      }
+      if (vanillaVersionJson) {
+        await fs.promises.mkdir(vanillaVersionDir, { recursive: true });
+        const vanillaClientUrl = vanillaVersionJson?.downloads?.client?.url || null;
+        if (vanillaClientUrl) {
+          const vanillaJarPath = path.join(vanillaVersionDir, `${resolvedGameVersion}.jar`);
+          if (!fs.existsSync(vanillaJarPath)) {
+            try { mainWindow?.webContents.send('minecraft:run-log', { type: 'info', msg: `Preparing vanilla ${resolvedGameVersion} client jar for Quilt...` }); } catch (e) { }
+            await ensureJarFile(vanillaClientUrl, vanillaJarPath);
+          }
+        }
+        await persistInstalledVersion(vanillaVersionDir, {
+          id: String(vanillaVersionJson?.id || resolvedGameVersion),
+          label: `Minecraft ${resolvedGameVersion}`,
+          type: 'vanilla',
+          mcVer: resolvedGameVersion,
+          versionJson: vanillaVersionJson,
+        });
+      }
+
+      const profileUrl = `https://meta.quiltmc.org/v3/versions/loader/${resolvedGameVersion}/${resolvedLoaderVersion}/profile/json`;
+      let profileJson = null;
+      try { const profileRes = await fetch(profileUrl); if (profileRes.ok) profileJson = await profileRes.json(); } catch { profileJson = null; }
+      const profileId = String(profileJson?.id || `quilt-loader-${resolvedLoaderVersion}-${resolvedGameVersion}`).trim();
+      const outDir = path.join(minecraftRoot, 'versions', profileId);
+      await fs.promises.mkdir(outDir, { recursive: true });
+      const profileJsonPath = path.join(outDir, `${profileId}.json`);
+      if (profileJson) await fs.promises.writeFile(profileJsonPath, JSON.stringify(profileJson, null, 2), 'utf8');
+      await persistInstalledVersion(outDir, { id: profileId, label: `Quilt ${resolvedLoaderVersion} - ${resolvedGameVersion}`, type: 'quilt', mcVer: resolvedGameVersion, loaderVersion: resolvedLoaderVersion, versionJson: profileJson || null });
+      try { mainWindow?.webContents.send('minecraft:install-complete', { installId, type, version: `${resolvedLoaderVersion} on ${resolvedGameVersion}`, path: profileJsonPath }); } catch (e) { }
+      return { ok: true, path: profileJsonPath, installId };
+    }
+
+    if (type === 'neoforge') {
+      const neoVersion = String(loaderVersion || version || '').trim();
+      if (!neoVersion) return { error: 'BadInput', message: 'NeoForge version is required.' };
+
+      let resolvedMinecraftVersion = String(gameVersion || '').trim();
+      if (!resolvedMinecraftVersion) {
+        const m = neoVersion.match(/^(\d+)\.(\d+)(?:\.|$)/);
+        if (m) {
+          const major = parseInt(m[1], 10);
+          const minor = parseInt(m[2], 10);
+          resolvedMinecraftVersion = (major >= 20 && major <= 25) ? `1.${major}.${minor}` : `${major}.${minor}`;
+        }
+      }
+      if (!resolvedMinecraftVersion) return { error: 'NotFound', message: 'Could not map NeoForge version to Minecraft version.' };
+
+      const minecraftRoot = getMinecraftRoot();
+
+      try { mainWindow?.webContents.send('minecraft:run-log', { type: 'info', msg: `Ensuring vanilla ${resolvedMinecraftVersion} is installed for NeoForge...` }); } catch (e) { }
+      await ensureVanillaVersionInstalled(minecraftRoot, resolvedMinecraftVersion, installId);
+
+      const installerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVersion}/neoforge-${neoVersion}-installer.jar`;
+      const tempDir = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'openlauncher-neoforge-'));
+      const installerPath = path.join(tempDir, 'neoforge-installer.jar');
+      const installerDownload = await downloadToFile(installerUrl, installerPath, installId, `neoforge-${neoVersion}-installer.jar`);
+      if (!installerDownload.ok) return { error: 'DownloadFailed', message: `NeoForge installer download failed: ${installerDownload.status || 'unknown'}` };
+
+      const majorVerMatch = neoVersion.match(/^(\d+)\./);
+      const neoMajor = majorVerMatch ? parseInt(majorVerMatch[1], 10) : 21;
+      const isJava21Required = neoMajor >= 21 || neoVersion.startsWith('20.5') || neoVersion.startsWith('20.6') || resolvedMinecraftVersion.startsWith('1.20.5') || resolvedMinecraftVersion.startsWith('1.20.6') || resolvedMinecraftVersion.startsWith('1.21') || resolvedMinecraftVersion.startsWith('26.');
+      const reqJava = isJava21Required ? 21 : 17;
+
+      const javaChoice = findJavaCommand(reqJava, opts?.javaPath || '') || findJavaCommand(8, opts?.javaPath || '');
+      const javaCmd = javaChoice?.javaCmd || resolveJavaCommand(opts?.javaPath || '');
+
+      try { mainWindow?.webContents.send('minecraft:run-log', { type: 'info', msg: `Running NeoForge installer using ${javaCmd}...` }); } catch (e) { }
+
+      const installerResult = await runCommand(javaCmd, ['-jar', installerPath, '--installClient', minecraftRoot], {
+        cwd: tempDir,
+        onStdout: (text) => {
+          try { mainWindow?.webContents.send('minecraft:install-progress', { installId, loaded: 0, total: 1, percent: null }); } catch (e) { }
+          try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stdout', msg: String(text) }); } catch (e) { }
+        },
+        onStderr: (text) => { try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stderr', msg: String(text) }); } catch (e) { } },
+      });
+
+      if (installerResult.code !== 0) {
+        return { error: 'NeoForgeInstallFailed', message: `NeoForge installer exited with code ${installerResult.code}. ${installerResult.stderr || installerResult.stdout || ''}`.trim() };
+      }
+
+      const possibleDirs = [
+        path.join(minecraftRoot, 'versions', `neoforge-${neoVersion}`),
+        path.join(minecraftRoot, 'versions', `${resolvedMinecraftVersion}-neoforge-${neoVersion}`),
+        path.join(minecraftRoot, 'versions', neoVersion),
+      ];
+      let outDir = possibleDirs.find(d => fs.existsSync(d)) || possibleDirs[0];
+      const versionId = path.basename(outDir);
+      const versionJsonPath = path.join(outDir, `${versionId}.json`);
+
+      let neoVersionJson = null;
+      try {
+        const raw = await fs.promises.readFile(versionJsonPath, 'utf8').catch(() => fs.promises.readFile(path.join(outDir, 'version.json'), 'utf8'));
+        neoVersionJson = JSON.parse(raw);
+      } catch { }
+
+      await persistInstalledVersion(outDir, {
+        id: versionId,
+        label: `NeoForge ${neoVersion} - ${resolvedMinecraftVersion}`,
+        type: 'neoforge',
+        mcVer: resolvedMinecraftVersion,
+        loaderVersion: neoVersion,
+        versionJson: neoVersionJson,
+      });
+
+      try { mainWindow?.webContents.send('minecraft:install-complete', { installId, type, version: `${neoVersion} / ${resolvedMinecraftVersion}`, path: versionJsonPath }); } catch (e) { }
+      return { ok: true, path: versionJsonPath, installId };
+    }
+
     return { error: 'NotImplemented', message: `Installer for '${type}' not implemented.` };
   } catch (error) {
     try { mainWindow?.webContents.send('minecraft:install-error', { type, version, message: error?.message }); } catch (e) { }
@@ -2911,6 +3190,8 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
 
   const missingLibraries = [];
   for (const lib of libraries) {
+    if (!rulesPassForCurrentSystem(lib?.rules)) continue;
+
     const resolvedLibraryPath = lib?.downloads?.artifact?.path
       ? path.join(libsDir, lib.downloads.artifact.path)
       : lib?.name
@@ -2918,9 +3199,16 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
         : null;
 
     const artifactUrl = lib?.downloads?.artifact?.url || null;
+    const candidates = resolveLibraryArtifactCandidates(lib);
+    const candidateUrls = [];
+    if (artifactUrl) candidateUrls.push(artifactUrl);
+    for (const c of candidates) {
+      if (!candidateUrls.includes(c)) candidateUrls.push(c);
+    }
+
     if (resolvedLibraryPath) {
-      if (!fs.existsSync(resolvedLibraryPath) && artifactUrl) {
-        missingLibraries.push({ url: artifactUrl, path: resolvedLibraryPath });
+      if (!fs.existsSync(resolvedLibraryPath) && candidateUrls.length > 0) {
+        missingLibraries.push({ urls: candidateUrls, path: resolvedLibraryPath });
       }
       if (lib?.name) {
         const libraryKeyInfo = getMavenLibraryKey(lib.name);
@@ -2951,7 +3239,7 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
           ? path.join(libsDir, nativeArtifact.path)
           : getLibraryPathFromName(`${lib.name}:${classifier}`, baseDir);
         if (!fs.existsSync(nativeOut)) {
-          missingLibraries.push({ url: nativeUrl, path: nativeOut });
+          missingLibraries.push({ urls: [nativeUrl], path: nativeOut });
         }
       }
     }
@@ -2964,10 +3252,17 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
       while (libIdx < missingLibraries.length) {
         const item = missingLibraries[libIdx++];
         if (!item) break;
-        try {
-          await ensureJarFile(item.url, item.path);
-        } catch (e) {
-          try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stderr', msg: `Library download failed: ${e.message}` }); } catch (ee) { }
+        if (fs.existsSync(item.path)) continue;
+        let downloaded = false;
+        for (const url of item.urls) {
+          try {
+            await ensureJarFile(url, item.path);
+            downloaded = true;
+            break;
+          } catch { }
+        }
+        if (!downloaded) {
+          try { mainWindow?.webContents.send('minecraft:run-log', { type: 'stderr', msg: `Library download failed for ${path.basename(item.path)}` }); } catch (ee) { }
         }
       }
     };
@@ -3093,8 +3388,8 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
   };
 
   function rulesPass(rules) {
-    if (!rules) return true;
-    let allow = false;
+    if (!rules || !Array.isArray(rules) || rules.length === 0) return true;
+    let allow = rules.some(r => r.action === 'allow') ? false : true;
     for (const r of rules) {
       let match = true;
       if (r.os && r.os.name) {
@@ -3225,6 +3520,7 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
   // ── STEP 5: Spawn the game process ────────────────────────────────────────
   const jvmArgs = [
     `-Djava.library.path=${path.join(baseDir, 'native-extract', mcVer)}`,
+    `-DlibraryDirectory=${path.join(baseDir, 'libraries')}`,
     '-Xmx' + (profile?.ram || 4) + 'G',
     '--add-exports', 'java.base/jdk.internal.ref=ALL-UNNAMED',
     '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
@@ -3249,45 +3545,25 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
       if (typeof arg === 'string') {
         let s = arg;
         for (const [k, v] of Object.entries(jvmSubstitutions)) s = s.replaceAll(k, v);
-        if (!jvmArgs.includes(s)) jvmArgs.push(s);
+        jvmArgs.push(s);
       } else if (arg && typeof arg === 'object') {
         if (!rulesPass(arg.rules)) continue;
         const val = arg.value;
         if (Array.isArray(val)) {
           for (let part of val) {
             for (const [k, v] of Object.entries(jvmSubstitutions)) part = part.replaceAll(k, v);
-            if (!jvmArgs.includes(part)) jvmArgs.push(part);
+            jvmArgs.push(part);
           }
         } else if (typeof val === 'string') {
           let s = val;
           for (const [k, v] of Object.entries(jvmSubstitutions)) s = s.replaceAll(k, v);
-          if (!jvmArgs.includes(s)) jvmArgs.push(s);
+          jvmArgs.push(s);
         }
       }
     }
   }
 
-  // Default optimized GC flags (Aikar's G1GC) for low latency, smooth FPS, and full Java 8/17/21 compatibility
-  const DEFAULT_GC_JVM_FLAGS = [
-    '-XX:+IgnoreUnrecognizedVMOptions',
-    '-XX:+UnlockExperimentalVMOptions',
-    '-XX:+UseG1GC',
-    '-XX:+ParallelRefProcEnabled',
-    '-XX:MaxGCPauseMillis=200',
-    '-XX:+DisableExplicitGC',
-    '-XX:+AlwaysPreTouch',
-    '-XX:G1NewSizePercent=30',
-    '-XX:G1MaxNewSizePercent=40',
-    '-XX:G1ReservePercent=20',
-    '-XX:G1HeapWastePercent=5',
-    '-XX:G1MixedGCCountTarget=4',
-    '-XX:InitiatingHeapOccupancyPercent=15',
-    '-XX:G1MixedGCLiveThresholdPercent=90',
-    '-XX:G1RSetUpdatingPauseTimePercent=5',
-    '-XX:SurvivorRatio=32',
-    '-XX:+PerfDisableSharedMem',
-    '-XX:MaxTenuringThreshold=1',
-  ];
+
 
   // Additional JVM arguments from profile & options
   const userArgs = [];
@@ -3310,15 +3586,11 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
   const allCurrentArgs = [...jvmArgs, ...userArgs];
   const hasExplicitGC = allCurrentArgs.some(arg => /^-XX:\+(UseG1GC|UseZGC|UseParallelGC|UseSerialGC|UseConcMarkSweepGC|UseShenandoahGC)/i.test(arg));
 
-  if (!hasExplicitGC) {
-    for (const flag of DEFAULT_GC_JVM_FLAGS) {
-      if (!jvmArgs.includes(flag)) jvmArgs.push(flag);
-    }
-  }
+
 
   // Push user-configured arguments (if user specifies -Xmx, override previous -Xmx)
   const hasUserXmx = userArgs.some(arg => arg.startsWith('-Xmx'));
-  let finalJvmArgs = jvmArgs;
+  let finalJvmArgs = [...jvmArgs];
   if (hasUserXmx) {
     finalJvmArgs = jvmArgs.filter(arg => !arg.startsWith('-Xmx'));
   }
@@ -3538,6 +3810,43 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
     // Don't return error, let it try anyway (might still work for some versions)
   }
 
+  if (!hasExplicitGC) {
+    let gcFlags = [];
+    if (detectedJavaMajor && detectedJavaMajor >= 21) {
+      gcFlags = [
+        '-XX:+IgnoreUnrecognizedVMOptions',
+        '-XX:+UnlockExperimentalVMOptions',
+        '-XX:+UseZGC',
+        '-XX:+ZGenerational'
+      ];
+    } else {
+      // Default optimized GC flags (Aikar's G1GC) for low latency, smooth FPS, and full Java 8/17 compatibility
+      gcFlags = [
+        '-XX:+IgnoreUnrecognizedVMOptions',
+        '-XX:+UnlockExperimentalVMOptions',
+        '-XX:+UseG1GC',
+        '-XX:+ParallelRefProcEnabled',
+        '-XX:MaxGCPauseMillis=200',
+        '-XX:+DisableExplicitGC',
+        '-XX:+AlwaysPreTouch',
+        '-XX:G1NewSizePercent=30',
+        '-XX:G1MaxNewSizePercent=40',
+        '-XX:G1ReservePercent=20',
+        '-XX:G1HeapWastePercent=5',
+        '-XX:G1MixedGCCountTarget=4',
+        '-XX:InitiatingHeapOccupancyPercent=15',
+        '-XX:G1MixedGCLiveThresholdPercent=90',
+        '-XX:G1RSetUpdatingPauseTimePercent=5',
+        '-XX:SurvivorRatio=32',
+        '-XX:+PerfDisableSharedMem',
+        '-XX:MaxTenuringThreshold=1',
+      ];
+    }
+    for (const flag of gcFlags) {
+      if (!jvmArgs.includes(flag)) jvmArgs.push(flag);
+    }
+  }
+
   // For legacy Java (Java 8 / < 9), remove modular options like --add-opens and --add-exports
   let sanitizedJvmArgs = [...jvmArgs];
   if (detectedJavaMajor && detectedJavaMajor < 9) {
@@ -3553,7 +3862,29 @@ ipcMain.handle('minecraft:run', async (_, opts) => {
     sanitizedJvmArgs = cleaned;
   }
 
-  const args = [...sanitizedJvmArgs, '-cp', classpath, mainClass, ...gameArgs];
+  // Filter out any existing -cp / -classpath from sanitizedJvmArgs so we append it cleanly before mainClass
+  const cleanedJvmArgs = [];
+  for (let i = 0; i < sanitizedJvmArgs.length; i++) {
+    const current = sanitizedJvmArgs[i];
+    if (current === '-cp' || current === '-classpath') {
+      i++; // skip classpath argument value
+      continue;
+    }
+    cleanedJvmArgs.push(current);
+  }
+
+  const args = [...cleanedJvmArgs, '-cp', classpath, mainClass, ...gameArgs];
+  try {
+    mainWindow?.webContents.send('minecraft:run-log', {
+      type: 'info',
+      msg: `[JVM] libraryDirectory: ${path.join(baseDir, 'libraries')}`
+    });
+  } catch (e) { }
+
+  try {
+    fs.writeFileSync(path.join(baseDir, 'launcher-args-dump.json'), JSON.stringify({ cmd: finalJavaCmd, args }, null, 2));
+  } catch (e) { }
+
   let child;
   try {
     child = spawn(finalJavaCmd, args, { cwd: baseDir });

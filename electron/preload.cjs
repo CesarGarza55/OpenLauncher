@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftToggleMod(modId, enable) {
     return ipcRenderer.invoke('minecraft:toggle-mod', { modId, enable });
   },
+  minecraftSetAllModsEnabled(enable) {
+    return ipcRenderer.invoke('minecraft:set-all-mods-enabled', { enable });
+  },
   minecraftDeleteMod(modId) {
     return ipcRenderer.invoke('minecraft:delete-mod', { modId });
   },
