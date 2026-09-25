@@ -50,8 +50,8 @@ The current Electron-based version represents a complete rewrite with improved p
 - **Modrinth Hub (Mods, Shaders & Texture Packs)**: Direct online browsing and 1-click installation of mods, shaders, and resource packs with auto-dependency resolution and update checks.
 - **My Library Management**: Dedicated tabs for local Mods, Shaders, and Texture Packs with live item counts and folder access.
 - **Fabric Conflict & Incompatibility Auto-Fixer**: Diagnoses Fabric crash logs and harmonizes mod versions in 1 click.
-- **Unified Version Installer**: Fast installation of Vanilla, Fabric, and Forge versions with live Minecraft Snapshot support.
-- **Fine-Tuned Performance**: Per-profile RAM allocation, custom Java paths, and garbage-collection-optimized JVM presets.
+- **Unified Version Installer**: Fast installation of **Vanilla**, **Fabric**, **Forge**, **NeoForge**, and **Quilt** versions with live Minecraft Snapshot support.
+- **Fine-Tuned Performance**: Per-profile RAM allocation, custom Java paths, and smart version-aware JVM garbage collection presets (Generational ZGC for Java 21+, Aikar's G1GC for Java 8–17).
 - **News Feed & Customization**: Integrated official Minecraft news, multi-language support (EN, ES, FR), and auto-updater.
 
 ---
@@ -67,7 +67,7 @@ Quick access to profiles, version selectors, installed mods, real-time console o
 <summary><b>View Interface Details & Screenshots (Versions, Settings, Microsoft Login, Mod Manager, Auto-Fixer)</b></summary>
 
 #### Version Installation
-Install Vanilla, Fabric, or Forge versions with automatic catalog loading and snapshot filters:
+Install Vanilla, Fabric, Forge, NeoForge, or Quilt versions with automatic catalog loading and snapshot filters:
 
 <img width="1552" height="897" alt="Version Installer" src="https://github.com/user-attachments/assets/70412866-f0d1-4c00-b54c-13a03bb142e9" />
 
@@ -76,10 +76,17 @@ Configure game directories, custom Java JREs, auto-updates, JVM arguments, and l
 
 <img width="1552" height="897" alt="Launcher Settings" src="https://github.com/user-attachments/assets/c9587697-9a6e-45f4-ae26-9d7ca701922a" />
 
-#### Optimized Default JVM Arguments
-```bash
--XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1
-```
+#### Optimized Dynamic JVM Arguments
+OpenLauncher dynamically applies the best Garbage Collector flags based on the detected Java runtime:
+
+- **Java 21+ (Modern Minecraft 1.20.5+) — Generational ZGC:**
+  ```bash
+  -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+ZGenerational
+  ```
+- **Java 8–17 (Legacy / Standard Minecraft) — Optimized Aikar's G1GC:**
+  ```bash
+  -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1
+  ```
 
 #### Microsoft Account Authentication
 Authenticate securely with your official Minecraft-entitled Microsoft account:
