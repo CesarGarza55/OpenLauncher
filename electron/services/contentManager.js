@@ -54,6 +54,71 @@ export async function fetchAndCacheIconAsBase64(iconUrl) {
   }
 }
 
+export function extractTextComponent(component) {
+  if (!component) return '';
+  if (typeof component === 'string') return component;
+  if (typeof component === 'number' || typeof component === 'boolean') return String(component);
+
+  if (Array.isArray(component)) {
+    return component.map(extractTextComponent).join('');
+  }
+
+  if (typeof component === 'object') {
+    let result = '';
+    if (component.fallback && typeof component.fallback === 'string') {
+      result += component.fallback;
+    } else if (component.text && typeof component.text === 'string') {
+      result += component.text;
+    } else if (component.translate && typeof component.translate === 'string') {
+      result += component.translate;
+    }
+
+    if (component.extra) {
+      result += extractTextComponent(component.extra);
+    }
+
+    if (component.with && Array.isArray(component.with)) {
+      result += ' ' + component.with.map(extractTextComponent).join(' ');
+    }
+
+    return result;
+  }
+
+  return '';
+}
+
+export function cleanMinecraftText(raw) {
+  if (raw === null || raw === undefined) return '';
+
+  let text = raw;
+
+  if (typeof text === 'object') {
+    text = extractTextComponent(text);
+  }
+
+  if (typeof text !== 'string') {
+    text = String(text || '');
+  }
+
+  const trimmed = text.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null) {
+        text = extractTextComponent(parsed);
+      }
+    } catch {}
+  }
+
+  // Strip Minecraft color codes and formatting markers (§0-§9, §a-§f, §k-§o, §r)
+  text = text
+    .replace(/(?:§|\\u00a7|&)[0-9a-fk-or]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return text;
+}
+
 export function extractJarMetadata(jarFilePath) {
   try {
     const zip = new AdmZip(jarFilePath);
@@ -451,10 +516,102 @@ export async function cleanupOldFileVersions(dir, projectId, targetFileName, onL
   } catch {}
 }
 
+export async function extractShaderEmbeddedIcon(fullPath, isDirectory) {
+  try {
+    if (!isDirectory && String(fullPath).toLowerCase().endsWith('.zip')) {
+      const zip = new AdmZip(fullPath);
+      const iconCandidates = [
+        'pack.png',
+        'icon.png',
+        'preview.png',
+        'thumbnail.png',
+        'shaders/icon.png',
+        'shaders/pack.png',
+        'shaders/preview.png',
+      ];
+      for (const candidate of iconCandidates) {
+        const entry = zip.getEntry(candidate);
+        if (entry) {
+          const buf = entry.getData();
+          return `data:image/png;base64,${buf.toString('base64')}`;
+        }
+      }
+    } else if (isDirectory) {
+      const iconCandidates = [
+        'pack.png',
+        'icon.png',
+        'preview.png',
+        'thumbnail.png',
+        path.join('shaders', 'icon.png'),
+        path.join('shaders', 'pack.png'),
+        path.join('shaders', 'preview.png'),
+      ];
+      for (const candidate of iconCandidates) {
+        const p = path.join(fullPath, candidate);
+        if (fs.existsSync(p)) {
+          const buf = await fs.promises.readFile(p);
+          return `data:image/png;base64,${buf.toString('base64')}`;
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export function generateShaderSearchQueries(fileName) {
+  const base = String(fileName || '').replace(/\.zip$/i, '');
+  const clean1 = base
+    .replace(/[-_]v?\d+[\w.]*$/i, '')
+    .replace(/[-_]r\d+[\w.]*$/i, '')
+    .replace(/[-_]v?\d+[\w.]*\s*(lite|ultra|fast|medium|high|extreme|plus)?$/i, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const clean2 = base
+    .replace(/['’]/g, '')
+    .replace(/\bv?\d+(\.\d+)*[\w-]*\b/gi, '')
+    .replace(/\b(lite|ultra|fast|medium|high|extreme|plus|shaders?|pack)\b/gi, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return [...new Set([clean1, clean2, base.split(/[-_ ]/)[0]].filter(q => q && q.length >= 2))];
+}
+
+export async function fetchModrinthShaderArtwork(fileName) {
+  try {
+    const queries = generateShaderSearchQueries(fileName);
+    for (const query of queries) {
+      const facets = JSON.stringify([['project_type:shader']]);
+      const url = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'OpenLauncher-ContentManager' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.hits) && data.hits.length > 0) {
+          const top = data.hits[0];
+          if (top && top.icon_url) {
+            return {
+              displayName: top.title,
+              iconUrl: top.icon_url,
+              description: top.description || '',
+              authors: top.author || '',
+            };
+          }
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export async function readInstalledShaders() {
   const installed = [];
   const seen = new Set();
   const metadataStore = await readModsMetadataStore();
+  const newDiscoveredMeta = {};
 
   for (const root of getMinecraftRoots()) {
     const shadersDir = path.join(root, 'shaderpacks');
@@ -464,6 +621,7 @@ export async function readInstalledShaders() {
         const fileName = entry.name;
         if (fileName.startsWith('.') || fileName === 'desktop.ini' || fileName === 'Thumbs.db') continue;
         const lowerName = fileName.toLowerCase();
+        if (entry.isFile() && !lowerName.endsWith('.zip')) continue;
         const baseKey = lowerName.replace(/\.zip$/i, '');
         if (seen.has(baseKey)) continue;
         seen.add(baseKey);
@@ -473,15 +631,51 @@ export async function readInstalledShaders() {
         try { stat = await fs.promises.stat(fullPath); } catch {}
 
         const meta = metadataStore[baseKey] || metadataStore[lowerName] || null;
+        let iconUrl = meta?.iconUrl || null;
+        let displayName = meta?.displayName || fileName.replace(/\.zip$/i, '');
+        let description = meta?.description || '';
+        let authors = meta?.authors || '';
+
+        // 1. Try embedded icon in ZIP / folder
+        if (!iconUrl) {
+          const embedded = await extractShaderEmbeddedIcon(fullPath, entry.isDirectory());
+          if (embedded) {
+            iconUrl = embedded;
+          }
+        }
+
+        // 2. If still no icon and not cached in metadata store, fetch from Modrinth online
+        if (!iconUrl) {
+          const onlineArtwork = await fetchModrinthShaderArtwork(fileName);
+          if (onlineArtwork && onlineArtwork.iconUrl) {
+            iconUrl = onlineArtwork.iconUrl;
+            if (!meta?.displayName && onlineArtwork.displayName) {
+              displayName = onlineArtwork.displayName;
+            }
+            if (!description && onlineArtwork.description) {
+              description = onlineArtwork.description;
+            }
+            if (!authors && onlineArtwork.authors) {
+              authors = onlineArtwork.authors;
+            }
+
+            newDiscoveredMeta[baseKey] = {
+              displayName,
+              iconUrl,
+              description,
+              authors,
+            };
+          }
+        }
 
         installed.push({
           id: baseKey,
-          name: meta?.displayName || fileName.replace(/\.zip$/i, ''),
+          name: displayName,
           fileName,
           version: meta?.version || '',
-          description: meta?.description || '',
-          authors: meta?.authors || '',
-          iconUrl: meta?.iconUrl || null,
+          description: cleanMinecraftText(description),
+          authors,
+          iconUrl,
           size: stat?.size || 0,
           isDirectory: entry.isDirectory(),
           path: fullPath,
@@ -489,6 +683,12 @@ export async function readInstalledShaders() {
       }
     } catch {}
   }
+
+  // Persist newly discovered artwork so subsequent loads are instant (0ms)
+  if (Object.keys(newDiscoveredMeta).length > 0) {
+    saveModMetadataStore(newDiscoveredMeta).catch(() => {});
+  }
+
   return installed;
 }
 
@@ -505,6 +705,7 @@ export async function readInstalledResourcePacks() {
         const fileName = entry.name;
         if (fileName.startsWith('.') || fileName === 'desktop.ini' || fileName === 'Thumbs.db') continue;
         const lowerName = fileName.toLowerCase();
+        if (entry.isFile() && !lowerName.endsWith('.zip')) continue;
         const baseKey = lowerName.replace(/\.zip$/i, '');
         if (seen.has(baseKey)) continue;
         seen.add(baseKey);
@@ -524,11 +725,7 @@ export async function readInstalledResourcePacks() {
               const text = mcmetaEntry.getData().toString('utf8');
               const json = JSON.parse(text);
               const desc = json?.pack?.description;
-              if (typeof desc === 'string') {
-                packMetaDesc = desc;
-              } else if (desc && typeof desc === 'object') {
-                packMetaDesc = desc.text || JSON.stringify(desc);
-              }
+              packMetaDesc = cleanMinecraftText(desc);
             }
             const iconEntry = zip.getEntry('pack.png');
             if (iconEntry) {
@@ -542,8 +739,7 @@ export async function readInstalledResourcePacks() {
               const text = await fs.promises.readFile(mcmetaPath, 'utf8');
               const json = JSON.parse(text);
               const desc = json?.pack?.description;
-              if (typeof desc === 'string') packMetaDesc = desc;
-              else if (desc && typeof desc === 'object') packMetaDesc = desc.text || JSON.stringify(desc);
+              packMetaDesc = cleanMinecraftText(desc);
             }
             const iconPath = path.join(fullPath, 'pack.png');
             if (fs.existsSync(iconPath)) {
@@ -560,7 +756,7 @@ export async function readInstalledResourcePacks() {
           name: meta?.displayName || fileName.replace(/\.zip$/i, ''),
           fileName,
           version: meta?.version || '',
-          description: meta?.description || packMetaDesc || '',
+          description: cleanMinecraftText(meta?.description || packMetaDesc || ''),
           authors: meta?.authors || '',
           iconUrl: meta?.iconUrl || packIcon || null,
           size: stat?.size || 0,
@@ -571,6 +767,110 @@ export async function readInstalledResourcePacks() {
     } catch {}
   }
   return installed;
+}
+
+export async function readInstalledDatapacks() {
+  const installed = [];
+  const seen = new Set();
+  const metadataStore = await readModsMetadataStore();
+
+  for (const root of getMinecraftRoots()) {
+    const packsDir = path.join(root, 'datapacks');
+    try {
+      const dirEntries = await fs.promises.readdir(packsDir, { withFileTypes: true });
+      for (const entry of dirEntries) {
+        const fileName = entry.name;
+        if (fileName.startsWith('.') || fileName === 'desktop.ini' || fileName === 'Thumbs.db') continue;
+        const lowerName = fileName.toLowerCase();
+        if (entry.isFile() && !lowerName.endsWith('.zip')) continue;
+        const baseKey = lowerName.replace(/\.zip$/i, '');
+        if (seen.has(baseKey)) continue;
+        seen.add(baseKey);
+
+        const fullPath = path.join(packsDir, fileName);
+        let stat = null;
+        try { stat = await fs.promises.stat(fullPath); } catch {}
+
+        let packMetaDesc = '';
+        let packIcon = null;
+
+        if (entry.isFile() && lowerName.endsWith('.zip')) {
+          try {
+            const zip = new AdmZip(fullPath);
+            const mcmetaEntry = zip.getEntry('pack.mcmeta');
+            if (mcmetaEntry) {
+              const text = mcmetaEntry.getData().toString('utf8');
+              const json = JSON.parse(text);
+              const desc = json?.pack?.description;
+              packMetaDesc = cleanMinecraftText(desc);
+            }
+            const iconEntry = zip.getEntry('pack.png');
+            if (iconEntry) {
+              packIcon = `data:image/png;base64,${iconEntry.getData().toString('base64')}`;
+            }
+          } catch {}
+        } else if (entry.isDirectory()) {
+          try {
+            const mcmetaPath = path.join(fullPath, 'pack.mcmeta');
+            if (fs.existsSync(mcmetaPath)) {
+              const text = await fs.promises.readFile(mcmetaPath, 'utf8');
+              const json = JSON.parse(text);
+              const desc = json?.pack?.description;
+              packMetaDesc = cleanMinecraftText(desc);
+            }
+            const iconPath = path.join(fullPath, 'pack.png');
+            if (fs.existsSync(iconPath)) {
+              const buf = await fs.promises.readFile(iconPath);
+              packIcon = `data:image/png;base64,${buf.toString('base64')}`;
+            }
+          } catch {}
+        }
+
+        const meta = metadataStore[baseKey] || metadataStore[lowerName] || null;
+
+        installed.push({
+          id: baseKey,
+          name: meta?.displayName || fileName.replace(/\.zip$/i, ''),
+          fileName,
+          version: meta?.version || '',
+          description: cleanMinecraftText(meta?.description || packMetaDesc || ''),
+          authors: meta?.authors || '',
+          iconUrl: meta?.iconUrl || packIcon || null,
+          size: stat?.size || 0,
+          isDirectory: entry.isDirectory(),
+          path: fullPath,
+        });
+      }
+    } catch {}
+  }
+  return installed;
+}
+
+export async function deleteDatapack(fileName) {
+  const root = getMinecraftRoot();
+  const packsDir = path.join(root, 'datapacks');
+  const targetPath = path.join(packsDir, fileName);
+  if (!fs.existsSync(targetPath)) {
+    return { error: 'NotFound', message: `Data pack not found: ${fileName}` };
+  }
+  const mainWindow = getMainWindow();
+  const choice = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
+    title: 'Delete data pack?', message: `Delete ${fileName}?`,
+    detail: 'This will remove the data pack from your Minecraft datapacks folder.',
+  });
+  if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
+  try {
+    const stat = await fs.promises.stat(targetPath);
+    if (stat.isDirectory()) {
+      await fs.promises.rm(targetPath, { recursive: true, force: true });
+    } else {
+      await fs.promises.unlink(targetPath);
+    }
+    return { ok: true, removed: targetPath };
+  } catch (err) {
+    return { error: 'DeleteFailed', message: err?.message || String(err) };
+  }
 }
 
 export async function deleteShader(fileName) {
@@ -593,6 +893,10 @@ export async function deleteShader(fileName) {
       await fs.promises.rm(targetPath, { recursive: true, force: true });
     } else {
       await fs.promises.unlink(targetPath);
+      const optTxt = path.join(shadersDir, `${fileName}.txt`);
+      if (fs.existsSync(optTxt)) {
+        await fs.promises.unlink(optTxt).catch(() => {});
+      }
     }
     return { ok: true, removed: targetPath };
   } catch (err) {
@@ -634,6 +938,8 @@ export async function openContentFolder(folderType = 'mods') {
     subDir = 'shaderpacks';
   } else if (folderType === 'texturepacks' || folderType === 'resourcepacks' || folderType === 'textures') {
     subDir = 'resourcepacks';
+  } else if (folderType === 'datapacks' || folderType === 'datapack') {
+    subDir = 'datapacks';
   }
   const targetPath = path.join(root, subDir);
   try {
@@ -654,6 +960,7 @@ export async function importContentFile(payload) {
   let targetSubDir = 'mods';
   if (type === 'shader' || type === 'shaders' || type === 'shaderpacks') targetSubDir = 'shaderpacks';
   else if (type === 'resourcepack' || type === 'texturepack' || type === 'textures' || type === 'resourcepacks') targetSubDir = 'resourcepacks';
+  else if (type === 'datapack' || type === 'datapacks') targetSubDir = 'datapacks';
 
   if (targetSubDir === 'mods') {
     return importModFile(payload);
@@ -706,6 +1013,9 @@ export async function pickContentFiles(type = 'mod') {
   } else if (type === 'resourcepack' || type === 'texturepack' || type === 'textures' || type === 'resourcepacks') {
     title = 'Select Texture Packs';
     filters = [{ name: 'Texture Packs (.zip)', extensions: ['zip'] }, { name: 'All Files', extensions: ['*'] }];
+  } else if (type === 'datapack' || type === 'datapacks') {
+    title = 'Select Data Packs';
+    filters = [{ name: 'Data Packs (.zip)', extensions: ['zip'] }, { name: 'All Files', extensions: ['*'] }];
   } else {
     title = 'Select Mod Files';
     filters = [{ name: 'Minecraft Mods (.jar, .olpkg)', extensions: ['jar', 'olpkg'] }, { name: 'All Files', extensions: ['*'] }];
@@ -732,13 +1042,21 @@ export async function installModrinthProject({
   projectType = 'mod',
 }, { onLog = null } = {}) {
   const root = getMinecraftRoot();
-  const normalizedType = projectType === 'shader' ? 'shader' : projectType === 'resourcepack' ? 'resourcepack' : 'mod';
+  const normalizedType = String(projectType || '').toLowerCase().includes('shader')
+    ? 'shader'
+    : String(projectType || '').toLowerCase().includes('resourcepack') || String(projectType || '').toLowerCase().includes('texture')
+      ? 'resourcepack'
+      : String(projectType || '').toLowerCase().includes('datapack')
+        ? 'datapack'
+        : 'mod';
 
   let targetDir = path.join(root, 'mods');
   if (normalizedType === 'shader') {
     targetDir = path.join(root, 'shaderpacks');
   } else if (normalizedType === 'resourcepack') {
     targetDir = path.join(root, 'resourcepacks');
+  } else if (normalizedType === 'datapack') {
+    targetDir = path.join(root, 'datapacks');
   }
 
   await fs.promises.mkdir(targetDir, { recursive: true });
@@ -790,7 +1108,7 @@ export async function installModrinthProject({
   }
 
   const destPath = path.join(targetDir, targetFileName);
-  const typeLabel = normalizedType === 'shader' ? 'Shader' : normalizedType === 'resourcepack' ? 'Resource Pack' : 'Mod';
+  const typeLabel = normalizedType === 'shader' ? 'Shader' : normalizedType === 'resourcepack' ? 'Resource Pack' : normalizedType === 'datapack' ? 'Data Pack' : 'Mod';
 
   onLog?.('info', `[Modrinth] Downloading ${typeLabel}: ${targetFileName}...`);
 
@@ -930,6 +1248,8 @@ export async function installModrinthProject({
     updatedContent = await readInstalledShaders();
   } else if (normalizedType === 'resourcepack') {
     updatedContent = await readInstalledResourcePacks();
+  } else if (normalizedType === 'datapack') {
+    updatedContent = await readInstalledDatapacks();
   } else {
     updatedContent = await readInstalledMods();
   }

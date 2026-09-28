@@ -3,16 +3,18 @@ import fs from 'fs';
 import os from 'os';
 import { getMinecraftRoot } from '../services/paths.js';
 import { getMainWindow } from '../services/windowManager.js';
-import { checkForLauncherUpdate } from '../services/updater.js';
+import { checkForLauncherUpdate, downloadAndApplyUpdate } from '../services/updater.js';
 import {
   readInstalledMods,
   readInstalledShaders,
   readInstalledResourcePacks,
+  readInstalledDatapacks,
   toggleMod,
   setAllModsEnabled,
   deleteMod,
   deleteShader,
   deleteResourcePack,
+  deleteDatapack,
   openContentFolder,
   importModFile,
   importContentFile,
@@ -30,7 +32,7 @@ import {
   stopMinecraft,
 } from '../services/minecraftRunner.js';
 import { loadLauncherCatalog } from '../../src/lib/minecraftLauncher.js';
-import { loadMinecraftNews } from '../../src/lib/minecraftNews.js';
+import { loadMinecraftNews, loadMinecraftArticle } from '../../src/lib/minecraftNews.js';
 import { loadLauncherState, saveLauncherState } from '../../src/lib/launcherState.js';
 import {
   getMicrosoftAuthState,
@@ -162,16 +164,28 @@ export function registerAllIpc() {
 
   ipcMain.handle('minecraft:get-news', async (_, options = {}) => {
     try {
-      const limit = Number(options?.limit) > 0 ? Number(options.limit) : 24;
+      const limit = Number(options?.limit) > 0 ? Number(options.limit) : 60;
       return await loadMinecraftNews({ limit });
     } catch (error) {
       return { error: error?.message || 'Failed to load Minecraft news.', items: [], sourceUrl: 'https://www.minecraft.net/en-us/articles' };
     }
   });
 
+  ipcMain.handle('minecraft:get-article', async (_, url) => {
+    try {
+      return await loadMinecraftArticle(url);
+    } catch (error) {
+      return { error: error?.message || 'Failed to load article content.', url };
+    }
+  });
+
   // ── Authentication ──
-  ipcMain.handle('minecraft:get-auth-state', async (_, profileKey = 'default') => {
-    return getMicrosoftAuthState({ profileKey, storageDir: app.getPath('userData') });
+  ipcMain.handle('minecraft:get-auth-state', async (_, profileKey = 'default', options = {}) => {
+    return getMicrosoftAuthState({
+      profileKey,
+      storageDir: app.getPath('userData'),
+      forceRefresh: Boolean(options?.forceRefresh),
+    });
   });
 
   ipcMain.handle('minecraft:login', async (event, profileKey = 'default', abortSignal) => {
@@ -195,17 +209,19 @@ export function registerAllIpc() {
     return logoutMicrosoft({ profileKey, storageDir: app.getPath('userData') });
   });
 
-  // ── Content Management (Mods, Shaders, Resource Packs) ──
+  // ── Content Management (Mods, Shaders, Resource Packs, Data Packs) ──
   ipcMain.handle('minecraft:get-installed-versions', async () => readInstalledVersions());
   ipcMain.handle('minecraft:get-installed-mods', async () => readInstalledMods());
   ipcMain.handle('minecraft:get-installed-shaders', async () => readInstalledShaders());
   ipcMain.handle('minecraft:get-installed-resourcepacks', async () => readInstalledResourcePacks());
+  ipcMain.handle('minecraft:get-installed-datapacks', async () => readInstalledDatapacks());
 
   ipcMain.handle('minecraft:toggle-mod', async (_, { modId, enable }) => toggleMod(modId, enable));
   ipcMain.handle('minecraft:set-all-mods-enabled', async (_, { enable }) => setAllModsEnabled(Boolean(enable)));
   ipcMain.handle('minecraft:delete-mod', async (_, { modId }) => deleteMod(modId));
   ipcMain.handle('minecraft:delete-shader', async (_, { fileName }) => deleteShader(fileName));
   ipcMain.handle('minecraft:delete-resourcepack', async (_, { fileName }) => deleteResourcePack(fileName));
+  ipcMain.handle('minecraft:delete-datapack', async (_, { fileName }) => deleteDatapack(fileName));
   ipcMain.handle('minecraft:open-content-folder', async (_, folderType) => openContentFolder(folderType));
   ipcMain.handle('minecraft:install-mod-file', async (_, { sourcePath }) => importModFile(sourcePath));
   ipcMain.handle('minecraft:import-content-file', async (_, payload) => importContentFile(payload));
@@ -233,8 +249,12 @@ export function registerAllIpc() {
   // ── Updates ──
   ipcMain.handle('minecraft:check-update', async () => {
     return checkForLauncherUpdate({
-      promptUser: true,
-      parentWindow: getMainWindow(),
+      onEvent: sendToRenderer,
+    });
+  });
+
+  ipcMain.handle('minecraft:apply-update', async (_, updatePayload) => {
+    return downloadAndApplyUpdate(updatePayload, {
       onEvent: sendToRenderer,
     });
   });

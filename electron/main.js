@@ -64,8 +64,6 @@ async function init() {
       const state = await loadLauncherState(app.getPath('userData'));
       if (state.settings?.autoUpdate !== false) {
         checkForLauncherUpdate({
-          promptUser: true,
-          parentWindow: mainWindow,
           onEvent: (channel, payload) => {
             try { mainWindow?.webContents.send(channel, payload); } catch { }
           },

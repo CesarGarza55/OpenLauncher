@@ -1,20 +1,27 @@
+import { memo } from 'react';
 import { useI18n } from '../../context/I18nContext';
 import { ICONS } from '../../constants/icons';
 import { Icon, Toggle } from '../common/CommonComponents';
-import { truncateText } from '../../utils/formatters';
+import { truncateText, cleanMinecraftText } from '../../utils/formatters';
 
-export function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdate }) {
+export const ModCard = memo(function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdate, onOpenDetails }) {
   const { t } = useI18n();
   const displayName = mod.name || mod.fileName || mod.id;
   const iconUrl = mod.iconUrl;
   const typeBadge = mod.type && mod.type !== 'jar' ? mod.type.toUpperCase() : null;
 
   return (
-    <div className={`mod-card ${!mod.enabled ? 'mod-card-disabled' : ''} ${updateInfo ? 'has-update' : ''}`}>
+    <div
+      className={`mod-card ${!mod.enabled ? 'mod-card-disabled' : ''} ${updateInfo ? 'has-update' : ''}`}
+      onClick={() => {
+        if (onOpenDetails) onOpenDetails(mod);
+      }}
+      style={{ cursor: onOpenDetails ? 'pointer' : 'default' }}
+    >
       <div className="mod-card-header">
         <div className="mod-card-icon-box">
           {iconUrl ? (
-            <img src={iconUrl} alt={displayName} className="mod-card-icon-img" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            <img src={iconUrl} alt={displayName} loading="lazy" decoding="async" className="mod-card-icon-img" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           ) : (
             <div className="mod-card-icon-fallback"><Icon d={ICONS.cube} size={20} /></div>
           )}
@@ -44,19 +51,22 @@ export function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdat
       </div>
 
       {mod.description ? (
-        <div className="mod-card-desc" title={mod.description}>{mod.description}</div>
+        <div className="mod-card-desc" title={cleanMinecraftText(mod.description)}>{cleanMinecraftText(mod.description)}</div>
       ) : null}
 
       <div className="mod-card-footer">
         <span className="mod-card-filename-pill" title={mod.fileName}>
           {mod.fileName}
         </span>
-        <div className="mod-card-actions">
+        <div className="mod-card-actions" onClick={(e) => e.stopPropagation()}>
           {updateInfo && onUpdate && (
             <button
               className="btn-primary mod-card-update-action-btn"
               type="button"
-              onClick={() => onUpdate(updateInfo)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate(updateInfo);
+              }}
               disabled={updating}
               title={t('mods.updateAvailableBadge', { version: updateInfo.newVersionNumber })}
             >
@@ -69,7 +79,10 @@ export function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdat
             className="profile-action-btn delete"
             type="button"
             title={t('mods.deleteMod')}
-            onClick={() => onDelete(mod.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(mod.id);
+            }}
           >
             <Icon d={ICONS.trash} size={12} />
           </button>
@@ -77,9 +90,9 @@ export function ModCard({ mod, updateInfo, updating, onToggle, onDelete, onUpdat
       </div>
     </div>
   );
-}
+});
 
-export function ModrinthCard({ project, installed, installing, onInstall, onOpenDetails }) {
+export const ModrinthCard = memo(function ModrinthCard({ project, installed, installing, onInstall, onOpenDetails }) {
   const { t } = useI18n();
   const title = project.title || project.slug;
   const author = project.author;
@@ -100,7 +113,7 @@ export function ModrinthCard({ project, installed, installing, onInstall, onOpen
       <div className="modrinth-card-header">
         <div className="modrinth-icon-box">
           {iconUrl ? (
-            <img src={iconUrl} alt={title} className="modrinth-icon-img" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            <img src={iconUrl} alt={title} loading="lazy" decoding="async" className="modrinth-icon-img" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           ) : (
             <div className="modrinth-icon-fallback"><Icon d={ICONS.cube} size={20} /></div>
           )}
@@ -181,9 +194,35 @@ export function ModrinthCard({ project, installed, installing, onInstall, onOpen
       </div>
     </div>
   );
-}
+});
 
-export function NewsCard({ item, onOpen }) {
+export const ModrinthCardSkeleton = memo(function ModrinthCardSkeleton() {
+  return (
+    <div className="modrinth-card modrinth-card-skeleton-item">
+      <div className="modrinth-card-header">
+        <div className="mod-skeleton-box modrinth-skeleton-icon" />
+        <div className="modrinth-title-group" style={{ gap: 6 }}>
+          <div className="mod-skeleton-box" style={{ width: '65%', height: '15px' }} />
+          <div className="mod-skeleton-box" style={{ width: '40%', height: '11px' }} />
+        </div>
+      </div>
+      <div className="modrinth-badges-row" style={{ gap: 6 }}>
+        <div className="mod-skeleton-box" style={{ width: '46px', height: '14px', borderRadius: 'var(--radius-pill)' }} />
+        <div className="mod-skeleton-box" style={{ width: '56px', height: '14px', borderRadius: 'var(--radius-pill)' }} />
+      </div>
+      <div className="modrinth-desc" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="mod-skeleton-box" style={{ width: '100%', height: '11px' }} />
+        <div className="mod-skeleton-box" style={{ width: '80%', height: '11px' }} />
+      </div>
+      <div className="modrinth-card-footer">
+        <div className="mod-skeleton-box" style={{ width: '70px', height: '12px' }} />
+        <div className="mod-skeleton-box" style={{ width: '72px', height: '26px', borderRadius: 'var(--radius-sm)' }} />
+      </div>
+    </div>
+  );
+});
+
+export const NewsCard = memo(function NewsCard({ item, onOpen }) {
   const { t } = useI18n();
   const metaText = [item.author, item.published].filter(Boolean).join(' · ');
   const cardMeta = truncateText(metaText, 42);
@@ -191,10 +230,14 @@ export function NewsCard({ item, onOpen }) {
   const cardSummary = truncateText(item.summary, 132);
 
   return (
-    <article className="news-card">
+    <article
+      className="news-card"
+      onClick={() => onOpen(item)}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="news-card-media">
         {item.image ? (
-          <img src={item.image} alt="" loading="lazy" />
+          <img src={item.image} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         ) : (
           <div className="news-card-media-fallback">
             <Icon d={ICONS.news} size={24} />
@@ -204,22 +247,30 @@ export function NewsCard({ item, onOpen }) {
       <div className="news-card-body">
         <div className="news-card-meta">
           <span>{t('news.officialLabel')}</span>
-          {cardMeta ? <span>• {cardMeta}</span> : null}
+          {cardMeta ? <span>· {cardMeta}</span> : null}
         </div>
         <div className="news-card-title">{cardTitle}</div>
         {cardSummary ? <div className="news-card-summary">{cardSummary}</div> : null}
         <div className="news-card-actions">
-          <button className="btn-secondary" type="button" onClick={() => onOpen(item.url)} style={{ fontSize: 11, padding: '4px 10px' }}>
-            <Icon d={ICONS.external} size={11} />
-            {t('news.openArticle')}
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(item);
+            }}
+            style={{ fontSize: 11, padding: '4px 10px', gap: 5 }}
+          >
+            <Icon d={ICONS.book} size={11} />
+            <span>{t('news.readArticle') || t('news.openArticle') || 'Leer artículo'}</span>
           </button>
         </div>
       </div>
     </article>
   );
-}
+});
 
-export function ProfileCardActions({ active, name, disabled, onEdit, onDuplicate, onDelete }) {
+export const ProfileCardActions = memo(function ProfileCardActions({ active, name, disabled, onEdit, onDuplicate, onDelete }) {
   const { t } = useI18n();
 
   return (
@@ -253,4 +304,4 @@ export function ProfileCardActions({ active, name, disabled, onEdit, onDuplicate
       </button>
     </div>
   );
-}
+});

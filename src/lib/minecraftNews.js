@@ -219,7 +219,7 @@ async function scrapeMinecraftArticles(limit) {
   return fallbackItems;
 }
 
-export async function loadMinecraftNews({ limit = 24 } = {}) {
+export async function loadMinecraftNews({ limit = 60 } = {}) {
   // 1. Try modern official Mojang Launcher News v2 endpoint (latest 2026/current articles)
   try {
     const mojangData = await fetchJson(MOJANG_NEWS_V2_URL);
@@ -273,4 +273,224 @@ export async function loadMinecraftNews({ limit = 24 } = {}) {
       items: [],
     };
   }
+}
+
+export function parseMinecraftArticleHtml(html, baseUrl) {
+  let title = '';
+  let subheadline = '';
+  let category = '';
+  let author = '';
+  let date = '';
+  let heroImage = '';
+
+  // 1. Title extraction (prioritize OpenGraph and Twitter title over slug/fallback)
+  const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
+  const twTitleMatch = html.match(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+
+  if (ogTitleMatch && ogTitleMatch[1].trim()) {
+    title = stripTags(ogTitleMatch[1]);
+  } else if (twTitleMatch && twTitleMatch[1].trim()) {
+    title = stripTags(twTitleMatch[1]);
+  } else if (h1Match && h1Match[1].trim()) {
+    title = stripTags(h1Match[1]);
+  }
+
+  // 2. JSON-LD Metadata extraction
+  try {
+    const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+    for (const m of jsonLdMatches) {
+      const parsed = JSON.parse(m[1]);
+      if (parsed.headline && (!title || title.includes('-'))) {
+        title = stripTags(parsed.headline);
+      }
+      if (parsed.image && !heroImage) {
+        heroImage = Array.isArray(parsed.image) ? parsed.image[0] : parsed.image;
+      }
+      if (parsed.author && !author) {
+        author = typeof parsed.author === 'object' ? (parsed.author.name || '') : parsed.author;
+      }
+      if (parsed.datePublished && !date) {
+        const d = new Date(parsed.datePublished);
+        date = !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : parsed.datePublished;
+      }
+    }
+  } catch { }
+
+  // 3. Subheadline & Category
+  const subMatch = html.match(/class="[^"]*MC_articleHeroA_header_subheadline[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
+    || html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+  if (subMatch) subheadline = stripTags(subMatch[1]);
+
+  // Extract explicit category tag
+  const catMatch = html.match(/<div\b[^>]*class=["'][^"']*MC_articleHeroA_category[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+    || html.match(/class=["'][^"']*MC_articleHeroA_category[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|span)>/i);
+  if (catMatch) {
+    const cleanCat = stripTags(catMatch[1]);
+    if (cleanCat && cleanCat.length < 50 && !cleanCat.includes('\n')) {
+      category = cleanCat;
+    }
+  }
+
+  // 4. Author & Date extraction from DL/DT/DD or meta
+  if (!author) {
+    const dtAuthorMatch = html.match(/<dt>\s*Written By\s*<\/dt>\s*<dd>([\s\S]*?)<\/dd>/i)
+      || html.match(/class="[^"]*MC_articleHeroA_attribution_author[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    if (dtAuthorMatch) author = stripTags(dtAuthorMatch[1]);
+  }
+
+  if (!date) {
+    const dtDateMatch = html.match(/<dt>\s*Published\s*<\/dt>\s*<dd>([\s\S]*?)<\/dd>/i)
+      || html.match(/class="[^"]*MC_articleHeroA_attribution_published[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    if (dtDateMatch) date = stripTags(dtDateMatch[1]);
+  }
+
+  // 5. Hero Image
+  if (!heroImage) {
+    const heroImgMatch = html.match(/class="[^"]*(?:article-head__image|MC_articleHeroA_poster)[^"]*"[^>]*src="([^"]+)"/i)
+      || html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    if (heroImgMatch) heroImage = heroImgMatch[1];
+  }
+  if (heroImage && !heroImage.startsWith('http')) {
+    heroImage = new URL(heroImage, baseUrl || MINECRAFT_ARTICLES_URL).href;
+  }
+
+  // 6. Slice main content block between Hero and Share/Footer
+  const h1Index = html.indexOf('<h1');
+  let startSlice = (h1Index !== -1) ? html.indexOf('</section>', h1Index) : -1;
+  if (startSlice === -1) startSlice = (h1Index !== -1) ? h1Index : 0;
+
+  let endSlice = html.indexOf('Share this story');
+  if (endSlice === -1) endSlice = html.indexOf('MC_shareStory');
+  if (endSlice === -1) endSlice = html.indexOf('Newest News');
+  if (endSlice === -1) endSlice = html.indexOf('<footer');
+
+  const contentHtml = (startSlice !== -1 && endSlice !== -1 && endSlice > startSlice)
+    ? html.slice(startSlice, endSlice)
+    : html.slice(startSlice);
+
+  // 7. Extract structured body blocks
+  const blocks = [];
+  const tagRegex = /<(h[2-4]|p|figure|iframe|video|ul|ol|blockquote)\b([^>]*)>([\s\S]*?)<\/\1>|<img\b([^>]*)\/?>/gi;
+  let match;
+  while ((match = tagRegex.exec(contentHtml)) !== null) {
+    const tag = (match[1] || 'img').toLowerCase();
+    const attrs = match[2] || match[4] || '';
+    const innerHtml = match[3] || '';
+
+    // Check for YouTube / Video Embed in figure or anchor
+    if (tag === 'figure' || tag === 'iframe' || tag === 'video') {
+      const fullTagHtml = match[0];
+      const ytMatch = fullTagHtml.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/|data-video-id=["'])([a-zA-Z0-9_-]{11})/i);
+      if (ytMatch) {
+        const videoId = ytMatch[1];
+        const titleMatch = fullTagHtml.match(/title=["']([^"']*)["']/i) || fullTagHtml.match(/alt=["']([^"']*)["']/i);
+        blocks.push({
+          type: 'video',
+          provider: 'youtube',
+          videoId,
+          embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}`,
+          title: titleMatch ? titleMatch[1] : 'Minecraft Video',
+        });
+        continue;
+      }
+
+      // If it's a figure with normal image
+      if (tag === 'figure') {
+        const imgMatch = innerHtml.match(/<img\b([^>]*)\/?>/i);
+        if (imgMatch) {
+          const imgAttrs = imgMatch[1];
+          const srcMatch = imgAttrs.match(/src="([^"]+)"/i) || imgAttrs.match(/data-src="([^"]+)"/i);
+          const altMatch = imgAttrs.match(/alt="([^"]*)"/i);
+          const captionMatch = innerHtml.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
+          if (srcMatch) {
+            let src = srcMatch[1];
+            if (!src.startsWith('http')) src = new URL(src, baseUrl || MINECRAFT_ARTICLES_URL).href;
+            if (!src.includes('analytics') && !src.includes('tracking') && !src.includes('.svg') && !src.includes('author-avatars')) {
+              blocks.push({
+                type: 'image',
+                src,
+                alt: captionMatch ? stripTags(captionMatch[1]) : (altMatch ? altMatch[1] : ''),
+              });
+            }
+          }
+        }
+        continue;
+      }
+    }
+
+    if (tag === 'img') {
+      const srcMatch = attrs.match(/src="([^"]+)"/i) || attrs.match(/data-src="([^"]+)"/i);
+      const altMatch = attrs.match(/alt="([^"]*)"/i);
+      if (srcMatch) {
+        let src = srcMatch[1];
+        if (!src.startsWith('http')) src = new URL(src, baseUrl || MINECRAFT_ARTICLES_URL).href;
+        if (!src.includes('analytics') && !src.includes('tracking') && !src.includes('.svg') && !src.includes('author-avatars')) {
+          blocks.push({ type: 'image', src, alt: altMatch ? altMatch[1] : '' });
+        }
+      }
+    } else if (tag === 'p') {
+      // Check if paragraph contains a standalone YouTube link
+      const ytMatch = innerHtml.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+      if (ytMatch && (innerHtml.includes('<a') || innerHtml.length < 120)) {
+        blocks.push({
+          type: 'video',
+          provider: 'youtube',
+          videoId: ytMatch[1],
+          embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}`,
+          title: 'Minecraft Video',
+        });
+        continue;
+      }
+
+      const clean = stripTags(innerHtml);
+      if (clean && !clean.includes('MC_articleHeroA_header_subheadline') && clean !== subheadline && clean.length > 2) {
+        // Strip out noisy Word/RTE span wrappings while keeping bold/italic/links
+        const cleanedHtml = innerHtml
+          .replace(/<span\b[^>]*>/gi, '')
+          .replace(/<\/span>/gi, '')
+          .trim();
+        blocks.push({ type: 'paragraph', html: cleanedHtml || clean, text: clean });
+      }
+    } else if (tag.startsWith('h')) {
+      const level = parseInt(tag[1], 10);
+      const clean = stripTags(innerHtml);
+      if (clean && clean !== 'Share this story' && clean !== title) {
+        blocks.push({ type: 'heading', level, text: clean });
+      }
+    } else if (tag === 'ul' || tag === 'ol') {
+      const items = [...innerHtml.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+        .map(li => stripTags(li[1]))
+        .filter(Boolean);
+      if (items.length > 0) {
+        blocks.push({ type: tag === 'ol' ? 'ordered-list' : 'list', items });
+      }
+    } else if (tag === 'blockquote') {
+      const clean = stripTags(innerHtml);
+      if (clean) {
+        blocks.push({ type: 'quote', text: clean });
+      }
+    }
+  }
+
+  return {
+    title: decodeHtmlEntities(title.replace(/\s+\|\s+Minecraft$/i, '').trim()),
+    subheadline: decodeHtmlEntities(subheadline.trim()),
+    category: decodeHtmlEntities(category.trim()),
+    author: decodeHtmlEntities(author.trim()),
+    date: decodeHtmlEntities(date.trim()),
+    heroImage,
+    blocks,
+    url: baseUrl,
+  };
+}
+
+export async function loadMinecraftArticle(url) {
+  if (!url) throw new Error('No article URL provided');
+  let targetUrl = String(url).trim();
+  if (!targetUrl.startsWith('http')) {
+    targetUrl = resolveMinecraftUrl(targetUrl);
+  }
+  const html = await fetchHtml(targetUrl, 20000);
+  return parseMinecraftArticleHtml(html, targetUrl);
 }

@@ -38,10 +38,10 @@ export function cleanMinecraftVersion(version) {
 }
 
 /**
- * Search projects on Modrinth (mods, shaders, resourcepacks) with optional gameVersion, loader, and categories filters.
+ * Search projects on Modrinth (mods, shaders, resourcepacks, datapacks) with optional gameVersion, loader, and categories filters.
  */
 export async function searchModrinthProjects({
-  projectType = 'mod', // 'mod' | 'shader' | 'resourcepack'
+  projectType = 'mod', // 'mod' | 'shader' | 'resourcepack' | 'datapack'
   query = '',
   loader = '',
   gameVersion = '',
@@ -50,7 +50,13 @@ export async function searchModrinthProjects({
   offset = 0,
   limit = 20,
 } = {}) {
-  const typeStr = projectType === 'shader' ? 'shader' : projectType === 'resourcepack' ? 'resourcepack' : 'mod';
+  const typeStr = projectType === 'shader'
+    ? 'shader'
+    : projectType === 'resourcepack'
+      ? 'resourcepack'
+      : projectType === 'datapack'
+        ? 'datapack'
+        : 'mod';
   const facets = [[`project_type:${typeStr}`]];
 
   if (typeStr === 'mod') {

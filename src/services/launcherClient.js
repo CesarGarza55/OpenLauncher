@@ -8,16 +8,31 @@ const launcherFallback = {
   minecraftOpenRootDirectory: () => Promise.resolve({ skipped: true }),
   minecraftGetInstalledVersions: () => Promise.resolve([]),
   minecraftGetInstalledMods: () => Promise.resolve([]),
+  minecraftGetInstalledShaders: () => Promise.resolve([]),
+  minecraftGetInstalledResourcePacks: () => Promise.resolve([]),
+  minecraftGetInstalledDatapacks: () => Promise.resolve([]),
   minecraftGetNews: () => Promise.resolve({ items: [], sourceUrl: 'https://www.minecraft.net/en-us/articles' }),
+  minecraftGetArticle: (url) => {
+    if (typeof window !== 'undefined' && window.launcher?.invoke) {
+      return window.launcher.invoke('minecraft:get-article', url);
+    }
+    return Promise.resolve(null);
+  },
   minecraftToggleMod: () => Promise.resolve({ ok: true }),
   minecraftDeleteMod: () => Promise.resolve({ ok: true }),
+  minecraftDeleteShader: () => Promise.resolve({ ok: true }),
+  minecraftDeleteResourcePack: () => Promise.resolve({ ok: true }),
+  minecraftDeleteDatapack: () => Promise.resolve({ ok: true }),
+  minecraftOpenContentFolder: () => Promise.resolve({ ok: true }),
+  minecraftImportContentFile: () => Promise.resolve({ ok: true }),
+  minecraftPickContentFiles: () => Promise.resolve({ canceled: true, filePaths: [] }),
   minecraftInstallModFile: () => Promise.resolve({ ok: true }),
   minecraftPickModFiles: () => Promise.resolve([]),
   minecraftSaveState: () => Promise.resolve({ ok: true }),
   minecraftSetAllModsEnabled: () => Promise.resolve({ ok: true }),
-  minecraftGetAuthState: (profileKey) => {
+  minecraftGetAuthState: (profileKey, options) => {
     if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:get-auth-state', profileKey);
+      return window.launcher.invoke('minecraft:get-auth-state', profileKey, options);
     }
     return Promise.resolve(null);
   },
@@ -36,6 +51,12 @@ const launcherFallback = {
     return Promise.resolve(null);
   },
   minecraftCheckUpdate: () => Promise.resolve({ skipped: true }),
+  minecraftApplyUpdate: (payload) => {
+    if (typeof window !== 'undefined' && window.launcher?.invoke) {
+      return window.launcher.invoke('minecraft:apply-update', payload);
+    }
+    return Promise.resolve({ skipped: true });
+  },
   getAppVersion: () => Promise.resolve(''),
   getSystemInfo: () => Promise.resolve({}),
   minecraftInstall: (opts) => {
@@ -87,7 +108,9 @@ export const launcher = new Proxy({}, {
         if (prop === 'minecraftInstallCancel') return (opts) => window.launcher.invoke('minecraft:install-cancel', opts);
         if (prop === 'minecraftLogin') return (key) => window.launcher.invoke('minecraft:login', key);
         if (prop === 'minecraftLogout') return (key) => window.launcher.invoke('minecraft:logout', key);
-        if (prop === 'minecraftGetAuthState') return (key) => window.launcher.invoke('minecraft:get-auth-state', key);
+        if (prop === 'minecraftGetAuthState') return (key, opts) => window.launcher.invoke('minecraft:get-auth-state', key, opts);
+        if (prop === 'minecraftCheckUpdate') return () => window.launcher.invoke('minecraft:check-update');
+        if (prop === 'minecraftApplyUpdate') return (payload) => window.launcher.invoke('minecraft:apply-update', payload);
       }
     }
     if (prop in launcherFallback) {

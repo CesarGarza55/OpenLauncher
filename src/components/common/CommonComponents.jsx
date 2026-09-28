@@ -1,20 +1,24 @@
-export const Icon = ({ d, size = 14, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d={d} />
-  </svg>
-);
+import { memo } from 'react';
 
-export function MicrosoftLogo() {
+export const Icon = memo(function Icon({ d, size = 14, className = '' }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d={d} />
+    </svg>
+  );
+});
+
+export const MicrosoftLogo = memo(function MicrosoftLogo() {
   return (
     <svg width="14" height="14" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="1" y="1" width="9" height="9" fill="#f25022" />
@@ -23,9 +27,9 @@ export function MicrosoftLogo() {
       <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
     </svg>
   );
-}
+});
 
-export function Toggle({ on, onToggle }) {
+export const Toggle = memo(function Toggle({ on, onToggle }) {
   return (
     <div
       className={`toggle-switch ${on ? 'on' : ''}`}
@@ -36,9 +40,9 @@ export function Toggle({ on, onToggle }) {
       <div className="toggle-thumb" />
     </div>
   );
-}
+});
 
-export function EmptyState({
+export const EmptyState = memo(function EmptyState({
   icon,
   title,
   description,
@@ -76,9 +80,9 @@ export function EmptyState({
       )}
     </div>
   );
-}
+});
 
-export function LogLine({ entry }) {
+export const LogLine = memo(function LogLine({ entry }) {
   const typeClass = entry.type === 'stderr' ? 'log-err' : entry.type === 'game' ? 'log-game' : 'log-info';
   return (
     <div className={`log-line ${typeClass}`}>
@@ -86,9 +90,9 @@ export function LogLine({ entry }) {
       <span className="log-msg">{entry.msg}</span>
     </div>
   );
-}
+});
 
-export function Toast({ toast, onClose }) {
+export const Toast = memo(function Toast({ toast, onClose }) {
   if (!toast) return null;
   return (
     <div className={`toast toast-${toast.type || 'info'}`}>
@@ -98,4 +102,4 @@ export function Toast({ toast, onClose }) {
       </button>
     </div>
   );
-}
+});

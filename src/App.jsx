@@ -26,17 +26,20 @@ import {
 import {
   ModCard,
   ModrinthCard,
+  ModrinthCardSkeleton,
   NewsCard,
   ProfileCardActions,
 } from './components/cards/Cards';
 import { ModConflictModal } from './components/modals/ModConflictModal';
-import { ModDetailModal } from './components/modals/ModDetailModal';
+import { ProjectDetailView } from './components/views/ProjectDetailView';
+import { ArticleDetailView } from './components/views/ArticleDetailView';
 import {
   ProfileModal,
   InstallModal,
   SettingsModal,
   AboutModal,
   LoginLoadingModal,
+  UpdateModal,
 } from './components/modals/LauncherModals';
 import {
   createOfflineSession,
@@ -45,6 +48,7 @@ import {
   formatFileSize,
   formatRelativeTime,
   truncateText,
+  cleanMinecraftText,
 } from './utils/formatters';
 
 const APP_SOURCE_URL = 'https://github.com/CesarGarza55/OpenLauncher';
@@ -63,10 +67,11 @@ export default function App() {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [stateHydrated, setStateHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState('news');
-  const [exploreType, setExploreType] = useState('mods'); // 'mods' | 'shaders' | 'resourcepacks'
+  const [exploreType, setExploreType] = useState('mods'); // 'mods' | 'shaders' | 'resourcepacks' | 'datapacks'
   const [modSearch, setModSearch] = useState('');
   const [shaderSearch, setShaderSearch] = useState('');
   const [resourcePackSearch, setResourcePackSearch] = useState('');
+  const [datapackSearch, setDatapackSearch] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
   const [logFilter, setLogFilter] = useState('all');
   const [versionCatalog, setVersionCatalog] = useState([]);
@@ -75,8 +80,9 @@ export default function App() {
   const [mods, setMods] = useState([]);
   const [shaders, setShaders] = useState([]);
   const [resourcePacks, setResourcePacks] = useState([]);
-  const [modrinthQueries, setModrinthQueries] = useState({ mods: '', shaders: '', resourcepacks: '' });
-  const [modrinthCategories, setModrinthCategories] = useState({ mods: 'all', shaders: 'all', resourcepacks: 'all' });
+  const [datapacks, setDatapacks] = useState([]);
+  const [modrinthQueries, setModrinthQueries] = useState({ mods: '', shaders: '', resourcepacks: '', datapacks: '' });
+  const [modrinthCategories, setModrinthCategories] = useState({ mods: 'all', shaders: 'all', resourcepacks: 'all', datapacks: 'all' });
 
   const modrinthQuery = modrinthQueries[exploreType] || '';
   const modrinthCategory = modrinthCategories[exploreType] || 'all';
@@ -104,6 +110,7 @@ export default function App() {
   const [modrinthLoadingMore, setModrinthLoadingMore] = useState(false);
   const [modrinthInstalling, setModrinthInstalling] = useState({});
   const [selectedModDetail, setSelectedModDetail] = useState(null); // null | { project, initialTab: 'overview' | 'versions' }
+  const [selectedArticle, setSelectedArticle] = useState(null); // null | { title, url, summary, image, author, published }
   const [installingVersionId, setInstallingVersionId] = useState(null);
   const [modUpdates, setModUpdates] = useState({});
   const [checkingModUpdates, setCheckingModUpdates] = useState(false);
@@ -120,6 +127,7 @@ export default function App() {
   const [installId, setInstallId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [updateState, setUpdateState] = useState({ phase: 'idle', progress: 0, message: '' });
+  const [updateModalInfo, setUpdateModalInfo] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [modal, setModal] = useState(null); // null | 'newProfile' | 'install-minecraft' | 'install-fabric' | 'install-forge' | 'settings' | 'about'
   const [profileEditor, setProfileEditor] = useState(null); // null | { mode: 'new' | 'edit', profileId: number | null }
@@ -169,10 +177,10 @@ export default function App() {
   const activeVersion = activeProfileVersion || installedVersions[0] || versionCatalog[0] || null;
   const selectedInstalledVersionId = activeProfile?.version || (installedVersions[0] ? installedVersions[0].id : '');
 
-  const stateRef = useRef({ profiles, activeProfileId, mods, logs, settings, versionCatalog, installTargets });
+  const stateRef = useRef({ profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets });
   useEffect(() => {
-    stateRef.current = { profiles, activeProfileId, mods, logs, settings, versionCatalog, installTargets };
-  }, [profiles, activeProfileId, mods, logs, settings, versionCatalog, installTargets]);
+    stateRef.current = { profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets };
+  }, [profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets]);
 
   const logBufferRef = useRef([]);
   const logFlushTimeoutRef = useRef(null);
@@ -255,10 +263,10 @@ export default function App() {
     try {
       let payload = null;
       if (typeof launcher?.minecraftGetNews === 'function') {
-        payload = await launcher.minecraftGetNews({ limit: 24 });
+        payload = await launcher.minecraftGetNews({ limit: 60 });
       }
       if (!payload || !payload.items || payload.items.length === 0) {
-        payload = await loadMinecraftNews({ limit: 24 });
+        payload = await loadMinecraftNews({ limit: 60 });
       }
 
       if (!payload) {
@@ -280,7 +288,7 @@ export default function App() {
       }
     } catch (error) {
       try {
-        const fallbackPayload = await loadMinecraftNews({ limit: 16 });
+        const fallbackPayload = await loadMinecraftNews({ limit: 60 });
         if (fallbackPayload?.items?.length > 0) {
           setNewsItems(fallbackPayload.items);
           return;
@@ -304,6 +312,9 @@ export default function App() {
       profiles: updates.profiles !== undefined ? updates.profiles : currentState.profiles,
       activeProfileId: updates.activeProfileId !== undefined ? updates.activeProfileId : currentState.activeProfileId,
       mods: updates.mods !== undefined ? updates.mods : currentState.mods,
+      shaders: updates.shaders !== undefined ? updates.shaders : currentState.shaders,
+      resourcePacks: updates.resourcePacks !== undefined ? updates.resourcePacks : currentState.resourcePacks,
+      datapacks: updates.datapacks !== undefined ? updates.datapacks : currentState.datapacks,
       logs: updates.logs !== undefined ? updates.logs : currentState.logs,
       versions: updates.versions !== undefined ? updates.versions : currentState.versionCatalog,
       installTargets: updates.installTargets !== undefined ? updates.installTargets : currentState.installTargets,
@@ -354,6 +365,12 @@ export default function App() {
     const installCancelledOff = launcher.on?.('minecraft:install-cancelled', (e) => {
       addLog('info', `Installation cancelled: ${e?.message || 'user cancelled'}`);
       setInstallId(null);
+    });
+
+    const updateAvailableOff = launcher.on?.('minecraft:update-available', (info) => {
+      if (info?.available) {
+        setUpdateModalInfo(info);
+      }
     });
 
     const updateStatusOff = launcher.on?.('minecraft:update-status', (u) => {
@@ -447,6 +464,18 @@ export default function App() {
           setMods(state.mods);
         }
 
+        if (state?.shaders && Array.isArray(state.shaders)) {
+          setShaders(state.shaders);
+        }
+
+        if (state?.resourcePacks && Array.isArray(state.resourcePacks)) {
+          setResourcePacks(state.resourcePacks);
+        }
+
+        if (state?.datapacks && Array.isArray(state.datapacks)) {
+          setDatapacks(state.datapacks);
+        }
+
         if (state?.logs && Array.isArray(state.logs)) {
           setLogs(state.logs);
         }
@@ -456,15 +485,26 @@ export default function App() {
           setSettings(prev => ({ ...prev, minecraftRoot: rootRes.root }));
         }
 
-        const instVers = await launcher.minecraftGetInstalledVersions?.();
-        if (Array.isArray(instVers)) {
-          setInstalledVersions(instVers);
-        }
+        const [instVers, instMods, instShaders, instPacks, instDatapacks] = await Promise.all([
+          launcher.minecraftGetInstalledVersions ? launcher.minecraftGetInstalledVersions().catch(() => []) : [],
+          launcher.minecraftGetInstalledMods ? launcher.minecraftGetInstalledMods().catch(() => []) : [],
+          launcher.minecraftGetInstalledShaders ? launcher.minecraftGetInstalledShaders().catch(() => []) : [],
+          launcher.minecraftGetInstalledResourcePacks ? launcher.minecraftGetInstalledResourcePacks().catch(() => []) : [],
+          launcher.minecraftGetInstalledDatapacks ? launcher.minecraftGetInstalledDatapacks().catch(() => []) : [],
+        ]);
 
-        const instMods = await launcher.minecraftGetInstalledMods?.();
-        if (Array.isArray(instMods)) {
-          setMods(instMods);
-        }
+        if (Array.isArray(instVers)) setInstalledVersions(instVers);
+        if (Array.isArray(instMods)) setMods(instMods);
+        if (Array.isArray(instShaders)) setShaders(instShaders);
+        if (Array.isArray(instPacks)) setResourcePacks(instPacks);
+        if (Array.isArray(instDatapacks)) setDatapacks(instDatapacks);
+
+        persistState({
+          mods: Array.isArray(instMods) ? instMods : state?.mods || [],
+          shaders: Array.isArray(instShaders) ? instShaders : state?.shaders || [],
+          resourcePacks: Array.isArray(instPacks) ? instPacks : state?.resourcePacks || [],
+          datapacks: Array.isArray(instDatapacks) ? instDatapacks : state?.datapacks || [],
+        });
 
         let snapshot = null;
         if (launcher.minecraftGetCatalog) {
@@ -479,6 +519,16 @@ export default function App() {
         }
         if (snapshot?.installTargets) {
           setInstallTargets(snapshot.installTargets);
+        }
+
+        if (state?.settings?.autoUpdate !== false) {
+          launcher.minecraftCheckUpdate?.()
+            .then(res => {
+              if (res?.available) {
+                setUpdateModalInfo(res);
+              }
+            })
+            .catch(() => { });
         }
       } catch (err) {
         console.error('Failed to initialize launcher state:', err);
@@ -510,6 +560,7 @@ export default function App() {
       installCompleteOff?.();
       installErrorOff?.();
       installCancelledOff?.();
+      updateAvailableOff?.();
       updateStatusOff?.();
       updateProgressOff?.();
       updateCompleteOff?.();
@@ -525,8 +576,13 @@ export default function App() {
     launcher.openExternal?.(newsSourceUrl).catch(() => { });
   };
 
-  const handleOpenNewsArticle = (url) => {
-    launcher.openExternal?.(url).catch(() => { });
+  const handleOpenNewsArticle = (item) => {
+    if (typeof item === 'string') {
+      const existing = newsItems.find(n => n.url === item);
+      setSelectedArticle(existing || { url: item, title: 'Minecraft News' });
+    } else {
+      setSelectedArticle(item);
+    }
   };
 
   const handleOpenSourceCode = () => {
@@ -562,6 +618,16 @@ export default function App() {
               return next;
             });
           }
+        } else if (auth?.hasStoredToken && (auth?.name || activeProfile.skinName || activeProfile.microsoftAccount)) {
+          // Token is stored on disk but we had a transient error (e.g. offline) -> keep Microsoft identity
+          const savedName = auth.name || activeProfile.skinName || activeProfile.microsoftAccount || 'Player';
+          setAccount({
+            name: savedName,
+            loggedIn: true,
+            profileKey,
+            kind: 'microsoft',
+            session: auth?.access_token ? auth : createOfflineSession(savedName),
+          });
         } else {
           const fallbackName = String(activeProfile.skinName || activeProfile.localName || activeProfile.name || '').trim();
           if (fallbackName) {
@@ -593,7 +659,7 @@ export default function App() {
       });
 
     return () => { isMounted = false; };
-  }, [activeProfile?.id, activeProfile?.localName, activeProfile?.name, activeProfile?.skinName, activeProfile?.microsoftAccount]);
+  }, [activeProfile?.id]);
 
   const handleSaveProfile = (profileData) => {
     setProfiles(prev => {
@@ -728,10 +794,24 @@ export default function App() {
     addLog('info', `Launching profile: ${activeProfile.name}`);
 
     try {
+      let runSession = account.session;
+      if (account.kind === 'microsoft' && launcher.minecraftGetAuthState) {
+        try {
+          const profileKey = String(activeProfile.id || 'default');
+          const freshAuth = await launcher.minecraftGetAuthState(profileKey);
+          if (freshAuth?.loggedIn && freshAuth?.access_token) {
+            runSession = freshAuth;
+            setAccount(prev => ({ ...prev, session: freshAuth }));
+          }
+        } catch {
+          // Keep existing session if offline or transient error
+        }
+      }
+
       const runOpts = {
         profile: activeProfile,
         version: activeVersion || activeProfile?.version,
-        session: account.session || createOfflineSession(activeProfile.localName || 'Player'),
+        session: runSession || createOfflineSession(activeProfile.localName || 'Player'),
       };
       const res = await launcher.minecraftRun(runOpts);
       if (res?.error) {
@@ -969,7 +1049,7 @@ export default function App() {
     );
     if (files.length === 0) return;
 
-    const targetType = activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : (activeTab === 'explore' ? exploreType : 'mods');
+    const targetType = activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : activeTab === 'datapacks' ? 'datapacks' : (activeTab === 'explore' ? exploreType : 'mods');
 
     addLog('info', t('mods.importingCount', { count: files.length }));
     try {
@@ -997,6 +1077,18 @@ export default function App() {
           loadResourcePacks();
           pushToast({ tone: 'success', title: t('mods.contentTypeResourcePacks'), message: t('mods.resourcePacksImportedSuccess', { count: imported }) });
         }
+      } else if (targetType === 'datapacks') {
+        let imported = 0;
+        for (const file of files) {
+          if (!file.name.toLowerCase().endsWith('.zip')) continue;
+          const filePath = file.path || file.name;
+          const res = await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: filePath, fileName: file.name });
+          if (res?.ok) imported++;
+        }
+        if (imported > 0) {
+          loadDatapacks();
+          pushToast({ tone: 'success', title: t('mods.contentTypeDatapacks'), message: t('mods.datapacksImportedSuccess', { count: imported }) });
+        }
       } else {
         for (const file of files) {
           const filePath = file.path || file.name;
@@ -1014,23 +1106,42 @@ export default function App() {
   const loadMods = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledMods?.();
-      if (Array.isArray(list)) setMods(list);
+      if (Array.isArray(list)) {
+        setMods(list);
+        persistState({ mods: list });
+      }
     } catch { }
-  }, []);
+  }, [persistState]);
 
   const loadShaders = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledShaders?.();
-      if (Array.isArray(list)) setShaders(list);
+      if (Array.isArray(list)) {
+        setShaders(list);
+        persistState({ shaders: list });
+      }
     } catch { }
-  }, []);
+  }, [persistState]);
 
   const loadResourcePacks = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledResourcePacks?.();
-      if (Array.isArray(list)) setResourcePacks(list);
+      if (Array.isArray(list)) {
+        setResourcePacks(list);
+        persistState({ resourcePacks: list });
+      }
     } catch { }
-  }, []);
+  }, [persistState]);
+
+  const loadDatapacks = useCallback(async () => {
+    try {
+      const list = await launcher.minecraftGetInstalledDatapacks?.();
+      if (Array.isArray(list)) {
+        setDatapacks(list);
+        persistState({ datapacks: list });
+      }
+    } catch { }
+  }, [persistState]);
 
   const handleDeleteShader = async (shader) => {
     try {
@@ -1056,15 +1167,27 @@ export default function App() {
     }
   };
 
+  const handleDeleteDatapack = async (pack) => {
+    try {
+      const res = await launcher.minecraftDeleteDatapack?.(pack.fileName);
+      if (res?.ok) {
+        loadDatapacks();
+        pushToast({ tone: 'success', title: t('mods.deleteDatapack'), message: `${pack.name || pack.fileName} removed.` });
+      }
+    } catch (err) {
+      pushToast({ tone: 'error', title: t('mods.deleteDatapack'), message: err?.message || 'Delete failed.' });
+    }
+  };
+
   const handleOpenContentFolder = async (type) => {
     try {
-      const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : 'mods');
+      const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : activeTab === 'datapacks' ? 'datapacks' : 'mods');
       await launcher.minecraftOpenContentFolder?.(targetType);
     } catch { }
   };
 
   const handleAddContentClick = async (type) => {
-    const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : 'mods');
+    const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : activeTab === 'datapacks' ? 'datapacks' : 'mods');
     if (targetType === 'shaders' || targetType === 'shader') {
       const res = await launcher.minecraftPickContentFiles?.('shader');
       if (res?.filePaths?.length > 0) {
@@ -1082,6 +1205,15 @@ export default function App() {
         }
         loadResourcePacks();
         pushToast({ tone: 'success', title: t('mods.contentTypeResourcePacks'), message: t('mods.resourcePacksImportedSuccess', { count: res.filePaths.length }) });
+      }
+    } else if (targetType === 'datapacks' || targetType === 'datapack') {
+      const res = await launcher.minecraftPickContentFiles?.('datapack');
+      if (res?.filePaths?.length > 0) {
+        for (const fp of res.filePaths) {
+          await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: fp });
+        }
+        loadDatapacks();
+        pushToast({ tone: 'success', title: t('mods.contentTypeDatapacks'), message: t('mods.datapacksImportedSuccess', { count: res.filePaths.length }) });
       }
     } else {
       handleAddModClick();
@@ -1112,7 +1244,7 @@ export default function App() {
     }
 
     const currentOffset = isLoadMore ? modrinthResults.length : 0;
-    const projectType = exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod';
+    const projectType = exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod';
 
     try {
       let data;
@@ -1125,7 +1257,7 @@ export default function App() {
           category: modrinthCategory === 'all' ? '' : modrinthCategory,
           sortBy: modrinthSort,
           offset: currentOffset,
-          limit: 24,
+          limit: 60,
         });
       } else {
         data = await searchModrinthProjects({
@@ -1136,7 +1268,7 @@ export default function App() {
           category: modrinthCategory === 'all' ? '' : modrinthCategory,
           sortBy: modrinthSort,
           offset: currentOffset,
-          limit: 24,
+          limit: 60,
         });
       }
       if (data?.hits) {
@@ -1168,11 +1300,16 @@ export default function App() {
   useEffect(() => {
     setModrinthResults([]);
     setModrinthTotalHits(0);
+    setModrinthLoading(true);
   }, [exploreType]);
 
   useEffect(() => {
     if (activeTab === 'explore') {
-      if (!isOnline) return;
+      if (!isOnline) {
+        setModrinthLoading(false);
+        return;
+      }
+      setModrinthLoading(true);
       const timer = setTimeout(() => {
         executeModrinthSearch(false);
       }, 300);
@@ -1209,7 +1346,7 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug;
-    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod');
     setModrinthInstalling(prev => ({ ...prev, [projectId]: true }));
     setLogs([]);
     persistState({ logs: [] });
@@ -1236,11 +1373,14 @@ export default function App() {
         } else if (projectType === 'resourcepack') {
           if (Array.isArray(res.items)) setResourcePacks(res.items);
           else loadResourcePacks();
+        } else if (projectType === 'datapack') {
+          if (Array.isArray(res.items)) setDatapacks(res.items);
+          else loadDatapacks();
         } else {
           if (Array.isArray(res.mods || res.items)) setMods(res.mods || res.items);
           else loadMods();
         }
-        addLog('success', `${projectType === 'shader' ? 'Shader' : projectType === 'resourcepack' ? 'Texture pack' : 'Mod'} '${project.title || projectId}' installed.`);
+        addLog('success', `${projectType === 'shader' ? 'Shader' : projectType === 'resourcepack' ? 'Texture pack' : projectType === 'datapack' ? 'Data pack' : 'Mod'} '${project.title || projectId}' installed.`);
         pushToast({
           tone: 'success',
           title: t('mods.install'),
@@ -1265,6 +1405,86 @@ export default function App() {
     setSelectedModDetail({ project, initialTab: 'overview' });
   };
 
+  const handleOpenLocalModDetails = (mod) => {
+    const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
+    const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
+    const knownProjectId = updateInfo?.projectId || mod.projectId || mod.modrinthId;
+    const slugCandidate = knownProjectId || mod.modId || (mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').replace(/[-_]v?\d+.*$/i, '') : '') || mod.id;
+    setSelectedModDetail({
+      project: {
+        project_id: knownProjectId || slugCandidate,
+        slug: knownProjectId || slugCandidate,
+        modId: mod.modId,
+        title: mod.name || mod.fileName || mod.id,
+        name: mod.name || mod.fileName || mod.id,
+        author: mod.authors || '',
+        authors: mod.authors || '',
+        description: mod.description || '',
+        icon_url: mod.iconUrl,
+        project_type: 'mod',
+        localItem: mod,
+      },
+      initialTab: 'overview',
+    });
+  };
+
+  const handleOpenLocalShaderDetails = (shader) => {
+    const slugCandidate = shader.projectId || shader.modrinthId || shader.id || (shader.fileName ? shader.fileName.replace(/\.zip$/i, '') : '');
+    setSelectedModDetail({
+      project: {
+        project_id: slugCandidate,
+        slug: slugCandidate,
+        title: shader.name || shader.fileName,
+        name: shader.name || shader.fileName,
+        author: shader.authors || '',
+        authors: shader.authors || '',
+        description: shader.description || '',
+        icon_url: shader.iconUrl,
+        project_type: 'shader',
+        localItem: shader,
+      },
+      initialTab: 'overview',
+    });
+  };
+
+  const handleOpenLocalResourcePackDetails = (pack) => {
+    const slugCandidate = pack.projectId || pack.modrinthId || pack.id || (pack.fileName ? pack.fileName.replace(/\.zip$/i, '') : '');
+    setSelectedModDetail({
+      project: {
+        project_id: slugCandidate,
+        slug: slugCandidate,
+        title: pack.name || pack.fileName,
+        name: pack.name || pack.fileName,
+        author: pack.authors || '',
+        authors: pack.authors || '',
+        description: pack.description || '',
+        icon_url: pack.iconUrl,
+        project_type: 'resourcepack',
+        localItem: pack,
+      },
+      initialTab: 'overview',
+    });
+  };
+
+  const handleOpenLocalDatapackDetails = (pack) => {
+    const slugCandidate = pack.projectId || pack.modrinthId || pack.id || (pack.fileName ? pack.fileName.replace(/\.zip$/i, '') : '');
+    setSelectedModDetail({
+      project: {
+        project_id: slugCandidate,
+        slug: slugCandidate,
+        title: pack.name || pack.fileName,
+        name: pack.name || pack.fileName,
+        author: pack.authors || '',
+        authors: pack.authors || '',
+        description: pack.description || '',
+        icon_url: pack.iconUrl,
+        project_type: 'datapack',
+        localItem: pack,
+      },
+      initialTab: 'overview',
+    });
+  };
+
   const handleInstallSpecificVersion = async (project, version) => {
     if (!isOnline) {
       pushToast({
@@ -1275,7 +1495,7 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug || project.id;
-    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod');
     setInstallingVersionId(version.id);
     const primaryFile = version.files?.find(f => f.primary) || version.files?.[0];
     const verNumber = version.version_number || version.name || '';
@@ -1307,6 +1527,9 @@ export default function App() {
         } else if (projectType === 'resourcepack') {
           if (Array.isArray(res.items)) setResourcePacks(res.items);
           else loadResourcePacks();
+        } else if (projectType === 'datapack') {
+          if (Array.isArray(res.items)) setDatapacks(res.items);
+          else loadDatapacks();
         } else {
           if (Array.isArray(res.mods || res.items)) setMods(res.mods || res.items);
           else loadMods();
@@ -1334,7 +1557,7 @@ export default function App() {
 
   const isModInstalled = useCallback((project) => {
     if (!project) return false;
-    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : 'mod');
+    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod');
     const slug = String(project.slug || '').toLowerCase().trim();
     const projId = String(project.project_id || project.id || '').toLowerCase().trim();
     const cleanTitle = String(project.title || '').toLowerCase().trim();
@@ -1352,6 +1575,16 @@ export default function App() {
     if (projectType === 'resourcepack') {
       if (!Array.isArray(resourcePacks) || resourcePacks.length === 0) return false;
       return resourcePacks.some(p => {
+        const pId = String(p.id || '').toLowerCase().trim();
+        const pName = String(p.name || '').toLowerCase().trim();
+        const pFile = String(p.fileName || '').toLowerCase().trim();
+        return (slug && (pId === slug || pFile.startsWith(slug))) || (projId && pId === projId) || (cleanTitle && pName === cleanTitle);
+      });
+    }
+
+    if (projectType === 'datapack') {
+      if (!Array.isArray(datapacks) || datapacks.length === 0) return false;
+      return datapacks.some(p => {
         const pId = String(p.id || '').toLowerCase().trim();
         const pName = String(p.name || '').toLowerCase().trim();
         const pFile = String(p.fileName || '').toLowerCase().trim();
@@ -1386,7 +1619,7 @@ export default function App() {
       }
       return false;
     });
-  }, [exploreType, mods, shaders, resourcePacks]);
+  }, [exploreType, mods, shaders, resourcePacks, datapacks]);
 
   const checkingModUpdatesRef = useRef(false);
   const hasCheckedModsOnTabOpenRef = useRef(false);
@@ -1638,10 +1871,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'mods' || activeTab === 'shaders' || activeTab === 'resourcepacks' || activeTab === 'explore') {
+    if (activeTab === 'mods' || activeTab === 'shaders' || activeTab === 'resourcepacks' || activeTab === 'datapacks' || activeTab === 'explore') {
       loadMods();
       loadShaders();
       loadResourcePacks();
+      loadDatapacks();
 
       if (activeTab === 'mods' && isOnline) {
         if (!hasCheckedModsOnTabOpenRef.current) {
@@ -1652,17 +1886,36 @@ export default function App() {
     } else {
       hasCheckedModsOnTabOpenRef.current = false;
     }
-  }, [activeTab, isOnline, loadMods, loadShaders, loadResourcePacks]);
+  }, [activeTab, isOnline, loadMods, loadShaders, loadResourcePacks, loadDatapacks]);
 
   const handleCheckForUpdates = async () => {
-    addLog('info', 'Checking for launcher updates...');
+    addLog('info', t('messages.checkingUpdates'));
+    pushToast({ tone: 'info', title: t('update.launcherUpdate'), message: t('messages.checkingUpdates') });
     try {
       const res = await launcher.minecraftCheckUpdate?.();
-      if (res?.upToDate) {
-        pushToast({ tone: 'info', title: t('update.launcherUpdate'), message: t('messages.alreadyUpToDate') });
+      if (res?.available && res?.latestVersion) {
+        setUpdateModalInfo(res);
+      } else if (res?.upToDate) {
+        pushToast({ tone: 'success', title: t('update.launcherUpdate'), message: t('messages.alreadyUpToDate') });
       }
     } catch (e) {
       addLog('error', `Update check failed: ${e?.message || e}`);
+      pushToast({ tone: 'error', title: t('update.launcherUpdate'), message: t('messages.updateCheckFailed', { error: e?.message || '' }) });
+    }
+  };
+
+  const handleApplyUpdate = async (updateInfo) => {
+    setUpdateModalInfo(null);
+    setUpdateState({
+      phase: 'downloading',
+      progress: 0,
+      latestVersion: updateInfo?.latestVersion,
+      message: t('updater.downloading', { assetName: updateInfo?.asset?.name || '' }),
+    });
+    try {
+      await launcher.minecraftApplyUpdate(updateInfo);
+    } catch (e) {
+      addLog('error', `Failed to apply update: ${e?.message || e}`);
     }
   };
 
@@ -1819,15 +2072,15 @@ export default function App() {
 
             <div className="sidebar-nav">
               <div
-                className={`nav-item ${activeTab === 'news' ? 'active' : ''}`}
-                onClick={() => setActiveTab('news')}
+                className={`nav-item ${activeTab === 'news' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('news'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.news} size={14} /></span>
                 <span>{t('sidebar.news')}</span>
               </div>
               <div
-                className={`nav-item ${activeTab === 'explore' ? 'active' : ''}`}
-                onClick={() => setActiveTab('explore')}
+                className={`nav-item ${activeTab === 'explore' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('explore'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.compass} size={14} /></span>
                 <span>{t('sidebar.explore')}</span>
@@ -1841,28 +2094,36 @@ export default function App() {
 
             <div className="sidebar-nav">
               <div
-                className={`nav-item ${activeTab === 'mods' ? 'active' : ''}`}
-                onClick={() => setActiveTab('mods')}
+                className={`nav-item ${activeTab === 'mods' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('mods'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.cube} size={14} /></span>
                 <span>{t('sidebar.mods')}</span>
                 <span className="nav-counter">{mods.filter(m => m.enabled).length}</span>
               </div>
               <div
-                className={`nav-item ${activeTab === 'shaders' ? 'active' : ''}`}
-                onClick={() => setActiveTab('shaders')}
+                className={`nav-item ${activeTab === 'shaders' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('shaders'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.sun} size={14} /></span>
                 <span>{t('sidebar.shaders')}</span>
                 <span className="nav-counter">{shaders.length}</span>
               </div>
               <div
-                className={`nav-item ${activeTab === 'resourcepacks' ? 'active' : ''}`}
-                onClick={() => setActiveTab('resourcepacks')}
+                className={`nav-item ${activeTab === 'resourcepacks' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('resourcepacks'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.layers} size={14} /></span>
                 <span>{t('sidebar.resourcePacks')}</span>
                 <span className="nav-counter">{resourcePacks.length}</span>
+              </div>
+              <div
+                className={`nav-item ${activeTab === 'datapacks' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('datapacks'); }}
+              >
+                <span className="nav-icon"><Icon d={ICONS.datapack} size={14} /></span>
+                <span>{t('sidebar.datapacks')}</span>
+                <span className="nav-counter">{datapacks.length}</span>
               </div>
             </div>
 
@@ -1873,8 +2134,8 @@ export default function App() {
 
             <div className="sidebar-nav">
               <div
-                className={`nav-item ${activeTab === 'console' ? 'active' : ''}`}
-                onClick={() => setActiveTab('console')}
+                className={`nav-item ${activeTab === 'console' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('console'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.console} size={14} /></span>
                 <span>{t('sidebar.console')}</span>
@@ -1927,896 +2188,1108 @@ export default function App() {
 
         {/* ── MAIN CONTENT ── */}
         <main className="main-content">
-          {/* Top Action Toolbar */}
-          <div className="action-bar">
-            <div className="action-bar-tabs">
-              {/* Discover Group */}
-              <div className="tab-group">
-                <button
-                  className={`tab-btn ${activeTab === 'news' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('news')}
-                >
-                  <Icon d={ICONS.news} size={13} />
-                  <span>{t('sidebar.news')}</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'explore' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('explore')}
-                >
-                  <Icon d={ICONS.compass} size={13} />
-                  <span>{t('sidebar.explore')}</span>
-                </button>
-              </div>
-
-              <div className="tab-group-divider" />
-
-              {/* Library Group */}
-              <div className="tab-group">
-                <button
-                  className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('mods')}
-                >
-                  <Icon d={ICONS.cube} size={13} />
-                  <span>{t('sidebar.mods')}</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'shaders' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('shaders')}
-                >
-                  <Icon d={ICONS.sun} size={13} />
-                  <span>{t('sidebar.shaders')}</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'resourcepacks' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('resourcepacks')}
-                >
-                  <Icon d={ICONS.layers} size={13} />
-                  <span>{t('sidebar.resourcePacks')}</span>
-                </button>
-              </div>
-
-              <div className="tab-group-divider" />
-
-              {/* System Group */}
-              <div className="tab-group">
-                <button
-                  className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('console')}
-                >
-                  <Icon d={ICONS.console} size={13} />
-                  <span>{t('sidebar.console')}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="action-bar-actions">
-              {!isOnline && (
-                <div className="offline-pill" title={t('offline.newsDesc')}>
-                  <Icon d={ICONS.wifiOff} size={12} />
-                  <span>{t('offline.badge')}</span>
-                </div>
-              )}
-              <button
-                className="btn-primary"
-                onClick={() => setModal('install')}
-                disabled={gameState === 'running'}
-                title={t('install.installVersion')}
-                style={{ gap: 6, padding: '7px 14px' }}
-              >
-                <Icon d={ICONS.download} size={13} />
-                <span>{t('install.installVersion')}</span>
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={handleOpenMinecraftDirectory}
-                title={t('settings.openMinecraftDirectory')}
-              >
-                <Icon d={ICONS.folder} size={12} />
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={() => setModal('settings')}
-                title={t('settings.title')}
-              >
-                <Icon d={ICONS.settings} size={12} />
-              </button>
-            </div>
-          </div>
-
-          {/* Update Notification Banner */}
-          {updateState.phase === 'downloading' || updateState.phase === 'launching' || updateState.phase === 'complete' ? (
-            <div className="update-banner">
-              <div className="update-banner-header">
-                <span className="update-banner-title">{t('update.launcherUpdate')} — {updateState.latestVersion || ''}</span>
-                <span style={{ fontSize: 11, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>
-                  {updateState.phase === 'downloading' ? `${updateState.progress || 0}%` : updateState.phase}
-                </span>
-              </div>
-              <div className="update-banner-progress">
-                <div className="update-banner-fill" style={{ width: `${Math.max(0, Math.min(100, updateState.progress || 0))}%` }} />
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── TAB: NEWS ── */}
-          <div className="tab-panel" style={{ display: activeTab === 'news' ? 'flex' : 'none' }}>
-            <div className="news-header">
-              <div>
-                <h2 className="news-title">{t('news.title')}</h2>
-                <div className="news-subtitle">{t('news.subtitle')}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn-secondary" type="button" onClick={loadNews} disabled={newsLoading}>
-                  <Icon d={ICONS.refresh} size={11} />
-                  {newsLoading ? t('news.loading') : t('news.refresh')}
-                </button>
-                <button className="btn-primary" type="button" onClick={handleOpenNewsSource} style={{ fontSize: 12, padding: '6px 12px' }}>
-                  <Icon d={ICONS.external} size={11} />
-                  {t('news.openSource')}
-                </button>
-              </div>
-            </div>
-
-            {!isOnline && newsItems.length === 0 ? (
-              <EmptyState
-                icon={ICONS.wifiOff}
-                title={t('offline.newsTitle')}
-                description={t('offline.newsDesc')}
-                actionText={t('news.refresh')}
-                actionIcon={ICONS.refresh}
-                onAction={loadNews}
-              />
-            ) : newsError ? (
-              <EmptyState
-                icon={ICONS.news}
-                title={t('news.errorTitle')}
-                description={newsError}
-                actionText={t('news.refresh')}
-                actionIcon={ICONS.refresh}
-                onAction={loadNews}
-                secondaryText={t('news.openSource')}
-                onSecondary={handleOpenNewsSource}
-              />
-            ) : newsLoading && newsItems.length === 0 ? (
-              <div className="news-grid">
-                {[1, 2, 3, 4, 5, 6].map(i => (
-                  <div key={i} className="news-card-skeleton">
-                    <div className="skeleton-media" />
-                    <div className="skeleton-body">
-                      <div className="skeleton-line short" />
-                      <div className="skeleton-line" />
-                      <div className="skeleton-line sub" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : newsItems.length === 0 ? (
-              <EmptyState
-                icon={ICONS.news}
-                title={t('news.emptyTitle')}
-                description={t('news.emptyText')}
-                actionText={t('news.refresh')}
-                actionIcon={ICONS.refresh}
-                onAction={loadNews}
-                secondaryText={t('news.openSource')}
-                onSecondary={handleOpenNewsSource}
-              />
-            ) : (
-              <div className="news-grid">
-                {newsItems.map(item => (
-                  <NewsCard key={item.url} item={item} onOpen={handleOpenNewsArticle} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── TAB: EXPLORE (MODRINTH CATALOG) ── */}
-          <div
-            className="tab-panel"
-            style={{ display: activeTab === 'explore' ? 'flex' : 'none', position: 'relative' }}
-          >
-            <div className="explore-header">
-              <div>
-                <h2 className="explore-title" style={{ display: 'flex', alignItems: 'center' }}>
-                  {t('explore.title')}
-                  <div className="explore-beta-wrapper" ref={betaInfoRef}>
+          {selectedArticle ? (
+            <ArticleDetailView
+              item={selectedArticle}
+              onBack={() => setSelectedArticle(null)}
+            />
+          ) : selectedModDetail ? (
+            <ProjectDetailView
+              project={selectedModDetail.project}
+              initialTab={selectedModDetail.initialTab || 'overview'}
+              currentLoader={currentLoader}
+              currentMcVer={currentMcVer}
+              mods={
+                selectedModDetail?.project?.project_type === 'shader' || exploreType === 'shaders' ? shaders :
+                  selectedModDetail?.project?.project_type === 'resourcepack' || exploreType === 'resourcepacks' ? resourcePacks :
+                    selectedModDetail?.project?.project_type === 'datapack' || exploreType === 'datapacks' ? datapacks : mods
+              }
+              installingVersionId={installingVersionId}
+              onBack={() => setSelectedModDetail(null)}
+              onInstallVersion={handleInstallSpecificVersion}
+              parentTabTitle={
+                selectedModDetail.parentTitle ||
+                (activeTab === 'explore' ? t('sidebar.explore') :
+                  activeTab === 'mods' ? t('sidebar.mods') :
+                    activeTab === 'shaders' ? t('sidebar.shaders') :
+                      activeTab === 'resourcepacks' ? t('sidebar.resourcePacks') :
+                        activeTab === 'datapacks' ? t('sidebar.datapacks') : t('sidebar.explore'))
+              }
+            />
+          ) : (
+            <>
+              {/* Top Action Toolbar */}
+              <div className="action-bar">
+                <div className="action-bar-tabs">
+                  {/* Discover Group */}
+                  <div className="tab-group">
                     <button
-                      type="button"
-                      className={`explore-beta-tag ${showBetaInfo ? 'active' : ''}`}
-                      onClick={() => setShowBetaInfo(prev => !prev)}
-                      title={t('mods.modrinthBetaTitle')}
+                      className={`tab-btn ${activeTab === 'news' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('news')}
                     >
-                      <span>BETA</span>
-                      <Icon d={ICONS.info} size={11} style={{ opacity: 0.85 }} />
+                      <Icon d={ICONS.news} size={13} />
+                      <span>{t('sidebar.news')}</span>
                     </button>
-                    {showBetaInfo && (
-                      <div className="explore-beta-popover">
-                        <div className="explore-beta-popover-header">
-                          <div className="explore-beta-popover-title">
-                            <Icon d={ICONS.compass} size={14} style={{ color: 'var(--accent-light, #60a5fa)' }} />
-                            <span>{t('mods.modrinthBetaTitle')}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="explore-beta-popover-close"
-                            onClick={() => setShowBetaInfo(false)}
-                          >
-                            <Icon d={ICONS.x} size={11} />
-                          </button>
-                        </div>
-                        <div className="explore-beta-popover-body">
-                          {t('mods.modrinthBetaDescription')}
-                        </div>
-                        <div className="explore-beta-popover-footer">
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            style={{ fontSize: 11, padding: '4px 8px', height: 'auto', textDecoration: 'none' }}
-                            onClick={() => {
-                              launcher.openExternal?.('https://modrinth.com').catch(() => { });
-                            }}
-                          >
-                            <Icon d={ICONS.external} size={11} />
-                            <span>Modrinth.com</span>
-                          </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'explore' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('explore')}
+                    >
+                      <Icon d={ICONS.compass} size={13} />
+                      <span>{t('sidebar.explore')}</span>
+                    </button>
+                  </div>
+
+                  <div className="tab-group-divider" />
+
+                  {/* Library Group */}
+                  <div className="tab-group">
+                    <button
+                      className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('mods')}
+                    >
+                      <Icon d={ICONS.cube} size={13} />
+                      <span>{t('sidebar.mods')}</span>
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'shaders' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('shaders')}
+                    >
+                      <Icon d={ICONS.sun} size={13} />
+                      <span>{t('sidebar.shaders')}</span>
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'resourcepacks' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('resourcepacks')}
+                    >
+                      <Icon d={ICONS.layers} size={13} />
+                      <span>{t('sidebar.resourcePacks')}</span>
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'datapacks' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('datapacks')}
+                    >
+                      <Icon d={ICONS.datapack} size={13} />
+                      <span>{t('sidebar.datapacks')}</span>
+                    </button>
+                  </div>
+
+                  <div className="tab-group-divider" />
+
+                  {/* System Group */}
+                  <div className="tab-group">
+                    <button
+                      className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('console')}
+                    >
+                      <Icon d={ICONS.console} size={13} />
+                      <span>{t('sidebar.console')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="action-bar-actions">
+                  {!isOnline && (
+                    <div className="offline-pill" title={t('offline.newsDesc')}>
+                      <Icon d={ICONS.wifiOff} size={12} />
+                      <span>{t('offline.badge')}</span>
+                    </div>
+                  )}
+                  <button
+                    className="btn-primary"
+                    onClick={() => setModal('install')}
+                    disabled={gameState === 'running'}
+                    title={t('install.installVersion')}
+                    style={{ gap: 6, padding: '7px 14px' }}
+                  >
+                    <Icon d={ICONS.download} size={13} />
+                    <span>{t('install.installVersion')}</span>
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={handleOpenMinecraftDirectory}
+                    title={t('settings.openMinecraftDirectory')}
+                  >
+                    <Icon d={ICONS.folder} size={12} />
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setModal('settings')}
+                    title={t('settings.title')}
+                  >
+                    <Icon d={ICONS.settings} size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Update Notification Banner */}
+              {updateState.phase === 'downloading' || updateState.phase === 'launching' || updateState.phase === 'complete' ? (
+                <div className="update-banner">
+                  <div className="update-banner-header">
+                    <span className="update-banner-title">{t('update.launcherUpdate')} — {updateState.latestVersion || ''}</span>
+                    <span style={{ fontSize: 11, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>
+                      {updateState.phase === 'downloading' ? `${updateState.progress || 0}%` : updateState.phase}
+                    </span>
+                  </div>
+                  <div className="update-banner-progress">
+                    <div className="update-banner-fill" style={{ width: `${Math.max(0, Math.min(100, updateState.progress || 0))}%` }} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* ── TAB: NEWS ── */}
+              <div className="tab-panel" style={{ display: activeTab === 'news' ? 'flex' : 'none' }}>
+                <div className="news-header">
+                  <div>
+                    <h2 className="news-title">{t('news.title')}</h2>
+                    <div className="news-subtitle">{t('news.subtitle')}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-secondary" type="button" onClick={loadNews} disabled={newsLoading}>
+                      <Icon d={ICONS.refresh} size={11} />
+                      {newsLoading ? t('news.loading') : t('news.refresh')}
+                    </button>
+                    <button className="btn-primary" type="button" onClick={handleOpenNewsSource} style={{ fontSize: 12, padding: '6px 12px' }}>
+                      <Icon d={ICONS.external} size={11} />
+                      {t('news.openSource')}
+                    </button>
+                  </div>
+                </div>
+
+                {!isOnline && newsItems.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.wifiOff}
+                    title={t('offline.newsTitle')}
+                    description={t('offline.newsDesc')}
+                    actionText={t('news.refresh')}
+                    actionIcon={ICONS.refresh}
+                    onAction={loadNews}
+                  />
+                ) : newsError ? (
+                  <EmptyState
+                    icon={ICONS.news}
+                    title={t('news.errorTitle')}
+                    description={newsError}
+                    actionText={t('news.refresh')}
+                    actionIcon={ICONS.refresh}
+                    onAction={loadNews}
+                    secondaryText={t('news.openSource')}
+                    onSecondary={handleOpenNewsSource}
+                  />
+                ) : newsLoading && newsItems.length === 0 ? (
+                  <div className="news-grid">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <div key={i} className="news-card-skeleton">
+                        <div className="skeleton-media" />
+                        <div className="skeleton-body">
+                          <div className="skeleton-line short" />
+                          <div className="skeleton-line" />
+                          <div className="skeleton-line sub" />
                         </div>
                       </div>
-                    )}
-                  </div>
-                </h2>
-                <div className="explore-subtitle">{t('explore.subtitle')}</div>
-              </div>
-              <div className="explore-type-selector">
-                <button
-                  type="button"
-                  className={`explore-type-pill ${exploreType === 'mods' ? 'active' : ''}`}
-                  onClick={() => setExploreType('mods')}
-                >
-                  <Icon d={ICONS.cube} size={15} />
-                  <span>{t('explore.tabMods')}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`explore-type-pill ${exploreType === 'shaders' ? 'active' : ''}`}
-                  onClick={() => setExploreType('shaders')}
-                >
-                  <Icon d={ICONS.sun} size={15} />
-                  <span>{t('explore.tabShaders')}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`explore-type-pill ${exploreType === 'resourcepacks' ? 'active' : ''}`}
-                  onClick={() => setExploreType('resourcepacks')}
-                >
-                  <Icon d={ICONS.layers} size={15} />
-                  <span>{t('explore.tabResourcePacks')}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="modrinth-browser">
-              <div className="modrinth-controls-bar">
-                <div className="mods-search-box modrinth-search-box">
-                  <Icon d={ICONS.search} size={14} />
-                  <input
-                    type="text"
-                    className="mods-search-input"
-                    placeholder={
-                      exploreType === 'shaders'
-                        ? t('mods.searchModrinthShadersPlaceholder')
-                        : exploreType === 'resourcepacks'
-                          ? t('mods.searchModrinthResourcePacksPlaceholder')
-                          : t('mods.searchModrinthPlaceholder')
-                    }
-                    value={modrinthQuery}
-                    onChange={e => setModrinthQuery(e.target.value)}
-                  />
-                  {modrinthQuery && (
-                    <button className="search-clear-btn" onClick={() => setModrinthQuery('')}>
-                      <Icon d={ICONS.x} size={11} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="modrinth-filters-row">
-                  <div className="modrinth-filter-select-wrapper">
-                    <span className="modrinth-filter-label">{t('mods.filterSort')}:</span>
-                    <select
-                      className="select-input modrinth-filter-select"
-                      value={modrinthSort}
-                      onChange={e => setModrinthSort(e.target.value)}
-                    >
-                      <option value="relevance">{t('mods.sortRelevance')}</option>
-                      <option value="downloads">{t('mods.sortDownloads')}</option>
-                      <option value="follows">{t('mods.sortFollows')}</option>
-                      <option value="newest">{t('mods.sortNewest')}</option>
-                      <option value="updated">{t('mods.sortUpdated')}</option>
-                    </select>
-                  </div>
-
-                  {exploreType === 'mods' && (
-                    <div className="modrinth-filter-select-wrapper">
-                      <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
-                      <select
-                        className="select-input modrinth-filter-select"
-                        value={modrinthLoaderFilter}
-                        onChange={e => setModrinthLoaderFilter(e.target.value)}
-                      >
-                        {currentLoader && (
-                          <option value="auto">
-                            Auto ({currentLoader.toUpperCase()})
-                          </option>
-                        )}
-                        <option value="all">{t('mods.allLoaders')}</option>
-                        <option value="fabric">Fabric</option>
-                        <option value="forge">Forge</option>
-                        <option value="neoforge">NeoForge</option>
-                        <option value="quilt">Quilt</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="modrinth-filter-select-wrapper">
-                    <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
-                    <select
-                      className="select-input modrinth-filter-select"
-                      value={modrinthVersionFilter}
-                      onChange={e => setModrinthVersionFilter(e.target.value)}
-                    >
-                      <option value="auto">
-                        {currentMcVer ? `Auto (${currentMcVer})` : t('mods.allVersions')}
-                      </option>
-                      <option value="all">{t('mods.allVersions')}</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Category Pills */}
-              <div className="modrinth-category-pills">
-                {(exploreType === 'shaders' ? [
-                  { id: 'all', label: t('mods.allCategories') },
-                  { id: 'fantasy', label: 'Fantasy' },
-                  { id: 'realistic', label: 'Realistic' },
-                  { id: 'performance', label: 'Performance' },
-                  { id: 'semi-realistic', label: 'Semi-Realistic' },
-                  { id: 'cinematic', label: 'Cinematic' },
-                  { id: 'vanilla-like', label: 'Vanilla-like' },
-                ] : exploreType === 'resourcepacks' ? [
-                  { id: 'all', label: t('mods.allCategories') },
-                  { id: '16x', label: '16x' },
-                  { id: '32x', label: '32x' },
-                  { id: '64x', label: '64x' },
-                  { id: '128x', label: '128x' },
-                  { id: '512x', label: '512x' },
-                  { id: 'realistic', label: 'Realistic' },
-                  { id: 'medieval', label: 'Medieval' },
-                  { id: 'vanilla-like', label: 'Vanilla-like' },
-                ] : [
-                  { id: 'all', label: t('mods.allCategories') },
-                  { id: 'optimization', label: 'Optimization' },
-                  { id: 'technology', label: 'Technology' },
-                  { id: 'adventure', label: 'Adventure' },
-                  { id: 'decoration', label: 'Decoration' },
-                  { id: 'utility', label: 'Utility' },
-                  { id: 'magic', label: 'Magic' },
-                  { id: 'worldgen', label: 'World Gen' },
-                ]).map(cat => (
-                  <button
-                    key={cat.id}
-                    className={`category-pill ${modrinthCategory === cat.id ? 'active' : ''}`}
-                    onClick={() => setModrinthCategory(cat.id)}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Modrinth Grid */}
-              {!isOnline ? (
-                <EmptyState
-                  icon={ICONS.wifiOff}
-                  title={t('offline.modrinthTitle')}
-                  description={t('offline.modrinthDesc')}
-                />
-              ) : modrinthLoading ? (
-                <div className="modrinth-loading-state">
-                  <span className="modrinth-spinner" />
-                  <span>{t('account.loading')}</span>
-                </div>
-              ) : modrinthResults.length === 0 ? (
-                <EmptyState
-                  icon={ICONS.search}
-                  title={
-                    exploreType === 'shaders'
-                      ? t('mods.noShadersMatchTitle')
-                      : exploreType === 'resourcepacks'
-                        ? t('mods.noResourcePacksMatchTitle')
-                        : t('mods.noMatchTitle')
-                  }
-                  description={
-                    exploreType === 'shaders'
-                      ? t('mods.noModrinthShadersResults')
-                      : exploreType === 'resourcepacks'
-                        ? t('mods.noModrinthResourcePacksResults')
-                        : t('mods.noModrinthResults')
-                  }
-                  actionText={t('common.clearSearch')}
-                  onAction={() => {
-                    setModrinthQuery('');
-                    setModrinthCategory('all');
-                    setModrinthLoaderFilter('auto');
-                    setModrinthVersionFilter('auto');
-                  }}
-                />
-              ) : (
-                <>
-                  <div className="modrinth-grid">
-                    {modrinthResults.map(proj => (
-                      <ModrinthCard
-                        key={proj.project_id || proj.slug}
-                        project={proj}
-                        installed={isModInstalled(proj)}
-                        installing={Boolean(modrinthInstalling[proj.project_id || proj.slug])}
-                        onInstall={handleInstallModrinthMod}
-                        onOpenDetails={handleOpenModDetails}
-                      />
                     ))}
                   </div>
-                  <div ref={modrinthSentinelRef} className="modrinth-sentinel">
-                    {modrinthLoadingMore && (
-                      <div className="modrinth-load-more">
-                        <span className="modrinth-spinner small" />
-                        <span>{t('account.loading')}</span>
-                      </div>
-                    )}
+                ) : newsItems.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.news}
+                    title={t('news.emptyTitle')}
+                    description={t('news.emptyText')}
+                    actionText={t('news.refresh')}
+                    actionIcon={ICONS.refresh}
+                    onAction={loadNews}
+                    secondaryText={t('news.openSource')}
+                    onSecondary={handleOpenNewsSource}
+                  />
+                ) : (
+                  <div className="news-grid">
+                    {newsItems.map(item => (
+                      <NewsCard key={item.url} item={item} onOpen={handleOpenNewsArticle} />
+                    ))}
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* ── TAB: MODS (LIBRARY) ── */}
-          <div
-            className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-            style={{ display: activeTab === 'mods' ? 'flex' : 'none', position: 'relative' }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isDragging && (
-              <div className="dropzone-overlay">
-                <div className="dropzone-content">
-                  <Icon d={ICONS.download} size={36} />
-                  <span className="dropzone-title">{t('mods.dropzone')}</span>
-                  <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="mods-toolbar">
-              <div className="mods-search-box">
-                <Icon d={ICONS.search} size={13} />
-                <input
-                  type="text"
-                  className="mods-search-input"
-                  placeholder={t('mods.searchPlaceholder')}
-                  value={modSearch}
-                  onChange={e => setModSearch(e.target.value)}
-                />
-                {modSearch && (
-                  <button className="search-clear-btn" onClick={() => setModSearch('')}>
-                    <Icon d={ICONS.x} size={11} />
-                  </button>
                 )}
               </div>
 
-              {mods.length > 0 && (
-                <span className="mods-count-badge">
-                  {mods.filter(m => m.enabled).length}/{mods.length} {t('mods.active')}
-                </span>
-              )}
-
-              <div className="mods-toolbar-actions">
-                {mods.length > 0 && (() => {
-                  const anyEnabled = mods.some(m => m.enabled);
-                  return (
+              {/* ── TAB: EXPLORE (MODRINTH CATALOG) ── */}
+              <div
+                className="tab-panel"
+                style={{ display: activeTab === 'explore' ? 'flex' : 'none', position: 'relative' }}
+              >
+                <div className="explore-header">
+                  <div>
+                    <h2 className="explore-title" style={{ display: 'flex', alignItems: 'center' }}>
+                      {t('explore.title')}
+                      <div className="explore-beta-wrapper" ref={betaInfoRef}>
+                        <button
+                          type="button"
+                          className={`explore-beta-tag ${showBetaInfo ? 'active' : ''}`}
+                          onClick={() => setShowBetaInfo(prev => !prev)}
+                          title={t('mods.modrinthBetaTitle')}
+                        >
+                          <span>BETA</span>
+                          <Icon d={ICONS.info} size={11} style={{ opacity: 0.85 }} />
+                        </button>
+                        {showBetaInfo && (
+                          <div className="explore-beta-popover">
+                            <div className="explore-beta-popover-header">
+                              <div className="explore-beta-popover-title">
+                                <Icon d={ICONS.compass} size={14} style={{ color: 'var(--accent-light, #60a5fa)' }} />
+                                <span>{t('mods.modrinthBetaTitle')}</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="explore-beta-popover-close"
+                                onClick={() => setShowBetaInfo(false)}
+                              >
+                                <Icon d={ICONS.x} size={11} />
+                              </button>
+                            </div>
+                            <div className="explore-beta-popover-body">
+                              {t('mods.modrinthBetaDescription')}
+                            </div>
+                            <div className="explore-beta-popover-footer">
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                style={{ fontSize: 11, padding: '4px 8px', height: 'auto', textDecoration: 'none' }}
+                                onClick={() => {
+                                  launcher.openExternal?.('https://modrinth.com').catch(() => { });
+                                }}
+                              >
+                                <Icon d={ICONS.external} size={11} />
+                                <span>Modrinth.com</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </h2>
+                    <div className="explore-subtitle">{t('explore.subtitle')}</div>
+                  </div>
+                  <div className="explore-type-selector">
                     <button
-                      className="btn-secondary"
-                      onClick={() => handleSetAllModsEnabled(!anyEnabled)}
-                      title={anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}
+                      type="button"
+                      className={`explore-type-pill ${exploreType === 'mods' ? 'active' : ''}`}
+                      onClick={() => setExploreType('mods')}
                     >
-                      <Icon d={anyEnabled ? ICONS.stop : ICONS.check} size={12} />
-                      <span>{anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}</span>
+                      <Icon d={ICONS.cube} size={15} />
+                      <span>{t('explore.tabMods')}</span>
                     </button>
-                  );
-                })()}
-                <button
-                  className="btn-secondary"
-                  onClick={() => handleCheckModUpdates({ silent: false })}
-                  disabled={checkingModUpdates}
-                  title={t('mods.checkUpdates')}
-                >
-                  <Icon d={ICONS.refresh} size={12} className={checkingModUpdates ? 'spin-infinite' : ''} />
-                  <span>{t('mods.checkUpdates')}</span>
-                </button>
-                <button className="btn-secondary" onClick={() => handleOpenContentFolder('mods')} title={t('mods.openModsFolder')}>
-                  <Icon d={ICONS.folder} size={12} />
-                  <span>{t('mods.openFolder')}</span>
-                </button>
-                <button className="btn-primary" onClick={() => handleAddContentClick('mods')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                  <Icon d={ICONS.plus} size={12} />
-                  {t('mods.addMod')}
-                </button>
-              </div>
-            </div>
+                    <button
+                      type="button"
+                      className={`explore-type-pill ${exploreType === 'shaders' ? 'active' : ''}`}
+                      onClick={() => setExploreType('shaders')}
+                    >
+                      <Icon d={ICONS.sun} size={15} />
+                      <span>{t('explore.tabShaders')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`explore-type-pill ${exploreType === 'resourcepacks' ? 'active' : ''}`}
+                      onClick={() => setExploreType('resourcepacks')}
+                    >
+                      <Icon d={ICONS.layers} size={15} />
+                      <span>{t('explore.tabResourcePacks')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`explore-type-pill ${exploreType === 'datapacks' ? 'active' : ''}`}
+                      onClick={() => setExploreType('datapacks')}
+                    >
+                      <Icon d={ICONS.datapack} size={15} />
+                      <span>{t('explore.tabDatapacks')}</span>
+                    </button>
+                  </div>
+                </div>
 
-            {mods.length === 0 ? (
-              <EmptyState
-                icon={ICONS.cube}
-                title={t('mods.emptyTitle')}
-                description={t('mods.emptyText')}
-                actionText={t('explore.browseMods')}
-                actionIcon={ICONS.compass}
-                onAction={() => {
-                  setExploreType('mods');
-                  setActiveTab('explore');
-                }}
-                secondaryText={t('mods.openModsFolder')}
-                onSecondary={() => handleOpenContentFolder('mods')}
-              />
-            ) : (() => {
-              const filtered = mods.filter(m =>
-                String(m.name || '').toLowerCase().includes(modSearch.toLowerCase()) ||
-                String(m.fileName || '').toLowerCase().includes(modSearch.toLowerCase())
-              );
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    icon={ICONS.search}
-                    title={t('mods.noMatchTitle')}
-                    description={t('mods.noMatchText')}
-                    actionText={t('common.clearSearch')}
-                    onAction={() => setModSearch('')}
-                  />
-                );
-              }
-              return (
-                <div className="mods-grid">
-                  {filtered.map(mod => {
-                    const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
-                    const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
-                    const isUpdating = updatingMods.has(mod.fileName) || updatingMods.has(fileKey);
-                    return (
-                      <ModCard
-                        key={mod.id}
-                        mod={mod}
-                        updateInfo={updateInfo}
-                        updating={isUpdating}
-                        onToggle={handleModToggle}
-                        onDelete={handleModDelete}
-                        onUpdate={handleUpdateMod}
+                <div className="modrinth-browser">
+                  <div className="modrinth-controls-bar">
+                    <div className="mods-search-box modrinth-search-box">
+                      <Icon d={ICONS.search} size={14} />
+                      <input
+                        type="text"
+                        className="mods-search-input"
+                        placeholder={
+                          exploreType === 'shaders'
+                            ? t('mods.searchModrinthShadersPlaceholder')
+                            : exploreType === 'resourcepacks'
+                              ? t('mods.searchModrinthResourcePacksPlaceholder')
+                              : exploreType === 'datapacks'
+                                ? t('mods.searchModrinthDatapacksPlaceholder')
+                                : t('mods.searchModrinthPlaceholder')
+                        }
+                        value={modrinthQuery}
+                        onChange={e => setModrinthQuery(e.target.value)}
                       />
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
+                      {modrinthQuery && (
+                        <button className="search-clear-btn" onClick={() => setModrinthQuery('')}>
+                          <Icon d={ICONS.x} size={11} />
+                        </button>
+                      )}
+                    </div>
 
-          {/* ── TAB: SHADERS (LIBRARY) ── */}
-          <div
-            className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-            style={{ display: activeTab === 'shaders' ? 'flex' : 'none', position: 'relative' }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isDragging && (
-              <div className="dropzone-overlay">
-                <div className="dropzone-content">
-                  <Icon d={ICONS.download} size={36} />
-                  <span className="dropzone-title">{t('mods.dropzone')}</span>
-                  <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="mods-toolbar">
-              <div className="mods-search-box">
-                <Icon d={ICONS.search} size={13} />
-                <input
-                  type="text"
-                  className="mods-search-input"
-                  placeholder={t('mods.searchShadersPlaceholder')}
-                  value={shaderSearch}
-                  onChange={e => setShaderSearch(e.target.value)}
-                />
-                {shaderSearch && (
-                  <button className="search-clear-btn" onClick={() => setShaderSearch('')}>
-                    <Icon d={ICONS.x} size={11} />
-                  </button>
-                )}
-              </div>
-
-              {shaders.length > 0 && (
-                <span className="mods-count-badge">
-                  {shaders.length} {t('sidebar.shaders')}
-                </span>
-              )}
-
-              <div className="mods-toolbar-actions">
-                <button className="btn-secondary" onClick={() => handleOpenContentFolder('shaders')} title={t('mods.openShadersFolder')}>
-                  <Icon d={ICONS.folder} size={12} />
-                  <span>{t('mods.openFolder')}</span>
-                </button>
-                <button className="btn-primary" onClick={() => handleAddContentClick('shaders')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                  <Icon d={ICONS.plus} size={12} />
-                  {t('mods.addShader')}
-                </button>
-              </div>
-            </div>
-
-            {shaders.length === 0 ? (
-              <EmptyState
-                icon={ICONS.sun}
-                title={t('mods.emptyShadersTitle')}
-                description={t('mods.emptyShadersText')}
-                actionText={t('explore.browseShaders')}
-                actionIcon={ICONS.compass}
-                onAction={() => {
-                  setExploreType('shaders');
-                  setActiveTab('explore');
-                }}
-                secondaryText={t('mods.openShadersFolder')}
-                onSecondary={() => handleOpenContentFolder('shaders')}
-              />
-            ) : (() => {
-              const filtered = shaders.filter(s =>
-                String(s.name || '').toLowerCase().includes(shaderSearch.toLowerCase()) ||
-                String(s.fileName || '').toLowerCase().includes(shaderSearch.toLowerCase())
-              );
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    icon={ICONS.search}
-                    title={t('mods.noShadersMatchTitle')}
-                    description={t('mods.noShadersMatchText')}
-                    actionText={t('common.clearSearch')}
-                    onAction={() => setShaderSearch('')}
-                  />
-                );
-              }
-              return (
-                <div className="installed-packs-grid">
-                  {filtered.map(shader => (
-                    <div key={shader.id || shader.fileName} className="installed-pack-card">
-                      <div className="installed-pack-header">
-                        <div className="installed-pack-icon">
-                          {shader.iconUrl ? (
-                            <img src={shader.iconUrl} alt={shader.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                          ) : (
-                            <Icon d={ICONS.sun} size={20} />
-                          )}
-                        </div>
-                        <div className="installed-pack-meta">
-                          <span className="installed-pack-title" title={shader.name}>{shader.name}</span>
-                          <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
-                        </div>
+                    <div className="modrinth-filters-row">
+                      <div className="modrinth-filter-select-wrapper">
+                        <span className="modrinth-filter-label">{t('mods.filterSort')}:</span>
+                        <select
+                          className="select-input modrinth-filter-select"
+                          value={modrinthSort}
+                          onChange={e => setModrinthSort(e.target.value)}
+                        >
+                          <option value="relevance">{t('mods.sortRelevance')}</option>
+                          <option value="downloads">{t('mods.sortDownloads')}</option>
+                          <option value="follows">{t('mods.sortFollows')}</option>
+                          <option value="newest">{t('mods.sortNewest')}</option>
+                          <option value="updated">{t('mods.sortUpdated')}</option>
+                        </select>
                       </div>
-                      {shader.description && (
-                        <div className="installed-pack-desc" title={shader.description}>
-                          {shader.description}
+
+                      {exploreType === 'mods' && (
+                        <div className="modrinth-filter-select-wrapper">
+                          <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
+                          <select
+                            className="select-input modrinth-filter-select"
+                            value={modrinthLoaderFilter}
+                            onChange={e => setModrinthLoaderFilter(e.target.value)}
+                          >
+                            {currentLoader && (
+                              <option value="auto">
+                                Auto ({currentLoader.toUpperCase()})
+                              </option>
+                            )}
+                            <option value="all">{t('mods.allLoaders')}</option>
+                            <option value="fabric">Fabric</option>
+                            <option value="forge">Forge</option>
+                            <option value="neoforge">NeoForge</option>
+                            <option value="quilt">Quilt</option>
+                          </select>
                         </div>
                       )}
-                      <div className="installed-pack-footer">
-                        <span className="installed-pack-size">
-                          {shader.size ? formatFileSize(shader.size) : (shader.isDirectory ? 'Folder' : '')}
-                        </span>
-                        <div className="installed-pack-actions">
-                          <button
-                            className="mod-delete-btn"
-                            onClick={() => handleDeleteShader(shader)}
-                            title={t('mods.deleteShader')}
-                          >
-                            <Icon d={ICONS.trash} size={12} />
-                          </button>
-                        </div>
+
+                      <div className="modrinth-filter-select-wrapper">
+                        <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
+                        <select
+                          className="select-input modrinth-filter-select"
+                          value={modrinthVersionFilter}
+                          onChange={e => setModrinthVersionFilter(e.target.value)}
+                        >
+                          <option value="auto">
+                            {currentMcVer ? `Auto (${currentMcVer})` : t('mods.allVersions')}
+                          </option>
+                          <option value="all">{t('mods.allVersions')}</option>
+                        </select>
                       </div>
                     </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
+                  </div>
 
-          {/* ── TAB: TEXTURE PACKS (LIBRARY) ── */}
-          <div
-            className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-            style={{ display: activeTab === 'resourcepacks' ? 'flex' : 'none', position: 'relative' }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isDragging && (
-              <div className="dropzone-overlay">
-                <div className="dropzone-content">
-                  <Icon d={ICONS.download} size={36} />
-                  <span className="dropzone-title">{t('mods.dropzone')}</span>
-                  <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="mods-toolbar">
-              <div className="mods-search-box">
-                <Icon d={ICONS.search} size={13} />
-                <input
-                  type="text"
-                  className="mods-search-input"
-                  placeholder={t('mods.searchResourcePacksPlaceholder')}
-                  value={resourcePackSearch}
-                  onChange={e => setResourcePackSearch(e.target.value)}
-                />
-                {resourcePackSearch && (
-                  <button className="search-clear-btn" onClick={() => setResourcePackSearch('')}>
-                    <Icon d={ICONS.x} size={11} />
-                  </button>
-                )}
-              </div>
-
-              {resourcePacks.length > 0 && (
-                <span className="mods-count-badge">
-                  {resourcePacks.length} {t('sidebar.resourcePacks')}
-                </span>
-              )}
-
-              <div className="mods-toolbar-actions">
-                <button className="btn-secondary" onClick={() => handleOpenContentFolder('resourcepacks')} title={t('mods.openResourcePacksFolder')}>
-                  <Icon d={ICONS.folder} size={12} />
-                  <span>{t('mods.openFolder')}</span>
-                </button>
-                <button className="btn-primary" onClick={() => handleAddContentClick('resourcepacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                  <Icon d={ICONS.plus} size={12} />
-                  {t('mods.addResourcePack')}
-                </button>
-              </div>
-            </div>
-
-            {resourcePacks.length === 0 ? (
-              <EmptyState
-                icon={ICONS.layers}
-                title={t('mods.emptyResourcePacksTitle')}
-                description={t('mods.emptyResourcePacksText')}
-                actionText={t('explore.browseResourcePacks')}
-                actionIcon={ICONS.compass}
-                onAction={() => {
-                  setExploreType('resourcepacks');
-                  setActiveTab('explore');
-                }}
-                secondaryText={t('mods.openResourcePacksFolder')}
-                onSecondary={() => handleOpenContentFolder('resourcepacks')}
-              />
-            ) : (() => {
-              const filtered = resourcePacks.filter(p =>
-                String(p.name || '').toLowerCase().includes(resourcePackSearch.toLowerCase()) ||
-                String(p.fileName || '').toLowerCase().includes(resourcePackSearch.toLowerCase())
-              );
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    icon={ICONS.search}
-                    title={t('mods.noResourcePacksMatchTitle')}
-                    description={t('mods.noResourcePacksMatchText')}
-                    actionText={t('common.clearSearch')}
-                    onAction={() => setResourcePackSearch('')}
-                  />
-                );
-              }
-              return (
-                <div className="installed-packs-grid">
-                  {filtered.map(pack => (
-                    <div key={pack.id || pack.fileName} className="installed-pack-card">
-                      <div className="installed-pack-header">
-                        <div className="installed-pack-icon">
-                          {pack.iconUrl ? (
-                            <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                          ) : (
-                            <Icon d={ICONS.layers} size={20} />
-                          )}
-                        </div>
-                        <div className="installed-pack-meta">
-                          <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
-                          <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
-                        </div>
-                      </div>
-                      {pack.description && (
-                        <div className="installed-pack-desc" title={pack.description}>
-                          {pack.description}
-                        </div>
-                      )}
-                      <div className="installed-pack-footer">
-                        <span className="installed-pack-size">
-                          {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
-                        </span>
-                        <div className="installed-pack-actions">
-                          <button
-                            className="mod-delete-btn"
-                            onClick={() => handleDeleteResourcePack(pack)}
-                            title={t('mods.deleteResourcePack')}
-                          >
-                            <Icon d={ICONS.trash} size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* ── TAB: CONSOLE ── */}
-          <div className="tab-panel" style={{ display: activeTab === 'console' ? 'flex' : 'none' }}>
-            <div className="console-wrapper">
-              <div className="console-header">
-                <div className="console-title">
-                  <div className={`console-indicator ${gameState === 'running' ? 'running' : ''}`} />
-                  <span>{t('console.outputLog')}</span>
-                  {gameState === 'running' && (
-                    <span style={{ color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                      • {t('console.runningWithPid', { pid: runPid })}
-                    </span>
-                  )}
-                </div>
-                <div className="console-actions">
-                  <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 6 }}>
-                    {['all', 'info', 'warn', 'error'].map(lvl => (
+                  {/* Category Pills */}
+                  <div className="modrinth-category-pills">
+                    {(exploreType === 'shaders' ? [
+                      { id: 'all', label: t('mods.allCategories') },
+                      { id: 'fantasy', label: 'Fantasy' },
+                      { id: 'realistic', label: 'Realistic' },
+                      { id: 'performance', label: 'Performance' },
+                      { id: 'semi-realistic', label: 'Semi-Realistic' },
+                      { id: 'cinematic', label: 'Cinematic' },
+                      { id: 'vanilla-like', label: 'Vanilla-like' },
+                    ] : exploreType === 'resourcepacks' ? [
+                      { id: 'all', label: t('mods.allCategories') },
+                      { id: '16x', label: '16x' },
+                      { id: '32x', label: '32x' },
+                      { id: '64x', label: '64x' },
+                      { id: '128x', label: '128x' },
+                      { id: '512x', label: '512x' },
+                      { id: 'realistic', label: 'Realistic' },
+                      { id: 'medieval', label: 'Medieval' },
+                      { id: 'vanilla-like', label: 'Vanilla-like' },
+                    ] : exploreType === 'datapacks' ? [
+                      { id: 'all', label: t('mods.allCategories') },
+                      { id: 'adventure', label: 'Adventure' },
+                      { id: 'magic', label: 'Magic' },
+                      { id: 'technology', label: 'Technology' },
+                      { id: 'worldgen', label: 'World Gen' },
+                      { id: 'survival', label: 'Survival' },
+                      { id: 'utility', label: 'Utility' },
+                      { id: 'minigames', label: 'Minigames' },
+                      { id: 'vanilla-like', label: 'Vanilla-like' },
+                    ] : [
+                      { id: 'all', label: t('mods.allCategories') },
+                      { id: 'optimization', label: 'Optimization' },
+                      { id: 'technology', label: 'Technology' },
+                      { id: 'adventure', label: 'Adventure' },
+                      { id: 'decoration', label: 'Decoration' },
+                      { id: 'utility', label: 'Utility' },
+                      { id: 'magic', label: 'Magic' },
+                      { id: 'worldgen', label: 'World Gen' },
+                    ]).map(cat => (
                       <button
-                        key={lvl}
-                        className={`tab-btn ${logFilter === lvl ? 'active' : ''}`}
-                        style={{ fontSize: 10, padding: '2px 8px', textTransform: 'uppercase' }}
-                        onClick={() => setLogFilter(lvl)}
+                        key={cat.id}
+                        className={`category-pill ${modrinthCategory === cat.id ? 'active' : ''}`}
+                        onClick={() => setModrinthCategory(cat.id)}
                       >
-                        {lvl}
+                        {cat.label}
                       </button>
                     ))}
                   </div>
-                  <button className="btn-secondary" onClick={() => setAutoScroll(prev => !prev)} title={t('console.autoScroll')} style={{ padding: '4px 8px' }}>
-                    <Icon d={autoScroll ? ICONS.play : ICONS.stop} size={11} />
-                  </button>
-                  <button className="btn-secondary" onClick={handleCopyConsole} title={t('console.copy')} style={{ padding: '4px 8px' }}>
-                    <Icon d={ICONS.copy} size={11} />
-                  </button>
-                  <button className="btn-secondary" onClick={handleClearConsole} title={t('console.clear')} style={{ padding: '4px 8px' }}>
-                    <Icon d={ICONS.clear} size={11} />
-                  </button>
+
+                  {/* Modrinth Grid */}
+                  {!isOnline ? (
+                    <EmptyState
+                      icon={ICONS.wifiOff}
+                      title={t('offline.modrinthTitle')}
+                      description={t('offline.modrinthDesc')}
+                    />
+                  ) : modrinthLoading ? (
+                    <div className="modrinth-grid">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(i => (
+                        <ModrinthCardSkeleton key={i} />
+                      ))}
+                    </div>
+                  ) : modrinthResults.length === 0 ? (
+                    <EmptyState
+                      icon={ICONS.search}
+                      title={
+                        exploreType === 'shaders'
+                          ? t('mods.noShadersMatchTitle')
+                          : exploreType === 'resourcepacks'
+                            ? t('mods.noResourcePacksMatchTitle')
+                            : exploreType === 'datapacks'
+                              ? t('mods.noDatapacksMatchTitle')
+                              : t('mods.noMatchTitle')
+                      }
+                      description={
+                        exploreType === 'shaders'
+                          ? t('mods.noModrinthShadersResults')
+                          : exploreType === 'resourcepacks'
+                            ? t('mods.noModrinthResourcePacksResults')
+                            : exploreType === 'datapacks'
+                              ? t('mods.noModrinthDatapacksResults')
+                              : t('mods.noModrinthResults')
+                      }
+                      actionText={t('common.clearSearch')}
+                      onAction={() => {
+                        setModrinthQuery('');
+                        setModrinthCategory('all');
+                        setModrinthLoaderFilter('auto');
+                        setModrinthVersionFilter('auto');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <div className="modrinth-grid">
+                        {modrinthResults.map(proj => (
+                          <ModrinthCard
+                            key={proj.project_id || proj.slug}
+                            project={proj}
+                            installed={isModInstalled(proj)}
+                            installing={Boolean(modrinthInstalling[proj.project_id || proj.slug])}
+                            onInstall={handleInstallModrinthMod}
+                            onOpenDetails={handleOpenModDetails}
+                          />
+                        ))}
+                      </div>
+                      <div ref={modrinthSentinelRef} className="modrinth-sentinel">
+                        {modrinthLoadingMore && (
+                          <div className="modrinth-load-more">
+                            <span className="modrinth-spinner small" />
+                            <span>{t('account.loading')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="console-body" ref={consoleRef}>
-                {logs.length === 0 ? (
-                  <div className="console-empty-box">
-                    <Icon d={ICONS.console} size={28} />
-                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('console.noLogsYet')}</span>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>{t('console.noLogsYetSub')}</span>
+
+              {/* ── TAB: MODS (LIBRARY) ── */}
+              <div
+                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+                style={{ display: activeTab === 'mods' ? 'flex' : 'none', position: 'relative' }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {isDragging && (
+                  <div className="dropzone-overlay">
+                    <div className="dropzone-content">
+                      <Icon d={ICONS.download} size={36} />
+                      <span className="dropzone-title">{t('mods.dropzone')}</span>
+                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                    </div>
                   </div>
+                )}
+
+                <div className="mods-toolbar">
+                  <div className="mods-search-box">
+                    <Icon d={ICONS.search} size={13} />
+                    <input
+                      type="text"
+                      className="mods-search-input"
+                      placeholder={t('mods.searchPlaceholder')}
+                      value={modSearch}
+                      onChange={e => setModSearch(e.target.value)}
+                    />
+                    {modSearch && (
+                      <button className="search-clear-btn" onClick={() => setModSearch('')}>
+                        <Icon d={ICONS.x} size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {mods.length > 0 && (
+                    <span className="mods-count-badge">
+                      {mods.filter(m => m.enabled).length}/{mods.length} {t('mods.active')}
+                    </span>
+                  )}
+
+                  <div className="mods-toolbar-actions">
+                    {mods.length > 0 && (() => {
+                      const anyEnabled = mods.some(m => m.enabled);
+                      return (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleSetAllModsEnabled(!anyEnabled)}
+                          title={anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}
+                        >
+                          <Icon d={anyEnabled ? ICONS.stop : ICONS.check} size={12} />
+                          <span>{anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}</span>
+                        </button>
+                      );
+                    })()}
+                    <button
+                      className="btn-secondary"
+                      onClick={() => handleCheckModUpdates({ silent: false })}
+                      disabled={checkingModUpdates}
+                      title={t('mods.checkUpdates')}
+                    >
+                      <Icon d={ICONS.refresh} size={12} className={checkingModUpdates ? 'spin-infinite' : ''} />
+                      <span>{t('mods.checkUpdates')}</span>
+                    </button>
+                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('mods')} title={t('mods.openModsFolder')}>
+                      <Icon d={ICONS.folder} size={12} />
+                      <span>{t('mods.openFolder')}</span>
+                    </button>
+                    <button className="btn-primary" onClick={() => handleAddContentClick('mods')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                      <Icon d={ICONS.plus} size={12} />
+                      {t('mods.addMod')}
+                    </button>
+                  </div>
+                </div>
+
+                {mods.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.cube}
+                    title={t('mods.emptyTitle')}
+                    description={t('mods.emptyText')}
+                    actionText={t('explore.browseMods')}
+                    actionIcon={ICONS.compass}
+                    onAction={() => {
+                      setExploreType('mods');
+                      setActiveTab('explore');
+                    }}
+                    secondaryText={t('mods.openModsFolder')}
+                    onSecondary={() => handleOpenContentFolder('mods')}
+                  />
                 ) : (() => {
-                  const filteredLogs = logs.filter(entry => {
-                    if (logFilter === 'all') return true;
-                    const entryLevel = String(entry.level || '').toLowerCase();
-                    if (logFilter === 'warn') return entryLevel === 'warn' || String(entry.msg || '').includes('WARN');
-                    if (logFilter === 'error') return entryLevel === 'error' || String(entry.msg || '').includes('ERROR');
-                    if (logFilter === 'info') return entryLevel === 'info' && !String(entry.msg || '').includes('WARN') && !String(entry.msg || '').includes('ERROR');
-                    return true;
-                  });
-                  if (filteredLogs.length === 0) {
-                    return <span style={{ color: 'var(--text-faint)', padding: 12 }}>{t('console.noLogsWithFilter', { filter: logFilter })}</span>;
+                  const filtered = mods.filter(m =>
+                    String(m.name || '').toLowerCase().includes(modSearch.toLowerCase()) ||
+                    String(m.fileName || '').toLowerCase().includes(modSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <EmptyState
+                        icon={ICONS.search}
+                        title={t('mods.noMatchTitle')}
+                        description={t('mods.noMatchText')}
+                        actionText={t('common.clearSearch')}
+                        onAction={() => setModSearch('')}
+                      />
+                    );
                   }
-                  return filteredLogs.map((entry, i) => <LogLine key={i} entry={entry} />);
+                  return (
+                    <div className="mods-grid">
+                      {filtered.map(mod => {
+                        const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
+                        const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
+                        const isUpdating = updatingMods.has(mod.fileName) || updatingMods.has(fileKey);
+                        return (
+                          <ModCard
+                            key={mod.id}
+                            mod={mod}
+                            updateInfo={updateInfo}
+                            updating={isUpdating}
+                            onToggle={handleModToggle}
+                            onDelete={handleModDelete}
+                            onUpdate={handleUpdateMod}
+                            onOpenDetails={handleOpenLocalModDetails}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
                 })()}
               </div>
-            </div>
-          </div>
+
+              {/* ── TAB: SHADERS (LIBRARY) ── */}
+              <div
+                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+                style={{ display: activeTab === 'shaders' ? 'flex' : 'none', position: 'relative' }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {isDragging && (
+                  <div className="dropzone-overlay">
+                    <div className="dropzone-content">
+                      <Icon d={ICONS.download} size={36} />
+                      <span className="dropzone-title">{t('mods.dropzone')}</span>
+                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mods-toolbar">
+                  <div className="mods-search-box">
+                    <Icon d={ICONS.search} size={13} />
+                    <input
+                      type="text"
+                      className="mods-search-input"
+                      placeholder={t('mods.searchShadersPlaceholder')}
+                      value={shaderSearch}
+                      onChange={e => setShaderSearch(e.target.value)}
+                    />
+                    {shaderSearch && (
+                      <button className="search-clear-btn" onClick={() => setShaderSearch('')}>
+                        <Icon d={ICONS.x} size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {shaders.length > 0 && (
+                    <span className="mods-count-badge">
+                      {shaders.length} {t('sidebar.shaders')}
+                    </span>
+                  )}
+
+                  <div className="mods-toolbar-actions">
+                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('shaders')} title={t('mods.openShadersFolder')}>
+                      <Icon d={ICONS.folder} size={12} />
+                      <span>{t('mods.openFolder')}</span>
+                    </button>
+                    <button className="btn-primary" onClick={() => handleAddContentClick('shaders')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                      <Icon d={ICONS.plus} size={12} />
+                      {t('mods.addShader')}
+                    </button>
+                  </div>
+                </div>
+
+                {shaders.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.sun}
+                    title={t('mods.emptyShadersTitle')}
+                    description={t('mods.emptyShadersText')}
+                    actionText={t('explore.browseShaders')}
+                    actionIcon={ICONS.compass}
+                    onAction={() => {
+                      setExploreType('shaders');
+                      setActiveTab('explore');
+                    }}
+                    secondaryText={t('mods.openShadersFolder')}
+                    onSecondary={() => handleOpenContentFolder('shaders')}
+                  />
+                ) : (() => {
+                  const filtered = shaders.filter(s =>
+                    String(s.name || '').toLowerCase().includes(shaderSearch.toLowerCase()) ||
+                    String(s.fileName || '').toLowerCase().includes(shaderSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <EmptyState
+                        icon={ICONS.search}
+                        title={t('mods.noShadersMatchTitle')}
+                        description={t('mods.noShadersMatchText')}
+                        actionText={t('common.clearSearch')}
+                        onAction={() => setShaderSearch('')}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="installed-packs-grid">
+                      {filtered.map(shader => (
+                        <div
+                          key={shader.id || shader.fileName}
+                          className="installed-pack-card"
+                          onClick={() => handleOpenLocalShaderDetails(shader)}
+                        >
+                          <div className="installed-pack-header">
+                            <div className={`installed-pack-icon ${!shader.iconUrl ? 'shader-fallback-icon' : ''}`}>
+                              {shader.iconUrl ? (
+                                <img src={shader.iconUrl} alt={shader.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.classList.add('shader-fallback-icon'); }} />
+                              ) : (
+                                <Icon d={ICONS.sun} size={20} />
+                              )}
+                            </div>
+                            <div className="installed-pack-meta">
+                              <span className="installed-pack-title" title={shader.name}>{shader.name}</span>
+                              <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
+                            </div>
+                          </div>
+                          {shader.description && (
+                            <div className="installed-pack-desc" title={cleanMinecraftText(shader.description)}>
+                              {cleanMinecraftText(shader.description)}
+                            </div>
+                          )}
+                          <div className="installed-pack-footer">
+                            <span className="installed-pack-size">
+                              {shader.size ? formatFileSize(shader.size) : (shader.isDirectory ? 'Folder' : '')}
+                            </span>
+                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className="mod-delete-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteShader(shader);
+                                }}
+                                title={t('mods.deleteShader')}
+                              >
+                                <Icon d={ICONS.trash} size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── TAB: TEXTURE PACKS (LIBRARY) ── */}
+              <div
+                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+                style={{ display: activeTab === 'resourcepacks' ? 'flex' : 'none', position: 'relative' }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {isDragging && (
+                  <div className="dropzone-overlay">
+                    <div className="dropzone-content">
+                      <Icon d={ICONS.download} size={36} />
+                      <span className="dropzone-title">{t('mods.dropzone')}</span>
+                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mods-toolbar">
+                  <div className="mods-search-box">
+                    <Icon d={ICONS.search} size={13} />
+                    <input
+                      type="text"
+                      className="mods-search-input"
+                      placeholder={t('mods.searchResourcePacksPlaceholder')}
+                      value={resourcePackSearch}
+                      onChange={e => setResourcePackSearch(e.target.value)}
+                    />
+                    {resourcePackSearch && (
+                      <button className="search-clear-btn" onClick={() => setResourcePackSearch('')}>
+                        <Icon d={ICONS.x} size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {resourcePacks.length > 0 && (
+                    <span className="mods-count-badge">
+                      {resourcePacks.length} {t('sidebar.resourcePacks')}
+                    </span>
+                  )}
+
+                  <div className="mods-toolbar-actions">
+                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('resourcepacks')} title={t('mods.openResourcePacksFolder')}>
+                      <Icon d={ICONS.folder} size={12} />
+                      <span>{t('mods.openFolder')}</span>
+                    </button>
+                    <button className="btn-primary" onClick={() => handleAddContentClick('resourcepacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                      <Icon d={ICONS.plus} size={12} />
+                      {t('mods.addResourcePack')}
+                    </button>
+                  </div>
+                </div>
+
+                {resourcePacks.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.layers}
+                    title={t('mods.emptyResourcePacksTitle')}
+                    description={t('mods.emptyResourcePacksText')}
+                    actionText={t('explore.browseResourcePacks')}
+                    actionIcon={ICONS.compass}
+                    onAction={() => {
+                      setExploreType('resourcepacks');
+                      setActiveTab('explore');
+                    }}
+                    secondaryText={t('mods.openResourcePacksFolder')}
+                    onSecondary={() => handleOpenContentFolder('resourcepacks')}
+                  />
+                ) : (() => {
+                  const filtered = resourcePacks.filter(p =>
+                    String(p.name || '').toLowerCase().includes(resourcePackSearch.toLowerCase()) ||
+                    String(p.fileName || '').toLowerCase().includes(resourcePackSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <EmptyState
+                        icon={ICONS.search}
+                        title={t('mods.noResourcePacksMatchTitle')}
+                        description={t('mods.noResourcePacksMatchText')}
+                        actionText={t('common.clearSearch')}
+                        onAction={() => setResourcePackSearch('')}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="installed-packs-grid">
+                      {filtered.map(pack => (
+                        <div
+                          key={pack.id || pack.fileName}
+                          className="installed-pack-card"
+                          onClick={() => handleOpenLocalResourcePackDetails(pack)}
+                        >
+                          <div className="installed-pack-header">
+                            <div className="installed-pack-icon">
+                              {pack.iconUrl ? (
+                                <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                              ) : (
+                                <Icon d={ICONS.layers} size={20} />
+                              )}
+                            </div>
+                            <div className="installed-pack-meta">
+                              <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
+                              <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
+                            </div>
+                          </div>
+                          {pack.description && (
+                            <div className="installed-pack-desc" title={cleanMinecraftText(pack.description)}>
+                              {cleanMinecraftText(pack.description)}
+                            </div>
+                          )}
+                          <div className="installed-pack-footer">
+                            <span className="installed-pack-size">
+                              {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
+                            </span>
+                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className="mod-delete-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteResourcePack(pack);
+                                }}
+                                title={t('mods.deleteResourcePack')}
+                              >
+                                <Icon d={ICONS.trash} size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── TAB: DATA PACKS (LIBRARY) ── */}
+              <div
+                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
+                style={{ display: activeTab === 'datapacks' ? 'flex' : 'none', position: 'relative' }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {isDragging && (
+                  <div className="dropzone-overlay">
+                    <div className="dropzone-content">
+                      <Icon d={ICONS.download} size={36} />
+                      <span className="dropzone-title">{t('mods.dropzone')}</span>
+                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mods-toolbar">
+                  <div className="mods-search-box">
+                    <Icon d={ICONS.search} size={13} />
+                    <input
+                      type="text"
+                      className="mods-search-input"
+                      placeholder={t('mods.searchDatapacksPlaceholder')}
+                      value={datapackSearch}
+                      onChange={e => setDatapackSearch(e.target.value)}
+                    />
+                    {datapackSearch && (
+                      <button className="search-clear-btn" onClick={() => setDatapackSearch('')}>
+                        <Icon d={ICONS.x} size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {datapacks.length > 0 && (
+                    <span className="mods-count-badge">
+                      {datapacks.length} {t('sidebar.datapacks')}
+                    </span>
+                  )}
+
+                  <div className="mods-toolbar-actions">
+                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('datapacks')} title={t('mods.openDatapacksFolder')}>
+                      <Icon d={ICONS.folder} size={12} />
+                      <span>{t('mods.openFolder')}</span>
+                    </button>
+                    <button className="btn-primary" onClick={() => handleAddContentClick('datapacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
+                      <Icon d={ICONS.plus} size={12} />
+                      {t('mods.addDatapack')}
+                    </button>
+                  </div>
+                </div>
+
+                {datapacks.length === 0 ? (
+                  <EmptyState
+                    icon={ICONS.datapack}
+                    title={t('mods.emptyDatapacksTitle')}
+                    description={t('mods.emptyDatapacksText')}
+                    actionText={t('explore.browseDatapacks')}
+                    actionIcon={ICONS.compass}
+                    onAction={() => {
+                      setExploreType('datapacks');
+                      setActiveTab('explore');
+                    }}
+                    secondaryText={t('mods.openDatapacksFolder')}
+                    onSecondary={() => handleOpenContentFolder('datapacks')}
+                  />
+                ) : (() => {
+                  const filtered = datapacks.filter(p =>
+                    String(p.name || '').toLowerCase().includes(datapackSearch.toLowerCase()) ||
+                    String(p.fileName || '').toLowerCase().includes(datapackSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <EmptyState
+                        icon={ICONS.search}
+                        title={t('mods.noDatapacksMatchTitle')}
+                        description={t('mods.noDatapacksMatchText')}
+                        actionText={t('common.clearSearch')}
+                        onAction={() => setDatapackSearch('')}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="installed-packs-grid">
+                      {filtered.map(pack => (
+                        <div
+                          key={pack.id || pack.fileName}
+                          className="installed-pack-card"
+                          onClick={() => handleOpenLocalDatapackDetails(pack)}
+                        >
+                          <div className="installed-pack-header">
+                            <div className="installed-pack-icon">
+                              {pack.iconUrl ? (
+                                <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                              ) : (
+                                <Icon d={ICONS.datapack} size={20} />
+                              )}
+                            </div>
+                            <div className="installed-pack-meta">
+                              <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
+                              <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
+                            </div>
+                          </div>
+                          {pack.description && (
+                            <div className="installed-pack-desc" title={cleanMinecraftText(pack.description)}>
+                              {cleanMinecraftText(pack.description)}
+                            </div>
+                          )}
+                          <div className="installed-pack-footer">
+                            <span className="installed-pack-size">
+                              {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
+                            </span>
+                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className="mod-delete-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteDatapack(pack);
+                                }}
+                                title={t('mods.deleteDatapack')}
+                              >
+                                <Icon d={ICONS.trash} size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── TAB: CONSOLE ── */}
+              <div className="tab-panel" style={{ display: activeTab === 'console' ? 'flex' : 'none' }}>
+                <div className="console-wrapper">
+                  <div className="console-header">
+                    <div className="console-title">
+                      <div className={`console-indicator ${gameState === 'running' ? 'running' : ''}`} />
+                      <span>{t('console.outputLog')}</span>
+                      {gameState === 'running' && (
+                        <span style={{ color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                          • {t('console.runningWithPid', { pid: runPid })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="console-actions">
+                      <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 6 }}>
+                        {['all', 'info', 'warn', 'error'].map(lvl => (
+                          <button
+                            key={lvl}
+                            className={`tab-btn ${logFilter === lvl ? 'active' : ''}`}
+                            style={{ fontSize: 10, padding: '2px 8px', textTransform: 'uppercase' }}
+                            onClick={() => setLogFilter(lvl)}
+                          >
+                            {lvl}
+                          </button>
+                        ))}
+                      </div>
+                      <button className="btn-secondary" onClick={() => setAutoScroll(prev => !prev)} title={t('console.autoScroll')} style={{ padding: '4px 8px' }}>
+                        <Icon d={autoScroll ? ICONS.play : ICONS.stop} size={11} />
+                      </button>
+                      <button className="btn-secondary" onClick={handleCopyConsole} title={t('console.copy')} style={{ padding: '4px 8px' }}>
+                        <Icon d={ICONS.copy} size={11} />
+                      </button>
+                      <button className="btn-secondary" onClick={handleClearConsole} title={t('console.clear')} style={{ padding: '4px 8px' }}>
+                        <Icon d={ICONS.clear} size={11} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="console-body" ref={consoleRef}>
+                    {logs.length === 0 ? (
+                      <div className="console-empty-box">
+                        <Icon d={ICONS.console} size={28} />
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('console.noLogsYet')}</span>
+                        <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>{t('console.noLogsYetSub')}</span>
+                      </div>
+                    ) : (() => {
+                      const filteredLogs = logs.filter(entry => {
+                        if (logFilter === 'all') return true;
+                        const entryLevel = String(entry.level || '').toLowerCase();
+                        if (logFilter === 'warn') return entryLevel === 'warn' || String(entry.msg || '').includes('WARN');
+                        if (logFilter === 'error') return entryLevel === 'error' || String(entry.msg || '').includes('ERROR');
+                        if (logFilter === 'info') return entryLevel === 'info' && !String(entry.msg || '').includes('WARN') && !String(entry.msg || '').includes('ERROR');
+                        return true;
+                      });
+                      if (filteredLogs.length === 0) {
+                        return <span style={{ color: 'var(--text-faint)', padding: 12 }}>{t('console.noLogsWithFilter', { filter: logFilter })}</span>;
+                      }
+                      return filteredLogs.map((entry, i) => <LogLine key={i} entry={entry} />);
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* ── THE PLAY DECK (BOTTOM DOCK) ── */}
           <div className="play-deck">
@@ -2973,18 +3446,6 @@ export default function App() {
           onOpenModsFolder={handleOpenMinecraftDirectory}
         />
       )}
-      {selectedModDetail && (
-        <ModDetailModal
-          project={selectedModDetail.project}
-          initialTab={selectedModDetail.initialTab || 'overview'}
-          currentLoader={currentLoader}
-          currentMcVer={currentMcVer}
-          mods={selectedModDetail?.project?.project_type === 'shader' || exploreType === 'shaders' ? shaders : selectedModDetail?.project?.project_type === 'resourcepack' || exploreType === 'resourcepacks' ? resourcePacks : mods}
-          installingVersionId={installingVersionId}
-          onClose={() => setSelectedModDetail(null)}
-          onInstallVersion={handleInstallSpecificVersion}
-        />
-      )}
       {loginLoading && (
         <LoginLoadingModal
           onCancel={() => {
@@ -2994,6 +3455,13 @@ export default function App() {
             setLoginLoading(false);
             addLog('info', 'Login cancelled by user');
           }}
+        />
+      )}
+      {updateModalInfo && (
+        <UpdateModal
+          updateInfo={updateModalInfo}
+          onClose={() => setUpdateModalInfo(null)}
+          onInstall={handleApplyUpdate}
         />
       )}
     </>

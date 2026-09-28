@@ -80,3 +80,69 @@ export function findModInList(mods = [], targetId = '', displayName = '') {
     return prefixRegex.test(fn);
   }) || null;
 }
+
+export function extractTextComponent(component) {
+  if (!component) return '';
+  if (typeof component === 'string') return component;
+  if (typeof component === 'number' || typeof component === 'boolean') return String(component);
+
+  if (Array.isArray(component)) {
+    return component.map(extractTextComponent).join('');
+  }
+
+  if (typeof component === 'object') {
+    let result = '';
+    if (component.fallback && typeof component.fallback === 'string') {
+      result += component.fallback;
+    } else if (component.text && typeof component.text === 'string') {
+      result += component.text;
+    } else if (component.translate && typeof component.translate === 'string') {
+      result += component.translate;
+    }
+
+    if (component.extra) {
+      result += extractTextComponent(component.extra);
+    }
+
+    if (component.with && Array.isArray(component.with)) {
+      result += ' ' + component.with.map(extractTextComponent).join(' ');
+    }
+
+    return result;
+  }
+
+  return '';
+}
+
+export function cleanMinecraftText(raw) {
+  if (raw === null || raw === undefined) return '';
+
+  let text = raw;
+
+  if (typeof text === 'object') {
+    text = extractTextComponent(text);
+  }
+
+  if (typeof text !== 'string') {
+    text = String(text || '');
+  }
+
+  const trimmed = text.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null) {
+        text = extractTextComponent(parsed);
+      }
+    } catch {}
+  }
+
+  // Strip Minecraft color codes and formatting markers (§0-§9, §a-§f, §k-§o, §r)
+  text = text
+    .replace(/(?:§|\\u00a7|&)[0-9a-fk-or]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return text;
+}
+

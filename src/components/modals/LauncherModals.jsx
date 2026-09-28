@@ -587,3 +587,384 @@ export function LoginLoadingModal({ onCancel }) {
     </div>
   );
 }
+
+function parseFormattedInline(text) {
+  if (!text) return '';
+  const parts = [];
+  // Match links [text](url), bold **text**, inline `code`, italic *text*, or raw URLs https?://...
+  const regex = /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|https?:\/\/[^\s<>()]+)/g;
+  let lastIdx = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(text.slice(lastIdx, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('[') && token.includes('](')) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        const [, label, url] = linkMatch;
+        parts.push(
+          <a
+            key={match.index}
+            href={url}
+            onClick={(e) => {
+              e.preventDefault();
+              launcher.openExternal?.(url).catch(() => { });
+            }}
+            style={{ color: 'var(--accent-bright, #38ef7d)', textDecoration: 'underline', cursor: 'pointer', fontWeight: 500 }}
+          >
+            {label}
+          </a>
+        );
+      } else {
+        parts.push(token);
+      }
+    } else if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(
+        <strong key={match.index} style={{ color: 'var(--text-bright, #fff)', fontWeight: 600 }}>
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+      parts.push(
+        <em key={match.index} style={{ color: 'var(--text-dim, #ccc)', fontStyle: 'italic' }}>
+          {token.slice(1, -1)}
+        </em>
+      );
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code
+          key={match.index}
+          style={{
+            background: 'rgba(255,255,255,0.08)',
+            padding: '2px 6px',
+            borderRadius: 4,
+            fontSize: '0.88em',
+            color: 'var(--accent-bright, #38ef7d)',
+            fontFamily: 'Consolas, Monaco, monospace',
+          }}
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (token.startsWith('http://') || token.startsWith('https://')) {
+      parts.push(
+        <a
+          key={match.index}
+          href={token}
+          onClick={(e) => {
+            e.preventDefault();
+            launcher.openExternal?.(token).catch(() => { });
+          }}
+          style={{ color: 'var(--accent, #10b981)', textDecoration: 'underline', cursor: 'pointer', wordBreak: 'break-all' }}
+        >
+          {token}
+        </a>
+      );
+    }
+    lastIdx = regex.lastIndex;
+  }
+
+  if (lastIdx < text.length) {
+    parts.push(text.slice(lastIdx));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+export function ChangelogRenderer({ content }) {
+  if (!content) return null;
+  const lines = String(content).split('\n');
+
+  const elements = [];
+  let currentList = [];
+  let inCodeBlock = false;
+  let codeBlockLines = [];
+  let codeBlockLang = '';
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} style={{ margin: '6px 0 10px 0', paddingLeft: 20, listStyleType: 'disc' }}>
+          {currentList.map((item, i) => (
+            <li key={i} style={{ marginBottom: 4, color: 'var(--text, #d0d0d0)', lineHeight: 1.5, fontSize: 13 }}>
+              {parseFormattedInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  const flushCodeBlock = () => {
+    if (codeBlockLines.length > 0) {
+      elements.push(
+        <pre
+          key={`code-${elements.length}`}
+          style={{
+            background: 'rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 6,
+            padding: '10px 14px',
+            margin: '8px 0 12px 0',
+            overflowX: 'auto',
+            fontSize: 12,
+            fontFamily: 'Consolas, Monaco, monospace',
+            color: 'var(--text-bright, #fff)',
+            lineHeight: 1.45,
+          }}
+        >
+          <code>{codeBlockLines.join('\n')}</code>
+        </pre>
+      );
+      codeBlockLines = [];
+      codeBlockLang = '';
+    }
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    // Check code blocks
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCodeBlock();
+        inCodeBlock = false;
+      } else {
+        flushList();
+        inCodeBlock = true;
+        codeBlockLang = trimmed.slice(3).trim();
+      }
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      return;
+    }
+
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    // Dividers
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      flushList();
+      elements.push(
+        <hr key={index} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '14px 0' }} />
+      );
+      return;
+    }
+
+    // Blockquotes
+    if (trimmed.startsWith('> ')) {
+      flushList();
+      elements.push(
+        <blockquote
+          key={index}
+          style={{
+            margin: '8px 0',
+            paddingLeft: 12,
+            borderLeft: '3px solid var(--accent, #10b981)',
+            color: 'var(--text-dim, #aaa)',
+            fontSize: 13,
+            fontStyle: 'italic',
+          }}
+        >
+          {parseFormattedInline(trimmed.slice(2))}
+        </blockquote>
+      );
+      return;
+    }
+
+    // Headings
+    if (trimmed.startsWith('#### ')) {
+      flushList();
+      elements.push(
+        <h5 key={index} style={{ margin: '12px 0 4px 0', fontSize: 13, fontWeight: 700, color: 'var(--text-bright, #fff)' }}>
+          {trimmed.slice(5)}
+        </h5>
+      );
+    } else if (trimmed.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <h4 key={index} style={{ margin: '14px 0 6px 0', fontSize: 14, fontWeight: 700, color: 'var(--accent-bright, #38ef7d)' }}>
+          {trimmed.slice(4)}
+        </h4>
+      );
+    } else if (trimmed.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <h3 key={index} style={{ margin: '16px 0 8px 0', fontSize: 15, fontWeight: 700, color: 'var(--text-bright, #fff)', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 4 }}>
+          {trimmed.slice(3)}
+        </h3>
+      );
+    } else if (trimmed.startsWith('# ')) {
+      flushList();
+      elements.push(
+        <h2 key={index} style={{ margin: '18px 0 10px 0', fontSize: 16, fontWeight: 700, color: 'var(--text-bright, #fff)' }}>
+          {trimmed.slice(2)}
+        </h2>
+      );
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('+ ')) {
+      currentList.push(trimmed.slice(2));
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      currentList.push(trimmed.replace(/^\d+\.\s/, ''));
+    } else {
+      flushList();
+      elements.push(
+        <p key={index} style={{ margin: '4px 0 8px 0', color: 'var(--text, #d0d0d0)', lineHeight: 1.5, fontSize: 13 }}>
+          {parseFormattedInline(trimmed)}
+        </p>
+      );
+    }
+  });
+
+  if (inCodeBlock) {
+    flushCodeBlock();
+  }
+  flushList();
+
+  return <div style={{ textAlign: 'left' }}>{elements}</div>;
+}
+
+function formatFileSize(bytes) {
+  if (typeof bytes !== 'number' || isNaN(bytes) || bytes <= 0) return null;
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) {
+    return `${mb.toFixed(1)} MB`;
+  }
+  const kb = bytes / 1024;
+  return `${kb.toFixed(0)} KB`;
+}
+
+export function UpdateModal({ updateInfo, onClose, onInstall }) {
+  const { t } = useI18n();
+  if (!updateInfo) return null;
+
+  const latestVersion = updateInfo.latestVersion || '';
+  if (latestVersion.startsWith('release-')) {
+    // Strip "release-" prefix for display purposes
+    updateInfo.latestVersion = latestVersion.slice(8);
+  }
+  const currentVersion = updateInfo.currentVersion || '';
+  if (currentVersion.startsWith('release-')) {
+    // Strip "release-" prefix for display purposes
+    updateInfo.currentVersion = currentVersion.slice(8);
+  }
+  const releaseNotes = updateInfo.releaseNotes || '';
+  const assetSize = typeof updateInfo.asset?.size === 'number' && updateInfo.asset.size > 0
+    ? formatFileSize(updateInfo.asset.size)
+    : null;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{ padding: '20px 16px' }}>
+      <div
+        className="modal update-modal"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '92vw',
+          maxWidth: 680,
+          maxHeight: 'calc(90vh - 32px)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '24px 28px',
+        }}
+      >
+        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 24 }}>🚀</span>
+            <div className="modal-title" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>
+              {t('updater.updateAvailableTitle')}
+            </div>
+          </div>
+          <button className="modal-close-btn" onClick={onClose} title={t('window.close')}>
+            <Icon d={ICONS.x} size={14} />
+          </button>
+        </div>
+
+        <div className="modal-subtitle" style={{ marginTop: 2, marginBottom: 14, flex: '0 0 auto' }}>
+          {t('updater.updateAvailableMessage', { latestVersion })}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            marginBottom: 14,
+            background: 'rgba(255,255,255,0.03)',
+            padding: '12px 18px',
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.06)',
+            flex: '0 0 auto',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>
+              {t('updater.currentVersionLabel')}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-dim)' }}>v{currentVersion}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', color: 'var(--accent)', fontSize: 18, fontWeight: 700 }}>➜</div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 11, color: 'var(--accent-bright)', display: 'block', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>
+              {t('updater.newVersionLabel')}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-bright)' }}>v{latestVersion}</span>
+          </div>
+          {assetSize ? (
+            <>
+              <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>
+                  {t('updater.downloadSizeLabel')}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-bright, #fff)' }}>{assetSize}</span>
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        {releaseNotes ? (
+          <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, flex: '0 0 auto' }}>
+              {t('updater.changelogTitle')}
+            </div>
+            <div
+              style={{
+                flex: '1 1 auto',
+                minHeight: 140,
+                maxHeight: 360,
+                overflowY: 'auto',
+                background: 'rgba(0,0,0,0.35)',
+                padding: '16px 20px',
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <ChangelogRenderer content={releaseNotes} />
+            </div>
+          </div>
+        ) : null}
+
+        <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: 12, marginTop: 4, flex: '0 0 auto' }}>
+          <button className="btn-secondary" type="button" onClick={onClose} style={{ minWidth: 100, padding: '9px 18px' }}>
+            {t('updater.later')}
+          </button>
+          <button className="btn-primary" type="button" onClick={() => onInstall(updateInfo)} style={{ padding: '9px 20px' }}>
+            <Icon d={ICONS.download} size={15} />
+            <span>{t('updater.downloadAndInstall')}{assetSize ? ` (${assetSize})` : ''}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

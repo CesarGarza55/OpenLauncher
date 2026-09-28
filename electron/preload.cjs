@@ -27,8 +27,14 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftGetInstalledResourcePacks() {
     return ipcRenderer.invoke('minecraft:get-installed-resourcepacks');
   },
+  minecraftGetInstalledDatapacks() {
+    return ipcRenderer.invoke('minecraft:get-installed-datapacks');
+  },
   minecraftGetNews() {
     return ipcRenderer.invoke('minecraft:get-news');
+  },
+  minecraftGetArticle(url) {
+    return ipcRenderer.invoke('minecraft:get-article', url);
   },
   minecraftToggleMod(modId, enable) {
     return ipcRenderer.invoke('minecraft:toggle-mod', { modId, enable });
@@ -44,6 +50,9 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   minecraftDeleteResourcePack(fileName) {
     return ipcRenderer.invoke('minecraft:delete-resourcepack', { fileName });
+  },
+  minecraftDeleteDatapack(fileName) {
+    return ipcRenderer.invoke('minecraft:delete-datapack', { fileName });
   },
   minecraftOpenContentFolder(folderType) {
     return ipcRenderer.invoke('minecraft:open-content-folder', folderType);
@@ -78,8 +87,8 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftSaveState(state) {
     return ipcRenderer.invoke('minecraft:save-state', state);
   },
-  minecraftGetAuthState(profileKey) {
-    return ipcRenderer.invoke('minecraft:get-auth-state', profileKey);
+  minecraftGetAuthState(profileKey, options) {
+    return ipcRenderer.invoke('minecraft:get-auth-state', profileKey, options);
   },
   minecraftLogin(profileKey) {
     return ipcRenderer.invoke('minecraft:login', profileKey);
@@ -89,6 +98,9 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   minecraftCheckUpdate() {
     return ipcRenderer.invoke('minecraft:check-update');
+  },
+  minecraftApplyUpdate(payload) {
+    return ipcRenderer.invoke('minecraft:apply-update', payload);
   },
   minecraftGetSettings() {
     return ipcRenderer.invoke('minecraft:get-settings');

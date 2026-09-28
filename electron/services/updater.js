@@ -1,44 +1,42 @@
-import { app, dialog, shell } from 'electron';
+import { app, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { Readable } from 'stream';
+import { fileURLToPath } from 'url';
 import { loadLauncherState } from '../../src/lib/launcherState.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const UPDATE_REPOSITORY = 'CesarGarza55/OpenLauncher';
 const UPDATE_RELEASES_API = `https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`;
 const UPDATE_RELEASES_PAGE = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
 
-const UPDATER_TRANSLATIONS = {
-  en: {
-    checking: 'Checking for launcher updates...',
-    upToDate: 'Launcher is already up to date.',
-    openingReleasePage: 'Opening the release page for this update.',
-    downloading: 'Downloading {assetName}',
-    launching: 'Launching downloaded update',
-    updateAvailableTitle: 'Update available',
-    updateAvailableMessage: 'OpenLauncher {latestVersion} is available.',
-    detailWithAsset: 'Current version: {currentVersion}\nUpdate file: {assetName}',
-    detailWithoutAsset: 'Current version: {currentVersion}\nNo launchable asset was found for this platform, so the release page will open instead.',
-    downloadAndInstall: 'Download and install',
-    openReleasePage: 'Open release page',
-    later: 'Later',
-  },
-  es: {
-    checking: 'Buscando actualizaciones del launcher...',
-    upToDate: 'El launcher ya está actualizado.',
-    openingReleasePage: 'Abriendo la página de la versión de esta actualización.',
-    downloading: 'Descargando {assetName}',
-    launching: 'Iniciando la actualización descargada',
-    updateAvailableTitle: 'Actualización disponible',
-    updateAvailableMessage: 'OpenLauncher {latestVersion} está disponible.',
-    detailWithAsset: 'Versión actual: {currentVersion}\nArchivo de actualización: {assetName}',
-    detailWithoutAsset: 'Versión actual: {currentVersion}\nNo se encontró un archivo ejecutable para esta plataforma, así que se abrirá la página de la versión.',
-    downloadAndInstall: 'Descargar e instalar',
-    openReleasePage: 'Abrir página de versión',
-    later: 'Después',
-  },
-};
+const localeCache = new Map();
+
+export async function loadLocaleData(language = 'en') {
+  const lang = String(language || 'en').trim().toLowerCase();
+  if (localeCache.has(lang)) return localeCache.get(lang);
+
+  try {
+    const localePath = path.resolve(__dirname, `../../src/locales/${lang}.json`);
+    const content = await fs.promises.readFile(localePath, 'utf8');
+    const parsed = JSON.parse(content);
+    localeCache.set(lang, parsed);
+    return parsed;
+  } catch {
+    if (lang !== 'en') {
+      return loadLocaleData('en');
+    }
+    return {};
+  }
+}
+
+export async function getUpdaterStrings(language) {
+  const locale = await loadLocaleData(language);
+  return locale?.updater || {};
+}
 
 export function versionToTuple(version) {
   const value = String(version || '').trim();
@@ -73,7 +71,7 @@ export function isLaunchableUpdateAsset(assetName) {
     return lowerName.endsWith('.exe') || lowerName.endsWith('.zip');
   }
   if (process.platform === 'linux') {
-    return lowerName.endsWith('.deb') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tar.xz');
+    return lowerName.endsWith('.appimage') || lowerName.endsWith('.deb') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tar.xz');
   }
   if (process.platform === 'darwin') {
     return lowerName.endsWith('.dmg') || lowerName.endsWith('.zip');
@@ -90,14 +88,10 @@ export function formatI18nMessage(template, values = {}) {
 export async function getPreferredLanguage() {
   try {
     const state = await loadLauncherState(app.getPath('userData'));
-    return state.settings?.language === 'es' ? 'es' : 'en';
+    return state.settings?.language || 'en';
   } catch {
     return 'en';
   }
-}
-
-export function getUpdaterStrings(language) {
-  return UPDATER_TRANSLATIONS[language] || UPDATER_TRANSLATIONS.en;
 }
 
 export function pickUpdateAsset(release) {
@@ -122,19 +116,14 @@ export function pickUpdateAsset(release) {
         if (assetName.endsWith('.zip')) score += 90;
         if (assetName.includes('win')) score += 5;
       } else if (platform === 'linux') {
+        if (assetName.endsWith('.appimage')) {
+          score += process.env.APPIMAGE ? 120 : 100;
+        }
         if (assetName.endsWith('.deb')) {
-          if (assetName.includes('portable')) {
-            score += 80;
-          } else {
-            score += 100;
-          }
+          score += 90;
         }
         if (assetName.endsWith('.tar.gz') || assetName.endsWith('.tar.xz')) {
-          if (assetName.includes('portable')) {
-            score += 90;
-          } else {
-            score += 85;
-          }
+          score += 80;
         }
         if (assetName.includes('linux')) score += 5;
       } else if (platform === 'darwin') {
@@ -189,8 +178,31 @@ export async function launchDownloadedUpdate(filePath) {
     if (extension === '.appimage' || extension === '' || basename.endsWith('.tar.gz') || basename.endsWith('.tar.xz')) {
       await fs.promises.chmod(resolvedPath, 0o755).catch(() => { });
     }
+    if (extension === '.appimage') {
+      try {
+        if (process.env.APPIMAGE) {
+          try {
+            await fs.promises.copyFile(resolvedPath, process.env.APPIMAGE);
+            await fs.promises.chmod(process.env.APPIMAGE, 0o755);
+            const child = spawn(process.env.APPIMAGE, [], { detached: true, stdio: 'ignore' });
+            child.unref();
+            return { ok: true, launched: true, path: process.env.APPIMAGE };
+          } catch { }
+        }
+        const child = spawn(resolvedPath, [], { detached: true, stdio: 'ignore' });
+        child.unref();
+        return { ok: true, launched: true, path: resolvedPath };
+      } catch (e) {
+        try { await shell.openExternal(UPDATE_RELEASES_PAGE); } catch { }
+        return { ok: false, launched: false, path: resolvedPath, error: e?.message || String(e) };
+      }
+    }
     if (extension === '.deb') {
       await shell.openPath(resolvedPath);
+      return { ok: true, launched: true, path: resolvedPath };
+    }
+    if (basename.endsWith('.tar.gz') || basename.endsWith('.tar.xz')) {
+      await shell.openPath(path.dirname(resolvedPath));
       return { ok: true, launched: true, path: resolvedPath };
     }
   }
@@ -202,85 +214,125 @@ export async function launchDownloadedUpdate(filePath) {
     }
   }
 
-  if (process.platform === 'win32' && extension === '.zip') {
-    await shell.openPath(resolvedPath);
-    return { ok: true, launched: true, path: resolvedPath };
+  if (process.platform === 'win32') {
+    if (extension === '.zip') {
+      await shell.openPath(resolvedPath);
+      return { ok: true, launched: true, path: resolvedPath };
+    }
+    if (extension === '.exe') {
+      try {
+        const child = spawn(resolvedPath, ['/S'], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        child.unref();
+        return { ok: true, launched: true, path: resolvedPath };
+      } catch (e) {
+        try { await shell.openExternal(UPDATE_RELEASES_PAGE); } catch { }
+        return { ok: false, launched: false, path: resolvedPath, error: e?.message || String(e) };
+      }
+    }
   }
 
   if (isLaunchableUpdateAsset(resolvedPath)) {
     try {
       const child = spawn(resolvedPath, [], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' });
       child.unref();
+      return { ok: true, launched: true, path: resolvedPath };
     } catch (e) {
       try { await shell.openExternal(UPDATE_RELEASES_PAGE); } catch { }
       return { ok: false, launched: false, path: resolvedPath, error: e?.message || String(e) };
     }
-    return { ok: true, launched: true, path: resolvedPath };
   }
 
   await shell.openExternal(UPDATE_RELEASES_PAGE);
   return { ok: true, launched: false, path: resolvedPath };
 }
 
-export async function checkForLauncherUpdate({ promptUser = false, parentWindow = null, onEvent = null } = {}) {
+export async function downloadAndApplyUpdate(updatePayload = {}, { onEvent = null } = {}) {
   const currentVersion = String(app.getVersion() || '').trim();
-  const updaterStrings = getUpdaterStrings(await getPreferredLanguage());
+  const latestVersion = updatePayload.latestVersion || '';
+  const asset = updatePayload.asset;
+  const updaterStrings = await getUpdaterStrings(await getPreferredLanguage());
+
+  if (!asset || !asset.browser_download_url) {
+    onEvent?.('minecraft:update-status', { phase: 'release-page', currentVersion, latestVersion, message: updaterStrings.openingReleasePage });
+    await shell.openExternal(updatePayload.releaseUrl || UPDATE_RELEASES_PAGE);
+    return { ok: true, available: true, openedReleasePage: true, currentVersion, latestVersion };
+  }
+
+  if (!isLaunchableUpdateAsset(asset.name)) {
+    onEvent?.('minecraft:update-status', { phase: 'release-page', currentVersion, latestVersion, message: updaterStrings.openingReleasePage });
+    await shell.openExternal(updatePayload.releaseUrl || UPDATE_RELEASES_PAGE);
+    return { ok: true, available: true, openedReleasePage: true, currentVersion, latestVersion };
+  }
+
+  onEvent?.('minecraft:update-status', {
+    phase: 'downloading',
+    currentVersion,
+    latestVersion,
+    assetName: asset.name,
+    message: formatI18nMessage(updaterStrings.downloading, { assetName: asset.name }),
+  });
+
+  const updatesDir = path.join(app.getPath('userData'), 'updates');
+  await fs.promises.mkdir(updatesDir, { recursive: true });
+  const downloadPath = path.join(updatesDir, String(asset.name || `OpenLauncher-${latestVersion}`));
+  try { await fs.promises.rm(downloadPath, { force: true }).catch(() => { }); } catch { }
+
+  await downloadFileToPath(asset.browser_download_url, downloadPath, {
+    onProgress: ({ loaded, total, percent }) => {
+      onEvent?.('minecraft:update-progress', { phase: 'downloading', loaded, total, percent, currentVersion, latestVersion, assetName: asset.name });
+    },
+  });
+
+  onEvent?.('minecraft:update-status', { phase: 'launching', currentVersion, latestVersion, assetName: asset.name, message: updaterStrings.launching });
+  const launchResult = await launchDownloadedUpdate(downloadPath);
+  onEvent?.('minecraft:update-complete', { phase: 'complete', currentVersion, latestVersion, assetName: asset.name, path: downloadPath });
+
+  if (launchResult?.launched) {
+    setTimeout(() => {
+      app.quit();
+    }, 400);
+  }
+
+  return { ok: true, available: true, downloaded: true, path: downloadPath, currentVersion, latestVersion };
+}
+
+export async function checkForLauncherUpdate({ onEvent = null } = {}) {
+  const currentVersion = String(app.getVersion() || '').trim();
+  const updaterStrings = await getUpdaterStrings(await getPreferredLanguage());
   onEvent?.('minecraft:update-status', { phase: 'checking', currentVersion, message: updaterStrings.checking });
+
   const response = await fetch(UPDATE_RELEASES_API, {
     headers: { 'User-Agent': 'OpenLauncher-Updater', Accept: 'application/vnd.github+json' },
   });
   if (!response.ok) throw new Error(`Failed to check updates: ${response.status}`);
   const release = await response.json();
   const latestVersion = normalizeReleaseVersionTag(release);
-  //console.log(`Current version: ${currentVersion}, Latest version: ${latestVersion}`);
+
   if (!latestVersion) return { error: 'InvalidRelease', message: 'Release metadata did not include a version tag.' };
+
   const currentTuple = versionToTuple(currentVersion);
   const latestTuple = versionToTuple(latestVersion);
+
   if (compareVersionTuples(latestTuple, currentTuple) <= 0) {
     onEvent?.('minecraft:update-status', { phase: 'up-to-date', currentVersion, latestVersion, message: updaterStrings.upToDate });
     return { ok: true, upToDate: true, currentVersion, latestVersion };
   }
+
   const asset = pickUpdateAsset(release);
-  const buttons = asset && isLaunchableUpdateAsset(asset.name)
-    ? [updaterStrings.downloadAndInstall, updaterStrings.later]
-    : [updaterStrings.openReleasePage, updaterStrings.later];
-  if (promptUser) {
-    const choice = await dialog.showMessageBox(parentWindow || undefined, {
-      type: 'info', buttons, defaultId: 0, cancelId: 1, noLink: true,
-      title: updaterStrings.updateAvailableTitle,
-      message: formatI18nMessage(updaterStrings.updateAvailableMessage, { latestVersion }),
-      detail: asset
-        ? formatI18nMessage(updaterStrings.detailWithAsset, { currentVersion: currentVersion || 'unknown', assetName: asset.name })
-        : formatI18nMessage(updaterStrings.detailWithoutAsset, { currentVersion: currentVersion || 'unknown' }),
-    });
-    if (choice.response !== 0) return { ok: true, available: true, declined: true, currentVersion, latestVersion };
-  }
-  if (!asset) {
-    onEvent?.('minecraft:update-status', { phase: 'release-page', currentVersion, latestVersion, message: updaterStrings.openingReleasePage });
-    await shell.openExternal(release.html_url || UPDATE_RELEASES_PAGE);
-    return { ok: true, available: true, openedReleasePage: true, currentVersion, latestVersion };
-  }
-  if (!isLaunchableUpdateAsset(asset.name)) {
-    onEvent?.('minecraft:update-status', { phase: 'release-page', currentVersion, latestVersion, message: updaterStrings.openingReleasePage });
-    await shell.openExternal(release.html_url || UPDATE_RELEASES_PAGE);
-    return { ok: true, available: true, openedReleasePage: true, currentVersion, latestVersion };
-  }
-  onEvent?.('minecraft:update-status', {
-    phase: 'downloading', currentVersion, latestVersion, assetName: asset.name,
-    message: formatI18nMessage(updaterStrings.downloading, { assetName: asset.name }),
-  });
-  const updatesDir = path.join(app.getPath('userData'), 'updates');
-  await fs.promises.mkdir(updatesDir, { recursive: true });
-  const downloadPath = path.join(updatesDir, String(asset.name || `OpenLauncher-${latestVersion}`));
-  try { await fs.promises.rm(downloadPath, { force: true }).catch(() => { }); } catch { }
-  await downloadFileToPath(asset.browser_download_url, downloadPath, {
-    onProgress: ({ loaded, total, percent }) => {
-      onEvent?.('minecraft:update-progress', { phase: 'downloading', loaded, total, percent, currentVersion, latestVersion, assetName: asset.name });
-    },
-  });
-  onEvent?.('minecraft:update-status', { phase: 'launching', currentVersion, latestVersion, assetName: asset.name, message: updaterStrings.launching });
-  const launchResult = await launchDownloadedUpdate(downloadPath);
-  if (launchResult?.launched) app.quit();
-  onEvent?.('minecraft:update-complete', { phase: 'complete', currentVersion, latestVersion, assetName: asset.name, path: downloadPath });
-  return { ok: true, available: true, downloaded: true, path: downloadPath, currentVersion, latestVersion };
+  const updateInfo = {
+    ok: true,
+    available: true,
+    currentVersion,
+    latestVersion,
+    releaseNotes: release.body || '',
+    releaseUrl: release.html_url || UPDATE_RELEASES_PAGE,
+    asset,
+  };
+
+  onEvent?.('minecraft:update-available', updateInfo);
+  return updateInfo;
 }

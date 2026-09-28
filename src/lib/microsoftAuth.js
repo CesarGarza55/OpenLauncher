@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import http from 'http';
 import path from 'path';
 import crypto from 'crypto';
+import { Buffer } from 'buffer';
+import process from 'process';
 import { safeStorage } from 'electron';
 
 // OpenLauncher provides a default Microsoft client ID for convenience, but developers can override it with their own by setting the `VITE_MICROSOFT_CLIENT_ID` or `MICROSOFT_CLIENT_ID` environment variable.
@@ -15,6 +17,13 @@ export const MICROSOFT_CLIENT_ID = process.env.VITE_MICROSOFT_CLIENT_ID
 const DEFAULT_REDIRECT_URL = 'http://localhost:8080/callback';
 const LOGIN_SUCCESS_REDIRECT_URL = 'https://openlauncher.codevbox.com/login-success';
 const LOGIN_FAILED_REDIRECT_URL = 'https://openlauncher.codevbox.com/login-failed';
+
+// In-memory cache for active Minecraft sessions to prevent redundant network calls
+// Shape: Map<profileKey, { accountInfo, expires_at: number }>
+const sessionCache = new Map();
+
+// In-flight refresh promises map to deduplicate concurrent requests for the same profileKey (Mutex)
+const inflightRefreshes = new Map();
 
 // Global singleton for the callback server
 let callbackServer = null;
@@ -108,6 +117,14 @@ async function writeAuthStore(storageDir, store) {
   await fs.writeFile(authStorePath(storageDir), JSON.stringify(store, null, 2), 'utf8');
 }
 
+export async function hasStoredRefreshToken(profileKey, storageDir) {
+  if (!storageDir) return false;
+  const secureToken = await getSecureRefreshToken(profileKey, storageDir);
+  if (secureToken) return true;
+  const store = await readAuthStore(storageDir);
+  return Boolean(store.profiles?.[profileKey]?.refresh_token);
+}
+
 export async function loadRefreshToken(profileKey, storageDir) {
   const secureToken = await getSecureRefreshToken(profileKey, storageDir);
   if (secureToken) return secureToken;
@@ -146,13 +163,24 @@ export async function saveRefreshToken(profileKey, token, storageDir, name = '')
 }
 
 export async function deleteRefreshToken(profileKey, storageDir) {
-  await deleteSecureRefreshToken(profileKey, storageDir);
+  const key = String(profileKey || 'default');
+  sessionCache.delete(key);
+  inflightRefreshes.delete(key);
+
+  await deleteSecureRefreshToken(key, storageDir);
 
   const store = await readAuthStore(storageDir);
-  if (store.profiles?.[profileKey]) {
-    delete store.profiles[profileKey];
+  if (store.profiles?.[key]) {
+    delete store.profiles[key];
     await writeAuthStore(storageDir, store);
   }
+}
+
+export function isSessionValid(session) {
+  if (!session || !session.access_token || session.access_token === '0') return false;
+  if (!session.expires_at || typeof session.expires_at !== 'number') return false;
+  // Consider session valid if more than 5 minutes remain before Minecraft access token expires
+  return Date.now() < (session.expires_at - 5 * 60 * 1000);
 }
 
 // ── PKCE Utilities ─────────────────────────────────────────────────────────
@@ -165,6 +193,23 @@ function sha256(buffer) {
 }
 
 // ── Direct Minecraft / Xbox Live Authentication Flow ─────────────────────────
+function parseXboxError(status, errorJson) {
+  const xerr = errorJson?.XErr;
+  if (xerr === 2148916233) {
+    return 'The Microsoft account does not have an Xbox Live profile. Please create one at xbox.com.';
+  }
+  if (xerr === 2148916235) {
+    return 'Xbox Live is not available in your country/region.';
+  }
+  if (xerr === 2148916236 || xerr === 2148916237) {
+    return 'Xbox Live adult verification is required.';
+  }
+  if (xerr === 2148916238) {
+    return 'Child account: This account must be added to a Microsoft Family by an adult.';
+  }
+  return `Xbox Live authentication failed with code ${xerr || status}.`;
+}
+
 async function postJson(url, data, headers = {}) {
   const res = await fetch(url, {
     method: 'POST',
@@ -177,14 +222,24 @@ async function postJson(url, data, headers = {}) {
   });
 
   if (!res.ok) {
+    let parsedJson = null;
     let errorDetail = '';
     try {
-      const errJson = await res.json();
-      errorDetail = JSON.stringify(errJson);
+      parsedJson = await res.json();
     } catch {
       errorDetail = await res.text().catch(() => '');
     }
-    const error = new Error(`Request to ${url} failed with status ${res.status}: ${errorDetail}`);
+
+    if (parsedJson?.XErr) {
+      const xboxMsg = parseXboxError(res.status, parsedJson);
+      const error = new Error(`Request to ${url} failed: ${xboxMsg}`);
+      error.status = res.status;
+      error.xerr = parsedJson.XErr;
+      throw error;
+    }
+
+    const detailMsg = errorDetail || (parsedJson ? JSON.stringify(parsedJson) : '');
+    const error = new Error(`Request to ${url} failed with status ${res.status}: ${detailMsg}`);
     error.status = res.status;
     throw error;
   }
@@ -231,12 +286,18 @@ export async function buildMinecraftAccountInfoFromAccessToken(msAccessToken, ms
   const mcAccessToken = mcLoginData?.access_token;
   if (!mcAccessToken) throw new Error('Minecraft login failed');
 
+  const expiresInSec = Number(mcLoginData?.expires_in) || 86400; // standard 24 hours
+  const expiresAt = Date.now() + (expiresInSec * 1000);
+
   // 4. Minecraft Profile Details
   const profileRes = await fetch('https://api.minecraftservices.com/minecraft/profile', {
     headers: { Authorization: `Bearer ${mcAccessToken}` },
   });
 
   if (!profileRes.ok) {
+    if (profileRes.status === 404) {
+      throw new Error('This Microsoft account does not own Minecraft Java Edition.');
+    }
     throw new Error(`Failed to fetch Minecraft profile: ${profileRes.status}`);
   }
 
@@ -244,6 +305,7 @@ export async function buildMinecraftAccountInfoFromAccessToken(msAccessToken, ms
 
   return {
     access_token: mcAccessToken,
+    expires_at: expiresAt,
     id: profile.id,
     uuid: profile.id,
     name: profile.name,
@@ -256,42 +318,86 @@ export async function refreshMicrosoftSession({
   profileKey,
   storageDir,
   clientId = MICROSOFT_CLIENT_ID,
+  force = false,
 }) {
-  const refreshToken = await loadRefreshToken(profileKey, storageDir);
-  if (!refreshToken) {
-    throw new Error('No refresh token available');
+  const key = String(profileKey || 'default');
+
+  // Fast path: if valid cached session exists and refresh is not forced, return cached session
+  if (!force && sessionCache.has(key)) {
+    const cached = sessionCache.get(key);
+    if (isSessionValid(cached)) {
+      return cached;
+    }
   }
 
-  const params = new URLSearchParams({
-    client_id: clientId,
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-  });
-
-  const tokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  });
-
-  if (!tokenRes.ok) {
-    const errorBody = await tokenRes.text().catch(() => '');
-    const err = new Error(`Token refresh failed (HTTP ${tokenRes.status}): ${errorBody}`);
-    err.status = tokenRes.status;
-    throw err;
+  // Deduplicate concurrent refreshes for the same profileKey (Mutex)
+  if (inflightRefreshes.has(key)) {
+    return inflightRefreshes.get(key);
   }
 
-  const tokenData = await tokenRes.json();
-  const accountInfo = await buildMinecraftAccountInfoFromAccessToken(
-    tokenData.access_token,
-    tokenData.refresh_token || refreshToken,
-  );
+  const refreshPromise = (async () => {
+    try {
+      const refreshToken = await loadRefreshToken(key, storageDir);
+      if (!refreshToken) {
+        const error = new Error('No refresh token available');
+        error.noToken = true;
+        throw error;
+      }
 
-  if (accountInfo?.refresh_token) {
-    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir, accountInfo.name || '');
-  }
+      const params = new URLSearchParams({
+        client_id: clientId,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
 
-  return accountInfo;
+      const tokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+
+      if (!tokenRes.ok) {
+        const errorBody = await tokenRes.text().catch(() => '');
+        let isInvalidGrant = false;
+        try {
+          const parsed = JSON.parse(errorBody);
+          if (parsed.error === 'invalid_grant' || (parsed.error_description && (
+            parsed.error_description.includes('AADSTS70008') ||
+            parsed.error_description.includes('AADSTS70000') ||
+            parsed.error_description.includes('AADSTS50173')
+          ))) {
+            isInvalidGrant = true;
+          }
+        } catch {
+          if (errorBody.includes('invalid_grant')) {
+            isInvalidGrant = true;
+          }
+        }
+        const err = new Error(`Token refresh failed (HTTP ${tokenRes.status}): ${errorBody}`);
+        err.status = tokenRes.status;
+        err.isInvalidGrant = isInvalidGrant;
+        throw err;
+      }
+
+      const tokenData = await tokenRes.json();
+      const accountInfo = await buildMinecraftAccountInfoFromAccessToken(
+        tokenData.access_token,
+        tokenData.refresh_token || refreshToken,
+      );
+
+      if (accountInfo?.refresh_token) {
+        await saveRefreshToken(key, accountInfo.refresh_token, storageDir, accountInfo.name || '');
+      }
+
+      sessionCache.set(key, accountInfo);
+      return accountInfo;
+    } finally {
+      inflightRefreshes.delete(key);
+    }
+  })();
+
+  inflightRefreshes.set(key, refreshPromise);
+  return refreshPromise;
 }
 
 async function waitForCallback({ port, timeoutMs, abortSignal }) {
@@ -305,7 +411,11 @@ async function waitForCallback({ port, timeoutMs, abortSignal }) {
       finished = true;
       if (timer) clearTimeout(timer);
       if (server) {
-        try { server.close(); } catch { }
+        try {
+          server.close();
+        } catch {
+          // Ignore server close error on cleanup
+        }
         server = null;
       }
       if (callbackServer === server) {
@@ -379,6 +489,7 @@ export async function loginMicrosoftInteractive({
   timeoutMs = 300000,
   abortSignal,
 } = {}) {
+  const key = String(profileKey || 'default');
   const state = crypto.randomUUID();
   const codeVerifier = base64url(crypto.randomBytes(64));
   const codeChallenge = base64url(sha256(codeVerifier));
@@ -427,9 +538,10 @@ export async function loginMicrosoftInteractive({
   );
 
   if (accountInfo?.refresh_token) {
-    await saveRefreshToken(profileKey, accountInfo.refresh_token, storageDir, accountInfo.name || '');
+    await saveRefreshToken(key, accountInfo.refresh_token, storageDir, accountInfo.name || '');
   }
 
+  sessionCache.set(key, accountInfo);
   return accountInfo;
 }
 
@@ -437,48 +549,86 @@ export async function getMicrosoftAuthState({
   profileKey,
   storageDir,
   clientId = MICROSOFT_CLIENT_ID,
+  forceRefresh = false,
 } = {}) {
-  const store = await readAuthStore(storageDir);
-  const hasStoredToken = !!store.profiles?.[profileKey]?.refresh_token;
+  const key = String(profileKey || 'default');
+  const hasToken = await hasStoredRefreshToken(key, storageDir);
+
+  if (!hasToken) {
+    sessionCache.delete(key);
+    return {
+      loggedIn: false,
+      name: '',
+      profileKey: key,
+      hasStoredToken: false,
+    };
+  }
+
+  // Fast path: if we have a valid session in cache and refresh is not forced, return it immediately
+  if (!forceRefresh && sessionCache.has(key)) {
+    const cached = sessionCache.get(key);
+    if (isSessionValid(cached)) {
+      return {
+        loggedIn: true,
+        name: cached.name || '',
+        profileKey: key,
+        hasStoredToken: true,
+        ...cached,
+      };
+    }
+  }
 
   try {
     const accountInfo = await refreshMicrosoftSession({
-      profileKey,
+      profileKey: key,
       storageDir,
       clientId,
+      force: forceRefresh,
     });
 
     return {
       loggedIn: true,
       name: accountInfo.name || '',
-      profileKey,
+      profileKey: key,
+      hasStoredToken: true,
       ...accountInfo,
     };
   } catch (error) {
     const errorMsg = error?.message || 'Not authenticated';
 
-    if (errorMsg.includes('401') || errorMsg.includes('invalid_grant') || errorMsg.includes('400')) {
-      await deleteRefreshToken(profileKey, storageDir);
+    // ONLY permanently delete the stored refresh token if Microsoft explicitly rejected the refresh token as invalid/revoked/expired
+    if (error?.isInvalidGrant) {
+      sessionCache.delete(key);
+      await deleteRefreshToken(key, storageDir);
       return {
         loggedIn: false,
         name: '',
-        profileKey,
+        profileKey: key,
         error: errorMsg,
         hasStoredToken: false,
       };
     }
 
+    // For transient/network/Xbox service errors, DO NOT delete the refresh token!
+    // Retrieve stored profile name from disk if available to maintain offline state
+    const store = await readAuthStore(storageDir);
+    const storedName = store.profiles?.[key]?.name || '';
+    const cachedSession = sessionCache.get(key);
+
     return {
-      loggedIn: false,
-      name: '',
-      profileKey,
+      loggedIn: Boolean(cachedSession?.access_token),
+      name: cachedSession?.name || storedName,
+      profileKey: key,
       error: errorMsg,
-      hasStoredToken,
+      hasStoredToken: true,
+      isOffline: true,
+      ...(cachedSession || {}),
     };
   }
 }
 
 export async function logoutMicrosoft({ profileKey, storageDir } = {}) {
-  await deleteRefreshToken(profileKey, storageDir);
-  return { loggedIn: false, name: '', profileKey };
+  const key = String(profileKey || 'default');
+  await deleteRefreshToken(key, storageDir);
+  return { loggedIn: false, name: '', profileKey: key, hasStoredToken: false };
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, screen } from 'electron';
+import { app, BrowserWindow, Menu, screen, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 
@@ -125,6 +125,23 @@ export async function createMainWindow({ isDev, electronDir }) {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Intercept all popup windows (e.g. YouTube iframe "Mirar en YouTube" / links) and open in default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:')) {
+      shell.openExternal(url).catch(() => {});
+    }
+    return { action: 'deny' };
+  });
+
+  // Prevent main window from navigating away from the launcher UI
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('http://localhost:5173') || url.startsWith('file://')) {
+      return;
+    }
+    event.preventDefault();
+    shell.openExternal(url).catch(() => {});
   });
 
   mainWindow.on('resize', scheduleWindowStateSave);

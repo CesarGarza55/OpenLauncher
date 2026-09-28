@@ -82,7 +82,17 @@ Section "install"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "URLInfoAbout" "${ABOUTURL}"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "NoRepair" 1
+
+  ${If} ${Silent}
+    Exec "$INSTDIR\${APP_EXE}"
+  ${EndIf}
 SectionEnd
+
+Function .onInit
+  ${If} ${Silent}
+    Sleep 1000
+  ${EndIf}
+FunctionEnd
 
 Function un.onInit
   MessageBox MB_OKCANCEL "Permanently remove ${APPNAME}?" IDOK next
