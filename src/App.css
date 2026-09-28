@@ -1305,6 +1305,7 @@ select option {
   line-height: 1.45;
   color: var(--text-secondary);
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -1527,6 +1528,7 @@ select option {
   color: var(--text-secondary);
   line-height: 1.35;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -1981,6 +1983,7 @@ select option {
   color: var(--text-secondary);
   line-height: 1.4;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -4527,7 +4530,8 @@ select option {
 .article-video-wrapper {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+  padding-bottom: 56.25%;
+  /* 16:9 Aspect Ratio */
   height: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -4574,7 +4578,8 @@ select option {
   text-align: center;
 }
 
-.article-list, .article-ordered-list {
+.article-list,
+.article-ordered-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
