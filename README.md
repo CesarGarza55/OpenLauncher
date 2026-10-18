@@ -215,4 +215,4 @@ OpenLauncher is developed and maintained by **[Cesar Garza](https://github.com/C
 
 ## Disclaimer
 
-This project is not affiliated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. Review the [Terms and Conditions and Privacy Policy](https://openlauncher.codevbox.com/terms_app) or contact [support@codevbox.com](mailto:support@codevbox.com).
+This project is not affiliated with Mojang AB or Microsoft. Minecraft is a registered trademark of Mojang AB and Microsoft. Review the [Terms and Conditions and Privacy Policy](https://openlauncher.codevbox.com/terms) or contact [support@codevbox.com](mailto:support@codevbox.com).

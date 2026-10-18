@@ -33,6 +33,15 @@ import {
 import { ModConflictModal } from './components/modals/ModConflictModal';
 import { ProjectDetailView } from './components/views/ProjectDetailView';
 import { ArticleDetailView } from './components/views/ArticleDetailView';
+import { NewsTab } from './components/views/tabs/NewsTab';
+import { ExploreTab } from './components/views/tabs/ExploreTab';
+import { ModsTab } from './components/views/tabs/ModsTab';
+import { ShadersTab } from './components/views/tabs/ShadersTab';
+import { ResourcePacksTab } from './components/views/tabs/ResourcePacksTab';
+import { DatapacksTab } from './components/views/tabs/DatapacksTab';
+import { ConsoleTab } from './components/views/tabs/ConsoleTab';
+import { useToasts } from './hooks/useToasts';
+import { useLauncherLogs } from './hooks/useLauncherLogs';
 import {
   ProfileModal,
   InstallModal,
@@ -72,8 +81,7 @@ export default function App() {
   const [shaderSearch, setShaderSearch] = useState('');
   const [resourcePackSearch, setResourcePackSearch] = useState('');
   const [datapackSearch, setDatapackSearch] = useState('');
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [logFilter, setLogFilter] = useState('all');
+
   const [versionCatalog, setVersionCatalog] = useState([]);
   const [installedVersions, setInstalledVersions] = useState([]);
   const [installTargets, setInstallTargets] = useState(INSTALL_TARGETS);
@@ -116,7 +124,18 @@ export default function App() {
   const [checkingModUpdates, setCheckingModUpdates] = useState(false);
   const [updatingMods, setUpdatingMods] = useState(new Set());
   const [modConflict, setModConflict] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const {
+    logs,
+    setLogs,
+    addLog,
+    clearLogs,
+    flushLogs,
+    logFilter,
+    setLogFilter,
+    autoScroll,
+    setAutoScroll,
+  } = useLauncherLogs();
+  const { toasts, pushToast, dismissToast } = useToasts();
   const [newsItems, setNewsItems] = useState([]);
   const [newsSourceUrl, setNewsSourceUrl] = useState('https://www.minecraft.net/en-us/articles');
   const [newsLoading, setNewsLoading] = useState(false);
@@ -128,7 +147,6 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [updateState, setUpdateState] = useState({ phase: 'idle', progress: 0, message: '' });
   const [updateModalInfo, setUpdateModalInfo] = useState(null);
-  const [toasts, setToasts] = useState([]);
   const [modal, setModal] = useState(null); // null | 'newProfile' | 'install-minecraft' | 'install-fabric' | 'install-forge' | 'settings' | 'about'
   const [profileEditor, setProfileEditor] = useState(null); // null | { mode: 'new' | 'edit', profileId: number | null }
   const [account, setAccount] = useState({ name: '', loggedIn: false, profileKey: 'default', kind: 'none', session: null });
@@ -149,7 +167,6 @@ export default function App() {
   const modrinthSentinelRef = useRef(null);
   const betaInfoRef = useRef(null);
   const gameTimerRef = useRef(null);
-  const toastTimersRef = useRef(new Map());
   const loginAbortControllerRef = useRef(null);
 
   useEffect(() => {
@@ -182,52 +199,7 @@ export default function App() {
     stateRef.current = { profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets };
   }, [profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets]);
 
-  const logBufferRef = useRef([]);
-  const logFlushTimeoutRef = useRef(null);
 
-  const flushLogs = useCallback(() => {
-    if (logFlushTimeoutRef.current) {
-      clearTimeout(logFlushTimeoutRef.current);
-      logFlushTimeoutRef.current = null;
-    }
-    if (logBufferRef.current.length === 0) return;
-    const itemsToAdd = logBufferRef.current;
-    logBufferRef.current = [];
-    setLogs(prev => {
-      const next = [...prev, ...itemsToAdd];
-      return next.length > 500 ? next.slice(-500) : next;
-    });
-  }, []);
-
-  const addLog = useCallback((level, msg) => {
-    logBufferRef.current.push({ level, msg, time: formatClock() });
-    if (!logFlushTimeoutRef.current) {
-      logFlushTimeoutRef.current = setTimeout(() => {
-        flushLogs();
-      }, 60);
-    }
-  }, [flushLogs]);
-
-  const dismissToast = useCallback((id) => {
-    const timer = toastTimersRef.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      toastTimersRef.current.delete(id);
-    }
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
-  const pushToast = useCallback(({ tone = 'info', title = '', message = '', duration = 4000 }) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setToasts(prev => [...prev, { id, tone, title, message }]);
-    if (duration > 0) {
-      const timer = setTimeout(() => {
-        dismissToast(id);
-      }, duration);
-      toastTimersRef.current.set(id, timer);
-    }
-    return id;
-  }, [dismissToast]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -2141,6 +2113,13 @@ export default function App() {
                 <span>{t('sidebar.console')}</span>
                 {gameState === 'running' && <span className="status-dot in-game" style={{ marginLeft: 'auto' }} />}
               </div>
+              <div
+                className={`nav-item ${modal === 'settings' ? 'active' : ''}`}
+                onClick={() => setModal('settings')}
+              >
+                <span className="nav-icon"><Icon d={ICONS.settings} size={14} /></span>
+                <span>{t('sidebar.settings')}</span>
+              </div>
             </div>
           </div>
 
@@ -2336,958 +2315,136 @@ export default function App() {
                 </div>
               ) : null}
 
-              {/* ── TAB: NEWS ── */}
-              <div className="tab-panel" style={{ display: activeTab === 'news' ? 'flex' : 'none' }}>
-                <div className="news-header">
-                  <div>
-                    <h2 className="news-title">{t('news.title')}</h2>
-                    <div className="news-subtitle">{t('news.subtitle')}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn-secondary" type="button" onClick={loadNews} disabled={newsLoading}>
-                      <Icon d={ICONS.refresh} size={11} />
-                      {newsLoading ? t('news.loading') : t('news.refresh')}
-                    </button>
-                    <button className="btn-primary" type="button" onClick={handleOpenNewsSource} style={{ fontSize: 12, padding: '6px 12px' }}>
-                      <Icon d={ICONS.external} size={11} />
-                      {t('news.openSource')}
-                    </button>
-                  </div>
-                </div>
+              <NewsTab
+                active={activeTab === 'news'}
+                isOnline={isOnline}
+                newsItems={newsItems}
+                newsLoading={newsLoading}
+                newsError={newsError}
+                loadNews={loadNews}
+                handleOpenNewsSource={handleOpenNewsSource}
+                handleOpenNewsArticle={handleOpenNewsArticle}
+              />
 
-                {!isOnline && newsItems.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.wifiOff}
-                    title={t('offline.newsTitle')}
-                    description={t('offline.newsDesc')}
-                    actionText={t('news.refresh')}
-                    actionIcon={ICONS.refresh}
-                    onAction={loadNews}
-                  />
-                ) : newsError ? (
-                  <EmptyState
-                    icon={ICONS.news}
-                    title={t('news.errorTitle')}
-                    description={newsError}
-                    actionText={t('news.refresh')}
-                    actionIcon={ICONS.refresh}
-                    onAction={loadNews}
-                    secondaryText={t('news.openSource')}
-                    onSecondary={handleOpenNewsSource}
-                  />
-                ) : newsLoading && newsItems.length === 0 ? (
-                  <div className="news-grid">
-                    {[1, 2, 3, 4, 5, 6].map(i => (
-                      <div key={i} className="news-card-skeleton">
-                        <div className="skeleton-media" />
-                        <div className="skeleton-body">
-                          <div className="skeleton-line short" />
-                          <div className="skeleton-line" />
-                          <div className="skeleton-line sub" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : newsItems.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.news}
-                    title={t('news.emptyTitle')}
-                    description={t('news.emptyText')}
-                    actionText={t('news.refresh')}
-                    actionIcon={ICONS.refresh}
-                    onAction={loadNews}
-                    secondaryText={t('news.openSource')}
-                    onSecondary={handleOpenNewsSource}
-                  />
-                ) : (
-                  <div className="news-grid">
-                    {newsItems.map(item => (
-                      <NewsCard key={item.url} item={item} onOpen={handleOpenNewsArticle} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ExploreTab
+                active={activeTab === 'explore'}
+                isOnline={isOnline}
+                exploreType={exploreType}
+                setExploreType={setExploreType}
+                showBetaInfo={showBetaInfo}
+                setShowBetaInfo={setShowBetaInfo}
+                betaInfoRef={betaInfoRef}
+                modrinthQuery={modrinthQuery}
+                setModrinthQuery={setModrinthQuery}
+                modrinthSort={modrinthSort}
+                setModrinthSort={setModrinthSort}
+                modrinthLoaderFilter={modrinthLoaderFilter}
+                setModrinthLoaderFilter={setModrinthLoaderFilter}
+                currentLoader={currentLoader}
+                modrinthVersionFilter={modrinthVersionFilter}
+                setModrinthVersionFilter={setModrinthVersionFilter}
+                currentMcVer={currentMcVer}
+                modrinthCategory={modrinthCategory}
+                setModrinthCategory={setModrinthCategory}
+                modrinthLoading={modrinthLoading}
+                modrinthResults={modrinthResults}
+                isModInstalled={isModInstalled}
+                modrinthInstalling={modrinthInstalling}
+                handleInstallModrinthMod={handleInstallModrinthMod}
+                handleOpenModDetails={handleOpenModDetails}
+                modrinthSentinelRef={modrinthSentinelRef}
+                modrinthLoadingMore={modrinthLoadingMore}
+              />
 
-              {/* ── TAB: EXPLORE (MODRINTH CATALOG) ── */}
-              <div
-                className="tab-panel"
-                style={{ display: activeTab === 'explore' ? 'flex' : 'none', position: 'relative' }}
-              >
-                <div className="explore-header">
-                  <div>
-                    <h2 className="explore-title" style={{ display: 'flex', alignItems: 'center' }}>
-                      {t('explore.title')}
-                      <div className="explore-beta-wrapper" ref={betaInfoRef}>
-                        <button
-                          type="button"
-                          className={`explore-beta-tag ${showBetaInfo ? 'active' : ''}`}
-                          onClick={() => setShowBetaInfo(prev => !prev)}
-                          title={t('mods.modrinthBetaTitle')}
-                        >
-                          <span>BETA</span>
-                          <Icon d={ICONS.info} size={11} style={{ opacity: 0.85 }} />
-                        </button>
-                        {showBetaInfo && (
-                          <div className="explore-beta-popover">
-                            <div className="explore-beta-popover-header">
-                              <div className="explore-beta-popover-title">
-                                <Icon d={ICONS.compass} size={14} style={{ color: 'var(--accent-light, #60a5fa)' }} />
-                                <span>{t('mods.modrinthBetaTitle')}</span>
-                              </div>
-                              <button
-                                type="button"
-                                className="explore-beta-popover-close"
-                                onClick={() => setShowBetaInfo(false)}
-                              >
-                                <Icon d={ICONS.x} size={11} />
-                              </button>
-                            </div>
-                            <div className="explore-beta-popover-body">
-                              {t('mods.modrinthBetaDescription')}
-                            </div>
-                            <div className="explore-beta-popover-footer">
-                              <button
-                                type="button"
-                                className="btn-ghost"
-                                style={{ fontSize: 11, padding: '4px 8px', height: 'auto', textDecoration: 'none' }}
-                                onClick={() => {
-                                  launcher.openExternal?.('https://modrinth.com').catch(() => { });
-                                }}
-                              >
-                                <Icon d={ICONS.external} size={11} />
-                                <span>Modrinth.com</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </h2>
-                    <div className="explore-subtitle">{t('explore.subtitle')}</div>
-                  </div>
-                  <div className="explore-type-selector">
-                    <button
-                      type="button"
-                      className={`explore-type-pill ${exploreType === 'mods' ? 'active' : ''}`}
-                      onClick={() => setExploreType('mods')}
-                    >
-                      <Icon d={ICONS.cube} size={15} />
-                      <span>{t('explore.tabMods')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`explore-type-pill ${exploreType === 'shaders' ? 'active' : ''}`}
-                      onClick={() => setExploreType('shaders')}
-                    >
-                      <Icon d={ICONS.sun} size={15} />
-                      <span>{t('explore.tabShaders')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`explore-type-pill ${exploreType === 'resourcepacks' ? 'active' : ''}`}
-                      onClick={() => setExploreType('resourcepacks')}
-                    >
-                      <Icon d={ICONS.layers} size={15} />
-                      <span>{t('explore.tabResourcePacks')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`explore-type-pill ${exploreType === 'datapacks' ? 'active' : ''}`}
-                      onClick={() => setExploreType('datapacks')}
-                    >
-                      <Icon d={ICONS.datapack} size={15} />
-                      <span>{t('explore.tabDatapacks')}</span>
-                    </button>
-                  </div>
-                </div>
 
-                <div className="modrinth-browser">
-                  <div className="modrinth-controls-bar">
-                    <div className="mods-search-box modrinth-search-box">
-                      <Icon d={ICONS.search} size={14} />
-                      <input
-                        type="text"
-                        className="mods-search-input"
-                        placeholder={
-                          exploreType === 'shaders'
-                            ? t('mods.searchModrinthShadersPlaceholder')
-                            : exploreType === 'resourcepacks'
-                              ? t('mods.searchModrinthResourcePacksPlaceholder')
-                              : exploreType === 'datapacks'
-                                ? t('mods.searchModrinthDatapacksPlaceholder')
-                                : t('mods.searchModrinthPlaceholder')
-                        }
-                        value={modrinthQuery}
-                        onChange={e => setModrinthQuery(e.target.value)}
-                      />
-                      {modrinthQuery && (
-                        <button className="search-clear-btn" onClick={() => setModrinthQuery('')}>
-                          <Icon d={ICONS.x} size={11} />
-                        </button>
-                      )}
-                    </div>
+              <ModsTab
+                active={activeTab === 'mods'}
+                isDragging={isDragging}
+                handleDragOver={handleDragOver}
+                handleDragLeave={handleDragLeave}
+                handleDrop={handleDrop}
+                modSearch={modSearch}
+                setModSearch={setModSearch}
+                mods={mods}
+                handleSetAllModsEnabled={handleSetAllModsEnabled}
+                handleCheckModUpdates={handleCheckModUpdates}
+                checkingModUpdates={checkingModUpdates}
+                handleOpenContentFolder={handleOpenContentFolder}
+                handleAddContentClick={handleAddContentClick}
+                setExploreType={setExploreType}
+                setActiveTab={setActiveTab}
+                modUpdates={modUpdates}
+                updatingMods={updatingMods}
+                handleModToggle={handleModToggle}
+                handleModDelete={handleModDelete}
+                handleUpdateMod={handleUpdateMod}
+                handleOpenLocalModDetails={handleOpenLocalModDetails}
+              />
 
-                    <div className="modrinth-filters-row">
-                      <div className="modrinth-filter-select-wrapper">
-                        <span className="modrinth-filter-label">{t('mods.filterSort')}:</span>
-                        <select
-                          className="select-input modrinth-filter-select"
-                          value={modrinthSort}
-                          onChange={e => setModrinthSort(e.target.value)}
-                        >
-                          <option value="relevance">{t('mods.sortRelevance')}</option>
-                          <option value="downloads">{t('mods.sortDownloads')}</option>
-                          <option value="follows">{t('mods.sortFollows')}</option>
-                          <option value="newest">{t('mods.sortNewest')}</option>
-                          <option value="updated">{t('mods.sortUpdated')}</option>
-                        </select>
-                      </div>
+              <ShadersTab
+                active={activeTab === 'shaders'}
+                isDragging={isDragging}
+                handleDragOver={handleDragOver}
+                handleDragLeave={handleDragLeave}
+                handleDrop={handleDrop}
+                shaderSearch={shaderSearch}
+                setShaderSearch={setShaderSearch}
+                shaders={shaders}
+                handleOpenContentFolder={handleOpenContentFolder}
+                handleAddContentClick={handleAddContentClick}
+                setExploreType={setExploreType}
+                setActiveTab={setActiveTab}
+                handleOpenLocalShaderDetails={handleOpenLocalShaderDetails}
+                handleDeleteShader={handleDeleteShader}
+              />
 
-                      {exploreType === 'mods' && (
-                        <div className="modrinth-filter-select-wrapper">
-                          <span className="modrinth-filter-label">{t('mods.filterLoader')}:</span>
-                          <select
-                            className="select-input modrinth-filter-select"
-                            value={modrinthLoaderFilter}
-                            onChange={e => setModrinthLoaderFilter(e.target.value)}
-                          >
-                            {currentLoader && (
-                              <option value="auto">
-                                Auto ({currentLoader.toUpperCase()})
-                              </option>
-                            )}
-                            <option value="all">{t('mods.allLoaders')}</option>
-                            <option value="fabric">Fabric</option>
-                            <option value="forge">Forge</option>
-                            <option value="neoforge">NeoForge</option>
-                            <option value="quilt">Quilt</option>
-                          </select>
-                        </div>
-                      )}
+              <ResourcePacksTab
+                active={activeTab === 'resourcepacks'}
+                isDragging={isDragging}
+                handleDragOver={handleDragOver}
+                handleDragLeave={handleDragLeave}
+                handleDrop={handleDrop}
+                resourcePackSearch={resourcePackSearch}
+                setResourcePackSearch={setResourcePackSearch}
+                resourcePacks={resourcePacks}
+                handleOpenContentFolder={handleOpenContentFolder}
+                handleAddContentClick={handleAddContentClick}
+                setExploreType={setExploreType}
+                setActiveTab={setActiveTab}
+                handleOpenLocalResourcePackDetails={handleOpenLocalResourcePackDetails}
+                handleDeleteResourcePack={handleDeleteResourcePack}
+              />
 
-                      <div className="modrinth-filter-select-wrapper">
-                        <span className="modrinth-filter-label">{t('mods.filterVersion')}:</span>
-                        <select
-                          className="select-input modrinth-filter-select"
-                          value={modrinthVersionFilter}
-                          onChange={e => setModrinthVersionFilter(e.target.value)}
-                        >
-                          <option value="auto">
-                            {currentMcVer ? `Auto (${currentMcVer})` : t('mods.allVersions')}
-                          </option>
-                          <option value="all">{t('mods.allVersions')}</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+              <DatapacksTab
+                active={activeTab === 'datapacks'}
+                isDragging={isDragging}
+                handleDragOver={handleDragOver}
+                handleDragLeave={handleDragLeave}
+                handleDrop={handleDrop}
+                datapackSearch={datapackSearch}
+                setDatapackSearch={setDatapackSearch}
+                datapacks={datapacks}
+                handleOpenContentFolder={handleOpenContentFolder}
+                handleAddContentClick={handleAddContentClick}
+                setExploreType={setExploreType}
+                setActiveTab={setActiveTab}
+                handleOpenLocalDatapackDetails={handleOpenLocalDatapackDetails}
+                handleDeleteDatapack={handleDeleteDatapack}
+              />
 
-                  {/* Category Pills */}
-                  <div className="modrinth-category-pills">
-                    {(exploreType === 'shaders' ? [
-                      { id: 'all', label: t('mods.allCategories') },
-                      { id: 'fantasy', label: 'Fantasy' },
-                      { id: 'realistic', label: 'Realistic' },
-                      { id: 'performance', label: 'Performance' },
-                      { id: 'semi-realistic', label: 'Semi-Realistic' },
-                      { id: 'cinematic', label: 'Cinematic' },
-                      { id: 'vanilla-like', label: 'Vanilla-like' },
-                    ] : exploreType === 'resourcepacks' ? [
-                      { id: 'all', label: t('mods.allCategories') },
-                      { id: '16x', label: '16x' },
-                      { id: '32x', label: '32x' },
-                      { id: '64x', label: '64x' },
-                      { id: '128x', label: '128x' },
-                      { id: '512x', label: '512x' },
-                      { id: 'realistic', label: 'Realistic' },
-                      { id: 'medieval', label: 'Medieval' },
-                      { id: 'vanilla-like', label: 'Vanilla-like' },
-                    ] : exploreType === 'datapacks' ? [
-                      { id: 'all', label: t('mods.allCategories') },
-                      { id: 'adventure', label: 'Adventure' },
-                      { id: 'magic', label: 'Magic' },
-                      { id: 'technology', label: 'Technology' },
-                      { id: 'worldgen', label: 'World Gen' },
-                      { id: 'survival', label: 'Survival' },
-                      { id: 'utility', label: 'Utility' },
-                      { id: 'minigames', label: 'Minigames' },
-                      { id: 'vanilla-like', label: 'Vanilla-like' },
-                    ] : [
-                      { id: 'all', label: t('mods.allCategories') },
-                      { id: 'optimization', label: 'Optimization' },
-                      { id: 'technology', label: 'Technology' },
-                      { id: 'adventure', label: 'Adventure' },
-                      { id: 'decoration', label: 'Decoration' },
-                      { id: 'utility', label: 'Utility' },
-                      { id: 'magic', label: 'Magic' },
-                      { id: 'worldgen', label: 'World Gen' },
-                    ]).map(cat => (
-                      <button
-                        key={cat.id}
-                        className={`category-pill ${modrinthCategory === cat.id ? 'active' : ''}`}
-                        onClick={() => setModrinthCategory(cat.id)}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Modrinth Grid */}
-                  {!isOnline ? (
-                    <EmptyState
-                      icon={ICONS.wifiOff}
-                      title={t('offline.modrinthTitle')}
-                      description={t('offline.modrinthDesc')}
-                    />
-                  ) : modrinthLoading ? (
-                    <div className="modrinth-grid">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(i => (
-                        <ModrinthCardSkeleton key={i} />
-                      ))}
-                    </div>
-                  ) : modrinthResults.length === 0 ? (
-                    <EmptyState
-                      icon={ICONS.search}
-                      title={
-                        exploreType === 'shaders'
-                          ? t('mods.noShadersMatchTitle')
-                          : exploreType === 'resourcepacks'
-                            ? t('mods.noResourcePacksMatchTitle')
-                            : exploreType === 'datapacks'
-                              ? t('mods.noDatapacksMatchTitle')
-                              : t('mods.noMatchTitle')
-                      }
-                      description={
-                        exploreType === 'shaders'
-                          ? t('mods.noModrinthShadersResults')
-                          : exploreType === 'resourcepacks'
-                            ? t('mods.noModrinthResourcePacksResults')
-                            : exploreType === 'datapacks'
-                              ? t('mods.noModrinthDatapacksResults')
-                              : t('mods.noModrinthResults')
-                      }
-                      actionText={t('common.clearSearch')}
-                      onAction={() => {
-                        setModrinthQuery('');
-                        setModrinthCategory('all');
-                        setModrinthLoaderFilter('auto');
-                        setModrinthVersionFilter('auto');
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <div className="modrinth-grid">
-                        {modrinthResults.map(proj => (
-                          <ModrinthCard
-                            key={proj.project_id || proj.slug}
-                            project={proj}
-                            installed={isModInstalled(proj)}
-                            installing={Boolean(modrinthInstalling[proj.project_id || proj.slug])}
-                            onInstall={handleInstallModrinthMod}
-                            onOpenDetails={handleOpenModDetails}
-                          />
-                        ))}
-                      </div>
-                      <div ref={modrinthSentinelRef} className="modrinth-sentinel">
-                        {modrinthLoadingMore && (
-                          <div className="modrinth-load-more">
-                            <span className="modrinth-spinner small" />
-                            <span>{t('account.loading')}</span>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* ── TAB: MODS (LIBRARY) ── */}
-              <div
-                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-                style={{ display: activeTab === 'mods' ? 'flex' : 'none', position: 'relative' }}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {isDragging && (
-                  <div className="dropzone-overlay">
-                    <div className="dropzone-content">
-                      <Icon d={ICONS.download} size={36} />
-                      <span className="dropzone-title">{t('mods.dropzone')}</span>
-                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mods-toolbar">
-                  <div className="mods-search-box">
-                    <Icon d={ICONS.search} size={13} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchPlaceholder')}
-                      value={modSearch}
-                      onChange={e => setModSearch(e.target.value)}
-                    />
-                    {modSearch && (
-                      <button className="search-clear-btn" onClick={() => setModSearch('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {mods.length > 0 && (
-                    <span className="mods-count-badge">
-                      {mods.filter(m => m.enabled).length}/{mods.length} {t('mods.active')}
-                    </span>
-                  )}
-
-                  <div className="mods-toolbar-actions">
-                    {mods.length > 0 && (() => {
-                      const anyEnabled = mods.some(m => m.enabled);
-                      return (
-                        <button
-                          className="btn-secondary"
-                          onClick={() => handleSetAllModsEnabled(!anyEnabled)}
-                          title={anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}
-                        >
-                          <Icon d={anyEnabled ? ICONS.stop : ICONS.check} size={12} />
-                          <span>{anyEnabled ? t('mods.disableAll') : t('mods.enableAll')}</span>
-                        </button>
-                      );
-                    })()}
-                    <button
-                      className="btn-secondary"
-                      onClick={() => handleCheckModUpdates({ silent: false })}
-                      disabled={checkingModUpdates}
-                      title={t('mods.checkUpdates')}
-                    >
-                      <Icon d={ICONS.refresh} size={12} className={checkingModUpdates ? 'spin-infinite' : ''} />
-                      <span>{t('mods.checkUpdates')}</span>
-                    </button>
-                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('mods')} title={t('mods.openModsFolder')}>
-                      <Icon d={ICONS.folder} size={12} />
-                      <span>{t('mods.openFolder')}</span>
-                    </button>
-                    <button className="btn-primary" onClick={() => handleAddContentClick('mods')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      <Icon d={ICONS.plus} size={12} />
-                      {t('mods.addMod')}
-                    </button>
-                  </div>
-                </div>
-
-                {mods.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.cube}
-                    title={t('mods.emptyTitle')}
-                    description={t('mods.emptyText')}
-                    actionText={t('explore.browseMods')}
-                    actionIcon={ICONS.compass}
-                    onAction={() => {
-                      setExploreType('mods');
-                      setActiveTab('explore');
-                    }}
-                    secondaryText={t('mods.openModsFolder')}
-                    onSecondary={() => handleOpenContentFolder('mods')}
-                  />
-                ) : (() => {
-                  const filtered = mods.filter(m =>
-                    String(m.name || '').toLowerCase().includes(modSearch.toLowerCase()) ||
-                    String(m.fileName || '').toLowerCase().includes(modSearch.toLowerCase())
-                  );
-                  if (filtered.length === 0) {
-                    return (
-                      <EmptyState
-                        icon={ICONS.search}
-                        title={t('mods.noMatchTitle')}
-                        description={t('mods.noMatchText')}
-                        actionText={t('common.clearSearch')}
-                        onAction={() => setModSearch('')}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="mods-grid">
-                      {filtered.map(mod => {
-                        const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
-                        const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
-                        const isUpdating = updatingMods.has(mod.fileName) || updatingMods.has(fileKey);
-                        return (
-                          <ModCard
-                            key={mod.id}
-                            mod={mod}
-                            updateInfo={updateInfo}
-                            updating={isUpdating}
-                            onToggle={handleModToggle}
-                            onDelete={handleModDelete}
-                            onUpdate={handleUpdateMod}
-                            onOpenDetails={handleOpenLocalModDetails}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── TAB: SHADERS (LIBRARY) ── */}
-              <div
-                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-                style={{ display: activeTab === 'shaders' ? 'flex' : 'none', position: 'relative' }}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {isDragging && (
-                  <div className="dropzone-overlay">
-                    <div className="dropzone-content">
-                      <Icon d={ICONS.download} size={36} />
-                      <span className="dropzone-title">{t('mods.dropzone')}</span>
-                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mods-toolbar">
-                  <div className="mods-search-box">
-                    <Icon d={ICONS.search} size={13} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchShadersPlaceholder')}
-                      value={shaderSearch}
-                      onChange={e => setShaderSearch(e.target.value)}
-                    />
-                    {shaderSearch && (
-                      <button className="search-clear-btn" onClick={() => setShaderSearch('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {shaders.length > 0 && (
-                    <span className="mods-count-badge">
-                      {shaders.length} {t('sidebar.shaders')}
-                    </span>
-                  )}
-
-                  <div className="mods-toolbar-actions">
-                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('shaders')} title={t('mods.openShadersFolder')}>
-                      <Icon d={ICONS.folder} size={12} />
-                      <span>{t('mods.openFolder')}</span>
-                    </button>
-                    <button className="btn-primary" onClick={() => handleAddContentClick('shaders')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      <Icon d={ICONS.plus} size={12} />
-                      {t('mods.addShader')}
-                    </button>
-                  </div>
-                </div>
-
-                {shaders.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.sun}
-                    title={t('mods.emptyShadersTitle')}
-                    description={t('mods.emptyShadersText')}
-                    actionText={t('explore.browseShaders')}
-                    actionIcon={ICONS.compass}
-                    onAction={() => {
-                      setExploreType('shaders');
-                      setActiveTab('explore');
-                    }}
-                    secondaryText={t('mods.openShadersFolder')}
-                    onSecondary={() => handleOpenContentFolder('shaders')}
-                  />
-                ) : (() => {
-                  const filtered = shaders.filter(s =>
-                    String(s.name || '').toLowerCase().includes(shaderSearch.toLowerCase()) ||
-                    String(s.fileName || '').toLowerCase().includes(shaderSearch.toLowerCase())
-                  );
-                  if (filtered.length === 0) {
-                    return (
-                      <EmptyState
-                        icon={ICONS.search}
-                        title={t('mods.noShadersMatchTitle')}
-                        description={t('mods.noShadersMatchText')}
-                        actionText={t('common.clearSearch')}
-                        onAction={() => setShaderSearch('')}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="installed-packs-grid">
-                      {filtered.map(shader => (
-                        <div
-                          key={shader.id || shader.fileName}
-                          className="installed-pack-card"
-                          onClick={() => handleOpenLocalShaderDetails(shader)}
-                        >
-                          <div className="installed-pack-header">
-                            <div className={`installed-pack-icon ${!shader.iconUrl ? 'shader-fallback-icon' : ''}`}>
-                              {shader.iconUrl ? (
-                                <img src={shader.iconUrl} alt={shader.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.classList.add('shader-fallback-icon'); }} />
-                              ) : (
-                                <Icon d={ICONS.sun} size={20} />
-                              )}
-                            </div>
-                            <div className="installed-pack-meta">
-                              <span className="installed-pack-title" title={shader.name}>{shader.name}</span>
-                              <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
-                            </div>
-                          </div>
-                          {shader.description && (
-                            <div className="installed-pack-desc" title={cleanMinecraftText(shader.description)}>
-                              {cleanMinecraftText(shader.description)}
-                            </div>
-                          )}
-                          <div className="installed-pack-footer">
-                            <span className="installed-pack-size">
-                              {shader.size ? formatFileSize(shader.size) : (shader.isDirectory ? 'Folder' : '')}
-                            </span>
-                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                className="mod-delete-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteShader(shader);
-                                }}
-                                title={t('mods.deleteShader')}
-                              >
-                                <Icon d={ICONS.trash} size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── TAB: TEXTURE PACKS (LIBRARY) ── */}
-              <div
-                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-                style={{ display: activeTab === 'resourcepacks' ? 'flex' : 'none', position: 'relative' }}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {isDragging && (
-                  <div className="dropzone-overlay">
-                    <div className="dropzone-content">
-                      <Icon d={ICONS.download} size={36} />
-                      <span className="dropzone-title">{t('mods.dropzone')}</span>
-                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mods-toolbar">
-                  <div className="mods-search-box">
-                    <Icon d={ICONS.search} size={13} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchResourcePacksPlaceholder')}
-                      value={resourcePackSearch}
-                      onChange={e => setResourcePackSearch(e.target.value)}
-                    />
-                    {resourcePackSearch && (
-                      <button className="search-clear-btn" onClick={() => setResourcePackSearch('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {resourcePacks.length > 0 && (
-                    <span className="mods-count-badge">
-                      {resourcePacks.length} {t('sidebar.resourcePacks')}
-                    </span>
-                  )}
-
-                  <div className="mods-toolbar-actions">
-                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('resourcepacks')} title={t('mods.openResourcePacksFolder')}>
-                      <Icon d={ICONS.folder} size={12} />
-                      <span>{t('mods.openFolder')}</span>
-                    </button>
-                    <button className="btn-primary" onClick={() => handleAddContentClick('resourcepacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      <Icon d={ICONS.plus} size={12} />
-                      {t('mods.addResourcePack')}
-                    </button>
-                  </div>
-                </div>
-
-                {resourcePacks.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.layers}
-                    title={t('mods.emptyResourcePacksTitle')}
-                    description={t('mods.emptyResourcePacksText')}
-                    actionText={t('explore.browseResourcePacks')}
-                    actionIcon={ICONS.compass}
-                    onAction={() => {
-                      setExploreType('resourcepacks');
-                      setActiveTab('explore');
-                    }}
-                    secondaryText={t('mods.openResourcePacksFolder')}
-                    onSecondary={() => handleOpenContentFolder('resourcepacks')}
-                  />
-                ) : (() => {
-                  const filtered = resourcePacks.filter(p =>
-                    String(p.name || '').toLowerCase().includes(resourcePackSearch.toLowerCase()) ||
-                    String(p.fileName || '').toLowerCase().includes(resourcePackSearch.toLowerCase())
-                  );
-                  if (filtered.length === 0) {
-                    return (
-                      <EmptyState
-                        icon={ICONS.search}
-                        title={t('mods.noResourcePacksMatchTitle')}
-                        description={t('mods.noResourcePacksMatchText')}
-                        actionText={t('common.clearSearch')}
-                        onAction={() => setResourcePackSearch('')}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="installed-packs-grid">
-                      {filtered.map(pack => (
-                        <div
-                          key={pack.id || pack.fileName}
-                          className="installed-pack-card"
-                          onClick={() => handleOpenLocalResourcePackDetails(pack)}
-                        >
-                          <div className="installed-pack-header">
-                            <div className="installed-pack-icon">
-                              {pack.iconUrl ? (
-                                <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                              ) : (
-                                <Icon d={ICONS.layers} size={20} />
-                              )}
-                            </div>
-                            <div className="installed-pack-meta">
-                              <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
-                              <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
-                            </div>
-                          </div>
-                          {pack.description && (
-                            <div className="installed-pack-desc" title={cleanMinecraftText(pack.description)}>
-                              {cleanMinecraftText(pack.description)}
-                            </div>
-                          )}
-                          <div className="installed-pack-footer">
-                            <span className="installed-pack-size">
-                              {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
-                            </span>
-                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                className="mod-delete-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteResourcePack(pack);
-                                }}
-                                title={t('mods.deleteResourcePack')}
-                              >
-                                <Icon d={ICONS.trash} size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── TAB: DATA PACKS (LIBRARY) ── */}
-              <div
-                className={`tab-panel ${isDragging ? 'dragging-over' : ''}`}
-                style={{ display: activeTab === 'datapacks' ? 'flex' : 'none', position: 'relative' }}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {isDragging && (
-                  <div className="dropzone-overlay">
-                    <div className="dropzone-content">
-                      <Icon d={ICONS.download} size={36} />
-                      <span className="dropzone-title">{t('mods.dropzone')}</span>
-                      <span className="dropzone-sub">{t('mods.dropzoneSub')}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mods-toolbar">
-                  <div className="mods-search-box">
-                    <Icon d={ICONS.search} size={13} />
-                    <input
-                      type="text"
-                      className="mods-search-input"
-                      placeholder={t('mods.searchDatapacksPlaceholder')}
-                      value={datapackSearch}
-                      onChange={e => setDatapackSearch(e.target.value)}
-                    />
-                    {datapackSearch && (
-                      <button className="search-clear-btn" onClick={() => setDatapackSearch('')}>
-                        <Icon d={ICONS.x} size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {datapacks.length > 0 && (
-                    <span className="mods-count-badge">
-                      {datapacks.length} {t('sidebar.datapacks')}
-                    </span>
-                  )}
-
-                  <div className="mods-toolbar-actions">
-                    <button className="btn-secondary" onClick={() => handleOpenContentFolder('datapacks')} title={t('mods.openDatapacksFolder')}>
-                      <Icon d={ICONS.folder} size={12} />
-                      <span>{t('mods.openFolder')}</span>
-                    </button>
-                    <button className="btn-primary" onClick={() => handleAddContentClick('datapacks')} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      <Icon d={ICONS.plus} size={12} />
-                      {t('mods.addDatapack')}
-                    </button>
-                  </div>
-                </div>
-
-                {datapacks.length === 0 ? (
-                  <EmptyState
-                    icon={ICONS.datapack}
-                    title={t('mods.emptyDatapacksTitle')}
-                    description={t('mods.emptyDatapacksText')}
-                    actionText={t('explore.browseDatapacks')}
-                    actionIcon={ICONS.compass}
-                    onAction={() => {
-                      setExploreType('datapacks');
-                      setActiveTab('explore');
-                    }}
-                    secondaryText={t('mods.openDatapacksFolder')}
-                    onSecondary={() => handleOpenContentFolder('datapacks')}
-                  />
-                ) : (() => {
-                  const filtered = datapacks.filter(p =>
-                    String(p.name || '').toLowerCase().includes(datapackSearch.toLowerCase()) ||
-                    String(p.fileName || '').toLowerCase().includes(datapackSearch.toLowerCase())
-                  );
-                  if (filtered.length === 0) {
-                    return (
-                      <EmptyState
-                        icon={ICONS.search}
-                        title={t('mods.noDatapacksMatchTitle')}
-                        description={t('mods.noDatapacksMatchText')}
-                        actionText={t('common.clearSearch')}
-                        onAction={() => setDatapackSearch('')}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="installed-packs-grid">
-                      {filtered.map(pack => (
-                        <div
-                          key={pack.id || pack.fileName}
-                          className="installed-pack-card"
-                          onClick={() => handleOpenLocalDatapackDetails(pack)}
-                        >
-                          <div className="installed-pack-header">
-                            <div className="installed-pack-icon">
-                              {pack.iconUrl ? (
-                                <img src={pack.iconUrl} alt={pack.name} className="installed-pack-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                              ) : (
-                                <Icon d={ICONS.datapack} size={20} />
-                              )}
-                            </div>
-                            <div className="installed-pack-meta">
-                              <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
-                              <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
-                            </div>
-                          </div>
-                          {pack.description && (
-                            <div className="installed-pack-desc" title={cleanMinecraftText(pack.description)}>
-                              {cleanMinecraftText(pack.description)}
-                            </div>
-                          )}
-                          <div className="installed-pack-footer">
-                            <span className="installed-pack-size">
-                              {pack.size ? formatFileSize(pack.size) : (pack.isDirectory ? 'Folder' : '')}
-                            </span>
-                            <div className="installed-pack-actions" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                className="mod-delete-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteDatapack(pack);
-                                }}
-                                title={t('mods.deleteDatapack')}
-                              >
-                                <Icon d={ICONS.trash} size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── TAB: CONSOLE ── */}
-              <div className="tab-panel" style={{ display: activeTab === 'console' ? 'flex' : 'none' }}>
-                <div className="console-wrapper">
-                  <div className="console-header">
-                    <div className="console-title">
-                      <div className={`console-indicator ${gameState === 'running' ? 'running' : ''}`} />
-                      <span>{t('console.outputLog')}</span>
-                      {gameState === 'running' && (
-                        <span style={{ color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                          • {t('console.runningWithPid', { pid: runPid })}
-                        </span>
-                      )}
-                    </div>
-                    <div className="console-actions">
-                      <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 6 }}>
-                        {['all', 'info', 'warn', 'error'].map(lvl => (
-                          <button
-                            key={lvl}
-                            className={`tab-btn ${logFilter === lvl ? 'active' : ''}`}
-                            style={{ fontSize: 10, padding: '2px 8px', textTransform: 'uppercase' }}
-                            onClick={() => setLogFilter(lvl)}
-                          >
-                            {lvl}
-                          </button>
-                        ))}
-                      </div>
-                      <button className="btn-secondary" onClick={() => setAutoScroll(prev => !prev)} title={t('console.autoScroll')} style={{ padding: '4px 8px' }}>
-                        <Icon d={autoScroll ? ICONS.play : ICONS.stop} size={11} />
-                      </button>
-                      <button className="btn-secondary" onClick={handleCopyConsole} title={t('console.copy')} style={{ padding: '4px 8px' }}>
-                        <Icon d={ICONS.copy} size={11} />
-                      </button>
-                      <button className="btn-secondary" onClick={handleClearConsole} title={t('console.clear')} style={{ padding: '4px 8px' }}>
-                        <Icon d={ICONS.clear} size={11} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="console-body" ref={consoleRef}>
-                    {logs.length === 0 ? (
-                      <div className="console-empty-box">
-                        <Icon d={ICONS.console} size={28} />
-                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('console.noLogsYet')}</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>{t('console.noLogsYetSub')}</span>
-                      </div>
-                    ) : (() => {
-                      const filteredLogs = logs.filter(entry => {
-                        if (logFilter === 'all') return true;
-                        const entryLevel = String(entry.level || '').toLowerCase();
-                        if (logFilter === 'warn') return entryLevel === 'warn' || String(entry.msg || '').includes('WARN');
-                        if (logFilter === 'error') return entryLevel === 'error' || String(entry.msg || '').includes('ERROR');
-                        if (logFilter === 'info') return entryLevel === 'info' && !String(entry.msg || '').includes('WARN') && !String(entry.msg || '').includes('ERROR');
-                        return true;
-                      });
-                      if (filteredLogs.length === 0) {
-                        return <span style={{ color: 'var(--text-faint)', padding: 12 }}>{t('console.noLogsWithFilter', { filter: logFilter })}</span>;
-                      }
-                      return filteredLogs.map((entry, i) => <LogLine key={i} entry={entry} />);
-                    })()}
-                  </div>
-                </div>
-              </div>
+              <ConsoleTab
+                active={activeTab === 'console'}
+                gameState={gameState}
+                runPid={runPid}
+                logFilter={logFilter}
+                setLogFilter={setLogFilter}
+                autoScroll={autoScroll}
+                setAutoScroll={setAutoScroll}
+                handleCopyConsole={handleCopyConsole}
+                handleClearConsole={handleClearConsole}
+                consoleRef={consoleRef}
+                logs={logs}
+              />
             </>
           )}
 

@@ -4678,3 +4678,125 @@ select option {
   display: flex;
   gap: 10px;
 }
+
+/* ── About Modal Styles ── */
+.about-modal-card {
+  max-width: 480px;
+  width: 100%;
+}
+
+.about-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.about-logo-wrapper {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.about-app-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+}
+
+.about-hero-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.about-hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-app-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.about-version-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 2px 7px;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  color: var(--text-secondary);
+}
+
+.about-app-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.about-meta-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+}
+
+.about-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.about-meta-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.about-meta-pill {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.about-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+  gap: 10px;
+}
+
+.about-external-links {
+  display: flex;
+  gap: 8px;
+}
+
+.about-btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
