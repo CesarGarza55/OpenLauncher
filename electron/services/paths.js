@@ -12,6 +12,15 @@ export function getMinecraftRoot() {
   return path.join(app.getPath('home'), '.minecraft');
 }
 
+export function getInstancesDir() {
+  return path.join(getMinecraftRoot(), 'instances');
+}
+
+export function getInstanceDir(instanceId) {
+  if (!instanceId) return getMinecraftRoot();
+  return path.join(getInstancesDir(), String(instanceId));
+}
+
 export function getMinecraftRoots() {
   return [getMinecraftRoot()];
 }

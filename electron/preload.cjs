@@ -18,17 +18,38 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftGetInstalledVersions() {
     return ipcRenderer.invoke('minecraft:get-installed-versions');
   },
-  minecraftGetInstalledMods() {
-    return ipcRenderer.invoke('minecraft:get-installed-mods');
+  minecraftGetInstalledMods(instanceId) {
+    return ipcRenderer.invoke('minecraft:get-installed-mods', instanceId);
   },
-  minecraftGetInstalledShaders() {
-    return ipcRenderer.invoke('minecraft:get-installed-shaders');
+  minecraftGetInstalledShaders(instanceId) {
+    return ipcRenderer.invoke('minecraft:get-installed-shaders', instanceId);
   },
-  minecraftGetInstalledResourcePacks() {
-    return ipcRenderer.invoke('minecraft:get-installed-resourcepacks');
+  minecraftGetInstalledResourcePacks(instanceId) {
+    return ipcRenderer.invoke('minecraft:get-installed-resourcepacks', instanceId);
   },
-  minecraftGetInstalledDatapacks() {
-    return ipcRenderer.invoke('minecraft:get-installed-datapacks');
+  minecraftGetInstalledDatapacks(instanceId) {
+    return ipcRenderer.invoke('minecraft:get-installed-datapacks', instanceId);
+  },
+  getInstances() {
+    return ipcRenderer.invoke('instances:get-all');
+  },
+  createInstance(payload) {
+    return ipcRenderer.invoke('instances:create', payload);
+  },
+  updateInstance(id, updates) {
+    return ipcRenderer.invoke('instances:update', { id, updates });
+  },
+  deleteInstance(id) {
+    return ipcRenderer.invoke('instances:delete', id);
+  },
+  scanBaseDirectory() {
+    return ipcRenderer.invoke('instances:scan-base');
+  },
+  migrateBaseToInstance(payload) {
+    return ipcRenderer.invoke('instances:migrate-base', payload);
+  },
+  pickInstanceImage() {
+    return ipcRenderer.invoke('instances:pick-image');
   },
   minecraftGetNews() {
     return ipcRenderer.invoke('minecraft:get-news');
@@ -36,32 +57,32 @@ contextBridge.exposeInMainWorld('launcher', {
   minecraftGetArticle(url) {
     return ipcRenderer.invoke('minecraft:get-article', url);
   },
-  minecraftToggleMod(modId, enable) {
-    return ipcRenderer.invoke('minecraft:toggle-mod', { modId, enable });
+  minecraftToggleMod(modId, enable, instanceId) {
+    return ipcRenderer.invoke('minecraft:toggle-mod', { modId, enable, instanceId });
   },
-  minecraftSetAllModsEnabled(enable) {
-    return ipcRenderer.invoke('minecraft:set-all-mods-enabled', { enable });
+  minecraftSetAllModsEnabled(enable, instanceId) {
+    return ipcRenderer.invoke('minecraft:set-all-mods-enabled', { enable, instanceId });
   },
-  minecraftDeleteMod(modId) {
-    return ipcRenderer.invoke('minecraft:delete-mod', { modId });
+  minecraftDeleteMod(modId, instanceId) {
+    return ipcRenderer.invoke('minecraft:delete-mod', { modId, instanceId });
   },
-  minecraftDeleteShader(fileName) {
-    return ipcRenderer.invoke('minecraft:delete-shader', { fileName });
+  minecraftDeleteShader(fileName, instanceId) {
+    return ipcRenderer.invoke('minecraft:delete-shader', { fileName, instanceId });
   },
-  minecraftDeleteResourcePack(fileName) {
-    return ipcRenderer.invoke('minecraft:delete-resourcepack', { fileName });
+  minecraftDeleteResourcePack(fileName, instanceId) {
+    return ipcRenderer.invoke('minecraft:delete-resourcepack', { fileName, instanceId });
   },
-  minecraftDeleteDatapack(fileName) {
-    return ipcRenderer.invoke('minecraft:delete-datapack', { fileName });
+  minecraftDeleteDatapack(fileName, instanceId) {
+    return ipcRenderer.invoke('minecraft:delete-datapack', { fileName, instanceId });
   },
-  minecraftOpenContentFolder(folderType) {
-    return ipcRenderer.invoke('minecraft:open-content-folder', folderType);
+  minecraftOpenContentFolder(folderType, instanceId) {
+    return ipcRenderer.invoke('minecraft:open-content-folder', folderType, instanceId);
   },
-  minecraftInstallModFile(sourcePath) {
-    return ipcRenderer.invoke('minecraft:install-mod-file', { sourcePath });
+  minecraftInstallModFile(sourcePath, instanceId) {
+    return ipcRenderer.invoke('minecraft:install-mod-file', { sourcePath, instanceId });
   },
-  minecraftImportContentFile(payload) {
-    return ipcRenderer.invoke('minecraft:import-content-file', payload);
+  minecraftImportContentFile(payload, instanceId) {
+    return ipcRenderer.invoke('minecraft:import-content-file', payload, instanceId);
   },
   minecraftModrinthSearch(params) {
     return ipcRenderer.invoke('minecraft:modrinth-search', params);

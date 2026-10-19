@@ -124,6 +124,7 @@ export async function loadLauncherState(storageDir) {
     latest: state.latest && typeof state.latest === 'object'
       ? state.latest
       : DEFAULT_LAUNCHER_STATE.latest,
+    activeInstanceId: typeof state.activeInstanceId === 'string' && state.activeInstanceId ? state.activeInstanceId : null,
   };
 }
 
@@ -132,6 +133,7 @@ export async function saveLauncherState(storageDir, state) {
   const normalizedState = {
     profiles,
     activeProfileId: typeof state?.activeProfileId === 'string' && state.activeProfileId ? state.activeProfileId : (profiles[0]?.id || 'default'),
+    activeInstanceId: typeof state?.activeInstanceId === 'string' && state.activeInstanceId ? state.activeInstanceId : null,
     mods: Array.isArray(state?.mods) ? state.mods : [],
     shaders: Array.isArray(state?.shaders) ? state.shaders : [],
     resourcePacks: Array.isArray(state?.resourcePacks) ? state.resourcePacks : [],

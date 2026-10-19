@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
-import { getMinecraftRoot, getMinecraftRoots } from './paths.js';
+import { getMinecraftRoot, getMinecraftRoots, getInstanceDir } from './paths.js';
 import { downloadFileToPath } from './updater.js';
 import { getMainWindow } from './windowManager.js';
 import {
@@ -242,12 +242,13 @@ export function extractJarMetadata(jarFilePath) {
   return null;
 }
 
-export async function readInstalledMods() {
+export async function readInstalledMods(instanceId = null) {
   const installed = [];
   const seen = new Set();
   const metadataStore = await readModsMetadataStore();
+  const roots = instanceId ? [getInstanceDir(instanceId)] : getMinecraftRoots();
 
-  for (const root of getMinecraftRoots()) {
+  for (const root of roots) {
     const modsDir = path.join(root, 'mods');
     try {
       const dirEntries = await fs.promises.readdir(modsDir, { withFileTypes: true });
@@ -306,8 +307,8 @@ export async function resolveModFile(modsDir, modId, extension) {
   } catch { return null; }
 }
 
-export async function toggleMod(modId, enable) {
-  const root = getMinecraftRoot();
+export async function toggleMod(modId, enable, instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const modsDir = path.join(root, 'mods');
   try {
     if (enable) {
@@ -330,11 +331,11 @@ export async function toggleMod(modId, enable) {
   } catch (error) { return { error: 'RenameFailed', message: error?.message || String(error) }; }
 }
 
-export async function setAllModsEnabled(enable) {
-  const mods = await readInstalledMods();
+export async function setAllModsEnabled(enable, instanceId = null) {
+  const mods = await readInstalledMods(instanceId);
   const targetMods = mods.filter(mod => Boolean(mod.enabled) !== Boolean(enable));
   for (const mod of targetMods) {
-    const result = await toggleMod(mod.id, enable);
+    const result = await toggleMod(mod.id, enable, instanceId);
     if (result?.error) {
       return { error: result.error, message: result.message || `Failed to update mod ${mod.id}.` };
     }
@@ -342,8 +343,8 @@ export async function setAllModsEnabled(enable) {
   return { ok: true, updated: targetMods.length };
 }
 
-export async function deleteMod(modId) {
-  const root = getMinecraftRoot();
+export async function deleteMod(modId, instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const modsDir = path.join(root, 'mods');
   const baseId = String(modId || '').replace(/\.(jar|olpkg)$/i, '').trim();
   if (!baseId) return { error: 'BadInput', message: 'Missing mod id.' };
@@ -366,7 +367,7 @@ export async function deleteMod(modId) {
   const choice = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
     title: 'Delete mod?', message: `Delete ${baseId}?`,
-    detail: 'This will remove the mod file from the Minecraft mods folder.',
+    detail: 'This will remove the mod file from the mods folder.',
   });
   if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
   try {
@@ -399,16 +400,17 @@ export function normalizeModFileName(fileName) {
   return trimmedName;
 }
 
-export async function importModFile(payload) {
+export async function importModFile(payload, instanceId = null) {
   const sourcePath = typeof payload === 'string' ? payload : payload?.sourcePath;
   const fileName = typeof payload === 'object' ? payload?.fileName : null;
   const fileBytes = typeof payload === 'object' ? payload?.fileBytes : null;
+  const targetInstanceId = instanceId || (typeof payload === 'object' ? payload?.instanceId : null);
   const resolvedSourcePath = String(sourcePath || '').trim();
   const resolvedFileName = normalizeModFileName(fileName || (resolvedSourcePath ? path.basename(resolvedSourcePath) : ''));
   if (!resolvedSourcePath && !resolvedFileName) return { error: 'BadInput', message: 'Missing mod file name.' };
   const ext = path.extname(resolvedFileName || resolvedSourcePath).toLowerCase();
   if (ext !== '.jar' && ext !== '.olpkg') return { error: 'UnsupportedFile', message: 'Only .jar and .olpkg files can be imported as mods.' };
-  const root = getMinecraftRoot();
+  const root = targetInstanceId ? getInstanceDir(targetInstanceId) : getMinecraftRoot();
   const modsDir = path.join(root, 'mods');
   await fs.promises.mkdir(modsDir, { recursive: true });
   const sourceFileName = resolvedFileName || path.basename(resolvedSourcePath);
@@ -422,7 +424,7 @@ export async function importModFile(payload) {
     const choice = await dialog.showMessageBox(mainWindow || undefined, {
       type: 'question', buttons: ['Cancel', 'Replace'], defaultId: 1, cancelId: 0, noLink: true,
       title: 'Replace mod?', message: `A mod with the same name already exists: ${sourceFileName}`,
-      detail: 'Do you want to replace the existing file in the Minecraft mods folder?',
+      detail: 'Do you want to replace the existing file in the mods folder?',
     });
     if (choice.response !== 1) return { canceled: true, reason: 'replace-cancelled', path: destinationPath };
     for (const existingPath of existingPaths) await fs.promises.unlink(existingPath).catch(() => { });
@@ -607,13 +609,14 @@ export async function fetchModrinthShaderArtwork(fileName) {
   return null;
 }
 
-export async function readInstalledShaders() {
+export async function readInstalledShaders(instanceId = null) {
   const installed = [];
   const seen = new Set();
   const metadataStore = await readModsMetadataStore();
   const newDiscoveredMeta = {};
+  const roots = instanceId ? [getInstanceDir(instanceId)] : getMinecraftRoots();
 
-  for (const root of getMinecraftRoots()) {
+  for (const root of roots) {
     const shadersDir = path.join(root, 'shaderpacks');
     try {
       const dirEntries = await fs.promises.readdir(shadersDir, { withFileTypes: true });
@@ -692,12 +695,13 @@ export async function readInstalledShaders() {
   return installed;
 }
 
-export async function readInstalledResourcePacks() {
+export async function readInstalledResourcePacks(instanceId = null) {
   const installed = [];
   const seen = new Set();
   const metadataStore = await readModsMetadataStore();
+  const roots = instanceId ? [getInstanceDir(instanceId)] : getMinecraftRoots();
 
-  for (const root of getMinecraftRoots()) {
+  for (const root of roots) {
     const packsDir = path.join(root, 'resourcepacks');
     try {
       const dirEntries = await fs.promises.readdir(packsDir, { withFileTypes: true });
@@ -769,12 +773,13 @@ export async function readInstalledResourcePacks() {
   return installed;
 }
 
-export async function readInstalledDatapacks() {
+export async function readInstalledDatapacks(instanceId = null) {
   const installed = [];
   const seen = new Set();
   const metadataStore = await readModsMetadataStore();
+  const roots = instanceId ? [getInstanceDir(instanceId)] : getMinecraftRoots();
 
-  for (const root of getMinecraftRoots()) {
+  for (const root of roots) {
     const packsDir = path.join(root, 'datapacks');
     try {
       const dirEntries = await fs.promises.readdir(packsDir, { withFileTypes: true });
@@ -846,8 +851,8 @@ export async function readInstalledDatapacks() {
   return installed;
 }
 
-export async function deleteDatapack(fileName) {
-  const root = getMinecraftRoot();
+export async function deleteDatapack(fileName, instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const packsDir = path.join(root, 'datapacks');
   const targetPath = path.join(packsDir, fileName);
   if (!fs.existsSync(targetPath)) {
@@ -857,7 +862,7 @@ export async function deleteDatapack(fileName) {
   const choice = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
     title: 'Delete data pack?', message: `Delete ${fileName}?`,
-    detail: 'This will remove the data pack from your Minecraft datapacks folder.',
+    detail: 'This will remove the data pack from the datapacks folder.',
   });
   if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
   try {
@@ -873,8 +878,8 @@ export async function deleteDatapack(fileName) {
   }
 }
 
-export async function deleteShader(fileName) {
-  const root = getMinecraftRoot();
+export async function deleteShader(fileName, instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const shadersDir = path.join(root, 'shaderpacks');
   const targetPath = path.join(shadersDir, fileName);
   if (!fs.existsSync(targetPath)) {
@@ -884,7 +889,7 @@ export async function deleteShader(fileName) {
   const choice = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
     title: 'Delete shader?', message: `Delete ${fileName}?`,
-    detail: 'This will remove the shader pack from your Minecraft shaderpacks folder.',
+    detail: 'This will remove the shader pack from the shaderpacks folder.',
   });
   if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
   try {
@@ -904,8 +909,8 @@ export async function deleteShader(fileName) {
   }
 }
 
-export async function deleteResourcePack(fileName) {
-  const root = getMinecraftRoot();
+export async function deleteResourcePack(fileName, instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const packsDir = path.join(root, 'resourcepacks');
   const targetPath = path.join(packsDir, fileName);
   if (!fs.existsSync(targetPath)) {
@@ -915,7 +920,7 @@ export async function deleteResourcePack(fileName) {
   const choice = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'warning', buttons: ['Cancel', 'Delete'], defaultId: 1, cancelId: 0, noLink: true,
     title: 'Delete texture pack?', message: `Delete ${fileName}?`,
-    detail: 'This will remove the texture pack from your Minecraft resourcepacks folder.',
+    detail: 'This will remove the texture pack from the resourcepacks folder.',
   });
   if (choice.response !== 1) return { canceled: true, reason: 'delete-cancelled' };
   try {
@@ -931,17 +936,21 @@ export async function deleteResourcePack(fileName) {
   }
 }
 
-export async function openContentFolder(folderType = 'mods') {
-  const root = getMinecraftRoot();
+export async function openContentFolder(folderType = 'mods', instanceId = null) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   let subDir = 'mods';
-  if (folderType === 'shaders' || folderType === 'shaderpacks') {
+  if (folderType === 'instance' || folderType === 'root') {
+    subDir = '';
+  } else if (folderType === 'shaders' || folderType === 'shaderpacks') {
     subDir = 'shaderpacks';
   } else if (folderType === 'texturepacks' || folderType === 'resourcepacks' || folderType === 'textures') {
     subDir = 'resourcepacks';
   } else if (folderType === 'datapacks' || folderType === 'datapack') {
     subDir = 'datapacks';
+  } else if (folderType === 'saves' || folderType === 'worlds') {
+    subDir = 'saves';
   }
-  const targetPath = path.join(root, subDir);
+  const targetPath = subDir ? path.join(root, subDir) : root;
   try {
     await fs.promises.mkdir(targetPath, { recursive: true });
     const result = await shell.openPath(targetPath);
@@ -954,16 +963,17 @@ export async function openContentFolder(folderType = 'mods') {
   }
 }
 
-export async function importContentFile(payload) {
+export async function importContentFile(payload, instanceId = null) {
   const { type = 'mod', sourcePath, fileName, fileBytes } = (typeof payload === 'object' ? payload : { sourcePath: payload });
-  const root = getMinecraftRoot();
+  const targetInstanceId = instanceId || (typeof payload === 'object' ? payload?.instanceId : null);
+  const root = targetInstanceId ? getInstanceDir(targetInstanceId) : getMinecraftRoot();
   let targetSubDir = 'mods';
   if (type === 'shader' || type === 'shaders' || type === 'shaderpacks') targetSubDir = 'shaderpacks';
   else if (type === 'resourcepack' || type === 'texturepack' || type === 'textures' || type === 'resourcepacks') targetSubDir = 'resourcepacks';
   else if (type === 'datapack' || type === 'datapacks') targetSubDir = 'datapacks';
 
   if (targetSubDir === 'mods') {
-    return importModFile(payload);
+    return importModFile(payload, targetInstanceId);
   }
 
   const destDir = path.join(root, targetSubDir);
@@ -979,7 +989,7 @@ export async function importContentFile(payload) {
     const choice = await dialog.showMessageBox(mainWindow || undefined, {
       type: 'question', buttons: ['Cancel', 'Replace'], defaultId: 1, cancelId: 0, noLink: true,
       title: 'Replace file?', message: `A file with the same name already exists: ${sourceFileName}`,
-      detail: `Do you want to replace the existing file in the Minecraft ${targetSubDir} folder?`,
+      detail: `Do you want to replace the existing file in the ${targetSubDir} folder?`,
     });
     if (choice.response !== 1) return { canceled: true, reason: 'replace-cancelled', path: destPath };
     await fs.promises.unlink(destPath).catch(() => {});
@@ -1040,8 +1050,9 @@ export async function installModrinthProject({
   gameVersion,
   loader,
   projectType = 'mod',
+  instanceId = null,
 }, { onLog = null } = {}) {
-  const root = getMinecraftRoot();
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const normalizedType = String(projectType || '').toLowerCase().includes('shader')
     ? 'shader'
     : String(projectType || '').toLowerCase().includes('resourcepack') || String(projectType || '').toLowerCase().includes('texture')
@@ -1245,13 +1256,13 @@ export async function installModrinthProject({
 
   let updatedContent = null;
   if (normalizedType === 'shader') {
-    updatedContent = await readInstalledShaders();
+    updatedContent = await readInstalledShaders(instanceId);
   } else if (normalizedType === 'resourcepack') {
-    updatedContent = await readInstalledResourcePacks();
+    updatedContent = await readInstalledResourcePacks(instanceId);
   } else if (normalizedType === 'datapack') {
-    updatedContent = await readInstalledDatapacks();
+    updatedContent = await readInstalledDatapacks(instanceId);
   } else {
-    updatedContent = await readInstalledMods();
+    updatedContent = await readInstalledMods(instanceId);
   }
 
   return {
@@ -1270,8 +1281,8 @@ export async function getFileSha512(filePath) {
   return crypto.createHash('sha512').update(fileBuffer).digest('hex');
 }
 
-export async function checkInstalledModsUpdates({ gameVersion, loader } = {}) {
-  const root = getMinecraftRoot();
+export async function checkInstalledModsUpdates({ gameVersion, loader, instanceId } = {}) {
+  const root = instanceId ? getInstanceDir(instanceId) : getMinecraftRoot();
   const modsDir = path.join(root, 'mods');
   try {
     const entries = await fs.promises.readdir(modsDir, { withFileTypes: true });

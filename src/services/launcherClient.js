@@ -11,6 +11,13 @@ const launcherFallback = {
   minecraftGetInstalledShaders: () => Promise.resolve([]),
   minecraftGetInstalledResourcePacks: () => Promise.resolve([]),
   minecraftGetInstalledDatapacks: () => Promise.resolve([]),
+  getInstances: () => Promise.resolve([]),
+  createInstance: (payload) => Promise.resolve({ ok: true, instance: payload }),
+  updateInstance: (id, updates) => Promise.resolve({ ok: true, instance: { id, ...updates } }),
+  deleteInstance: (id) => Promise.resolve({ ok: true, id }),
+  scanBaseDirectory: () => Promise.resolve({ modsCount: 0, shaderpacksCount: 0, resourcepacksCount: 0, savesCount: 0, hasConfig: false, hasOptions: false }),
+  migrateBaseToInstance: (payload) => Promise.resolve({ ok: true, instance: { id: 'migrated', ...payload } }),
+  pickInstanceImage: () => Promise.resolve({ canceled: true }),
   minecraftGetNews: () => Promise.resolve({ items: [], sourceUrl: 'https://www.minecraft.net/en-us/articles' }),
   minecraftGetArticle: (url) => {
     if (typeof window !== 'undefined' && window.launcher?.invoke) {

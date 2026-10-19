@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron';
 import fs from 'fs';
+import path from 'path';
 import os from 'os';
 import { getMinecraftRoot } from '../services/paths.js';
 import { getMainWindow } from '../services/windowManager.js';
@@ -44,6 +45,14 @@ import {
   getModrinthProject,
   getModrinthProjectVersions,
 } from '../../src/lib/modrinth.js';
+import {
+  readAllInstances,
+  createInstance,
+  updateInstance,
+  deleteInstance,
+  scanBaseDirectory,
+  migrateBaseToInstance,
+} from '../services/instanceManager.js';
 
 export function registerAllIpc() {
   const sendToRenderer = (channel, payload) => {
@@ -209,22 +218,51 @@ export function registerAllIpc() {
     return logoutMicrosoft({ profileKey, storageDir: app.getPath('userData') });
   });
 
+  // ── Instances ──
+  ipcMain.handle('instances:get-all', async () => readAllInstances());
+  ipcMain.handle('instances:create', async (_, payload) => createInstance(payload));
+  ipcMain.handle('instances:update', async (_, { id, updates }) => updateInstance(id, updates));
+  ipcMain.handle('instances:delete', async (_, id) => deleteInstance(id));
+  ipcMain.handle('instances:scan-base', async () => scanBaseDirectory());
+  ipcMain.handle('instances:migrate-base', async (_, payload) => migrateBaseToInstance(payload));
+  ipcMain.handle('instances:pick-image', async () => {
+    const win = getMainWindow();
+    const result = await dialog.showOpenDialog(win || undefined, {
+      title: 'Select instance icon image',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+    try {
+      const filePath = result.filePaths[0];
+      const ext = path.extname(filePath).slice(1).toLowerCase();
+      const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      const buf = await fs.promises.readFile(filePath);
+      return { canceled: false, dataUri: `data:${mime};base64,${buf.toString('base64')}` };
+    } catch (err) {
+      return { canceled: true, error: err.message };
+    }
+  });
+
   // ── Content Management (Mods, Shaders, Resource Packs, Data Packs) ──
   ipcMain.handle('minecraft:get-installed-versions', async () => readInstalledVersions());
-  ipcMain.handle('minecraft:get-installed-mods', async () => readInstalledMods());
-  ipcMain.handle('minecraft:get-installed-shaders', async () => readInstalledShaders());
-  ipcMain.handle('minecraft:get-installed-resourcepacks', async () => readInstalledResourcePacks());
-  ipcMain.handle('minecraft:get-installed-datapacks', async () => readInstalledDatapacks());
+  ipcMain.handle('minecraft:get-installed-mods', async (_, instanceId) => readInstalledMods(instanceId));
+  ipcMain.handle('minecraft:get-installed-shaders', async (_, instanceId) => readInstalledShaders(instanceId));
+  ipcMain.handle('minecraft:get-installed-resourcepacks', async (_, instanceId) => readInstalledResourcePacks(instanceId));
+  ipcMain.handle('minecraft:get-installed-datapacks', async (_, instanceId) => readInstalledDatapacks(instanceId));
 
-  ipcMain.handle('minecraft:toggle-mod', async (_, { modId, enable }) => toggleMod(modId, enable));
-  ipcMain.handle('minecraft:set-all-mods-enabled', async (_, { enable }) => setAllModsEnabled(Boolean(enable)));
-  ipcMain.handle('minecraft:delete-mod', async (_, { modId }) => deleteMod(modId));
-  ipcMain.handle('minecraft:delete-shader', async (_, { fileName }) => deleteShader(fileName));
-  ipcMain.handle('minecraft:delete-resourcepack', async (_, { fileName }) => deleteResourcePack(fileName));
-  ipcMain.handle('minecraft:delete-datapack', async (_, { fileName }) => deleteDatapack(fileName));
-  ipcMain.handle('minecraft:open-content-folder', async (_, folderType) => openContentFolder(folderType));
-  ipcMain.handle('minecraft:install-mod-file', async (_, { sourcePath }) => importModFile(sourcePath));
-  ipcMain.handle('minecraft:import-content-file', async (_, payload) => importContentFile(payload));
+  ipcMain.handle('minecraft:toggle-mod', async (_, { modId, enable, instanceId }) => toggleMod(modId, enable, instanceId));
+  ipcMain.handle('minecraft:set-all-mods-enabled', async (_, { enable, instanceId }) => setAllModsEnabled(Boolean(enable), instanceId));
+  ipcMain.handle('minecraft:delete-mod', async (_, { modId, instanceId }) => deleteMod(modId, instanceId));
+  ipcMain.handle('minecraft:delete-shader', async (_, { fileName, instanceId }) => deleteShader(fileName, instanceId));
+  ipcMain.handle('minecraft:delete-resourcepack', async (_, { fileName, instanceId }) => deleteResourcePack(fileName, instanceId));
+  ipcMain.handle('minecraft:delete-datapack', async (_, { fileName, instanceId }) => deleteDatapack(fileName, instanceId));
+  ipcMain.handle('minecraft:open-content-folder', async (_, folderType, instanceId) => openContentFolder(folderType, instanceId));
+  ipcMain.handle('minecraft:install-mod-file', async (_, { sourcePath, instanceId }) => importModFile({ sourcePath }, instanceId));
+  ipcMain.handle('minecraft:import-content-file', async (_, payload, instanceId) => importContentFile(payload, instanceId));
 
   ipcMain.handle('minecraft:pick-mod-files', async () => {
     const win = getMainWindow();

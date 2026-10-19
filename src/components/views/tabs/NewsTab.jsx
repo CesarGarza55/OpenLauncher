@@ -81,8 +81,8 @@ export function NewsTab({
         />
       ) : (
         <div className="news-grid">
-          {newsItems.map(item => (
-            <NewsCard key={item.url} item={item} onOpen={handleOpenNewsArticle} />
+          {newsItems.map((item, index) => (
+            <NewsCard key={item.id || item.guid || `${item.url || 'news'}-${index}`} item={item} onOpen={handleOpenNewsArticle} />
           ))}
         </div>
       )}

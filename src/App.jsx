@@ -40,6 +40,7 @@ import { ShadersTab } from './components/views/tabs/ShadersTab';
 import { ResourcePacksTab } from './components/views/tabs/ResourcePacksTab';
 import { DatapacksTab } from './components/views/tabs/DatapacksTab';
 import { ConsoleTab } from './components/views/tabs/ConsoleTab';
+import { InstancesTab } from './components/views/tabs/InstancesTab';
 import { useToasts } from './hooks/useToasts';
 import { useLauncherLogs } from './hooks/useLauncherLogs';
 import {
@@ -50,6 +51,11 @@ import {
   LoginLoadingModal,
   UpdateModal,
 } from './components/modals/LauncherModals';
+import { InstanceModal } from './components/modals/InstanceModal';
+import { AccountModal } from './components/modals/AccountModal';
+import { MigrateInstanceModal } from './components/modals/MigrateInstanceModal';
+import { ConfirmModal } from './components/modals/ConfirmModal';
+import { getInstanceIconSrc } from './constants/instanceIcons';
 import {
   createOfflineSession,
   getMcHeadsAvatarUrl,
@@ -147,6 +153,12 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [updateState, setUpdateState] = useState({ phase: 'idle', progress: 0, message: '' });
   const [updateModalInfo, setUpdateModalInfo] = useState(null);
+  const [instances, setInstances] = useState([]);
+  const [activeInstanceId, setActiveInstanceId] = useState(null);
+  const [instanceEditor, setInstanceEditor] = useState(null); // null | { mode: 'create' | 'edit', instance: null }
+  const [migrateModalOpen, setMigrateModalOpen] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null); // null | { title, message, confirmText, cancelText, danger, onConfirm }
   const [modal, setModal] = useState(null); // null | 'newProfile' | 'install-minecraft' | 'install-fabric' | 'install-forge' | 'settings' | 'about'
   const [profileEditor, setProfileEditor] = useState(null); // null | { mode: 'new' | 'edit', profileId: number | null }
   const [account, setAccount] = useState({ name: '', loggedIn: false, profileKey: 'default', kind: 'none', session: null });
@@ -194,10 +206,10 @@ export default function App() {
   const activeVersion = activeProfileVersion || installedVersions[0] || versionCatalog[0] || null;
   const selectedInstalledVersionId = activeProfile?.version || (installedVersions[0] ? installedVersions[0].id : '');
 
-  const stateRef = useRef({ profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets });
+  const stateRef = useRef({ profiles, activeProfileId, activeInstanceId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets });
   useEffect(() => {
-    stateRef.current = { profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets };
-  }, [profiles, activeProfileId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets]);
+    stateRef.current = { profiles, activeProfileId, activeInstanceId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets };
+  }, [profiles, activeProfileId, activeInstanceId, mods, shaders, resourcePacks, datapacks, logs, settings, versionCatalog, installTargets]);
 
 
 
@@ -283,6 +295,7 @@ export default function App() {
     const nextState = {
       profiles: updates.profiles !== undefined ? updates.profiles : currentState.profiles,
       activeProfileId: updates.activeProfileId !== undefined ? updates.activeProfileId : currentState.activeProfileId,
+      activeInstanceId: updates.activeInstanceId !== undefined ? updates.activeInstanceId : currentState.activeInstanceId,
       mods: updates.mods !== undefined ? updates.mods : currentState.mods,
       shaders: updates.shaders !== undefined ? updates.shaders : currentState.shaders,
       resourcePacks: updates.resourcePacks !== undefined ? updates.resourcePacks : currentState.resourcePacks,
@@ -293,6 +306,15 @@ export default function App() {
       settings: updates.settings !== undefined ? updates.settings : currentState.settings,
     };
     stateRef.current = { ...currentState, ...nextState, versionCatalog: nextState.versions, logs: nextState.logs };
+    if (nextState.activeInstanceId !== undefined) {
+      try {
+        if (nextState.activeInstanceId) {
+          localStorage.setItem('openlauncher_active_instance', nextState.activeInstanceId);
+        } else {
+          localStorage.removeItem('openlauncher_active_instance');
+        }
+      } catch { }
+    }
     launcher.minecraftSaveState?.(nextState);
   }, []);
 
@@ -457,13 +479,30 @@ export default function App() {
           setSettings(prev => ({ ...prev, minecraftRoot: rootRes.root }));
         }
 
-        const [instVers, instMods, instShaders, instPacks, instDatapacks] = await Promise.all([
+        const [instVers, instMods, instShaders, instPacks, instDatapacks, loadedInstances] = await Promise.all([
           launcher.minecraftGetInstalledVersions ? launcher.minecraftGetInstalledVersions().catch(() => []) : [],
           launcher.minecraftGetInstalledMods ? launcher.minecraftGetInstalledMods().catch(() => []) : [],
           launcher.minecraftGetInstalledShaders ? launcher.minecraftGetInstalledShaders().catch(() => []) : [],
           launcher.minecraftGetInstalledResourcePacks ? launcher.minecraftGetInstalledResourcePacks().catch(() => []) : [],
           launcher.minecraftGetInstalledDatapacks ? launcher.minecraftGetInstalledDatapacks().catch(() => []) : [],
+          launcher.getInstances ? launcher.getInstances().catch(() => []) : [],
         ]);
+
+        const targetInstanceIdCandidate = state?.activeInstanceId || (() => {
+          try { return localStorage.getItem('openlauncher_active_instance'); } catch { return null; }
+        })();
+
+        let resolvedActiveInstanceId = null;
+        if (Array.isArray(loadedInstances)) {
+          setInstances(loadedInstances);
+          if (targetInstanceIdCandidate && loadedInstances.some(inst => inst.id === targetInstanceIdCandidate)) {
+            resolvedActiveInstanceId = targetInstanceIdCandidate;
+          } else {
+            // Deleted externally or invalid ID -> fallback to Global (.minecraft)
+            resolvedActiveInstanceId = null;
+          }
+          setActiveInstanceId(resolvedActiveInstanceId);
+        }
 
         if (Array.isArray(instVers)) setInstalledVersions(instVers);
         if (Array.isArray(instMods)) setMods(instMods);
@@ -472,6 +511,7 @@ export default function App() {
         if (Array.isArray(instDatapacks)) setDatapacks(instDatapacks);
 
         persistState({
+          activeInstanceId: resolvedActiveInstanceId,
           mods: Array.isArray(instMods) ? instMods : state?.mods || [],
           shaders: Array.isArray(instShaders) ? instShaders : state?.shaders || [],
           resourcePacks: Array.isArray(instPacks) ? instPacks : state?.resourcePacks || [],
@@ -780,9 +820,22 @@ export default function App() {
         }
       }
 
+      const activeInst = instances.find(i => i.id === activeInstanceId) || null;
+      const targetVersion = activeInst?.version
+        ? (installedVersions.find(v => v.id === activeInst.version) || activeInst.version)
+        : (activeVersion || activeProfile?.version);
+
+      const runProfile = {
+        ...activeProfile,
+        ram: activeInst?.ram || activeProfile.ram,
+        jvmArguments: activeInst?.jvmArguments || activeProfile.jvmArguments,
+        javaPath: activeInst?.javaPath || activeProfile.javaPath,
+      };
+
       const runOpts = {
-        profile: activeProfile,
-        version: activeVersion || activeProfile?.version,
+        profile: runProfile,
+        version: targetVersion,
+        instanceId: activeInstanceId,
         session: runSession || createOfflineSession(activeProfile.localName || 'Player'),
       };
       const res = await launcher.minecraftRun(runOpts);
@@ -953,9 +1006,8 @@ export default function App() {
     if (!targetMod) return;
     const nextState = !targetMod.enabled;
     try {
-      await launcher.minecraftToggleMod(modId, nextState);
-      const updated = await launcher.minecraftGetInstalledMods();
-      if (Array.isArray(updated)) setMods(updated);
+      await launcher.minecraftToggleMod(modId, nextState, activeInstanceId);
+      loadMods();
     } catch (e) {
       addLog('error', `Failed to toggle mod: ${e?.message || e}`);
     }
@@ -963,9 +1015,8 @@ export default function App() {
 
   const handleSetAllModsEnabled = async (enable) => {
     try {
-      await launcher.minecraftSetAllModsEnabled(enable);
-      const updated = await launcher.minecraftGetInstalledMods();
-      if (Array.isArray(updated)) setMods(updated);
+      await launcher.minecraftSetAllModsEnabled(enable, activeInstanceId);
+      loadMods();
     } catch (e) {
       addLog('error', `Failed to set all mods enabled: ${e?.message || e}`);
     }
@@ -973,9 +1024,8 @@ export default function App() {
 
   const handleModDelete = async (modId) => {
     try {
-      await launcher.minecraftDeleteMod(modId);
-      const updated = await launcher.minecraftGetInstalledMods();
-      if (Array.isArray(updated)) setMods(updated);
+      await launcher.minecraftDeleteMod(modId, activeInstanceId);
+      loadMods();
     } catch (e) {
       addLog('error', `Failed to delete mod: ${e?.message || e}`);
     }
@@ -987,10 +1037,9 @@ export default function App() {
       const filePaths = Array.isArray(picked) ? picked : (picked?.filePaths || []);
       if (filePaths.length > 0) {
         for (const filePath of filePaths) {
-          await launcher.minecraftInstallModFile(filePath);
+          await launcher.minecraftInstallModFile(filePath, activeInstanceId);
         }
-        const updated = await launcher.minecraftGetInstalledMods();
-        if (Array.isArray(updated)) setMods(updated);
+        loadMods();
         pushToast({ tone: 'success', title: t('sidebar.modManager'), message: t('mods.modsImportedSuccess', { count: filePaths.length }) });
       }
     } catch (e) {
@@ -1030,7 +1079,7 @@ export default function App() {
         for (const file of files) {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
-          const res = await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: filePath, fileName: file.name });
+          const res = await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: filePath, fileName: file.name }, activeInstanceId);
           if (res?.ok) imported++;
         }
         if (imported > 0) {
@@ -1042,7 +1091,7 @@ export default function App() {
         for (const file of files) {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
-          const res = await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: filePath, fileName: file.name });
+          const res = await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: filePath, fileName: file.name }, activeInstanceId);
           if (res?.ok) imported++;
         }
         if (imported > 0) {
@@ -1054,7 +1103,7 @@ export default function App() {
         for (const file of files) {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
-          const res = await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: filePath, fileName: file.name });
+          const res = await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: filePath, fileName: file.name }, activeInstanceId);
           if (res?.ok) imported++;
         }
         if (imported > 0) {
@@ -1064,7 +1113,7 @@ export default function App() {
       } else {
         for (const file of files) {
           const filePath = file.path || file.name;
-          await launcher.minecraftInstallModFile(filePath);
+          await launcher.minecraftInstallModFile(filePath, activeInstanceId);
         }
         loadMods();
         pushToast({ tone: 'success', title: t('sidebar.modManager'), message: t('mods.modsImportedSuccess', { count: files.length }) });
@@ -1077,47 +1126,55 @@ export default function App() {
   // ── Load installed content ──
   const loadMods = useCallback(async () => {
     try {
-      const list = await launcher.minecraftGetInstalledMods?.();
+      const list = await launcher.minecraftGetInstalledMods?.(activeInstanceId);
       if (Array.isArray(list)) {
         setMods(list);
         persistState({ mods: list });
       }
     } catch { }
-  }, [persistState]);
+  }, [activeInstanceId, persistState]);
 
   const loadShaders = useCallback(async () => {
     try {
-      const list = await launcher.minecraftGetInstalledShaders?.();
+      const list = await launcher.minecraftGetInstalledShaders?.(activeInstanceId);
       if (Array.isArray(list)) {
         setShaders(list);
         persistState({ shaders: list });
       }
     } catch { }
-  }, [persistState]);
+  }, [activeInstanceId, persistState]);
 
   const loadResourcePacks = useCallback(async () => {
     try {
-      const list = await launcher.minecraftGetInstalledResourcePacks?.();
+      const list = await launcher.minecraftGetInstalledResourcePacks?.(activeInstanceId);
       if (Array.isArray(list)) {
         setResourcePacks(list);
         persistState({ resourcePacks: list });
       }
     } catch { }
-  }, [persistState]);
+  }, [activeInstanceId, persistState]);
 
   const loadDatapacks = useCallback(async () => {
     try {
-      const list = await launcher.minecraftGetInstalledDatapacks?.();
+      const list = await launcher.minecraftGetInstalledDatapacks?.(activeInstanceId);
       if (Array.isArray(list)) {
         setDatapacks(list);
         persistState({ datapacks: list });
       }
     } catch { }
-  }, [persistState]);
+  }, [activeInstanceId, persistState]);
+
+  // Synchronize content whenever activeInstanceId changes
+  useEffect(() => {
+    loadMods();
+    loadShaders();
+    loadResourcePacks();
+    loadDatapacks();
+  }, [activeInstanceId, loadMods, loadShaders, loadResourcePacks, loadDatapacks]);
 
   const handleDeleteShader = async (shader) => {
     try {
-      const res = await launcher.minecraftDeleteShader?.(shader.fileName);
+      const res = await launcher.minecraftDeleteShader?.(shader.fileName, activeInstanceId);
       if (res?.ok) {
         loadShaders();
         pushToast({ tone: 'success', title: t('mods.deleteShader'), message: `${shader.name || shader.fileName} removed.` });
@@ -1129,7 +1186,7 @@ export default function App() {
 
   const handleDeleteResourcePack = async (pack) => {
     try {
-      const res = await launcher.minecraftDeleteResourcePack?.(pack.fileName);
+      const res = await launcher.minecraftDeleteResourcePack?.(pack.fileName, activeInstanceId);
       if (res?.ok) {
         loadResourcePacks();
         pushToast({ tone: 'success', title: t('mods.deleteResourcePack'), message: `${pack.name || pack.fileName} removed.` });
@@ -1141,7 +1198,7 @@ export default function App() {
 
   const handleDeleteDatapack = async (pack) => {
     try {
-      const res = await launcher.minecraftDeleteDatapack?.(pack.fileName);
+      const res = await launcher.minecraftDeleteDatapack?.(pack.fileName, activeInstanceId);
       if (res?.ok) {
         loadDatapacks();
         pushToast({ tone: 'success', title: t('mods.deleteDatapack'), message: `${pack.name || pack.fileName} removed.` });
@@ -1154,7 +1211,7 @@ export default function App() {
   const handleOpenContentFolder = async (type) => {
     try {
       const targetType = type || (activeTab === 'shaders' ? 'shaders' : activeTab === 'resourcepacks' ? 'resourcepacks' : activeTab === 'datapacks' ? 'datapacks' : 'mods');
-      await launcher.minecraftOpenContentFolder?.(targetType);
+      await launcher.minecraftOpenContentFolder?.(targetType, activeInstanceId);
     } catch { }
   };
 
@@ -1193,9 +1250,11 @@ export default function App() {
   };
 
   // ── Modrinth Search & Install logic ──
+  const activeInstance = instances.find(i => i.id === activeInstanceId) || null;
+  const instanceLoader = String(activeInstance?.loader || '').toLowerCase();
   const profileLoader = String(activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
-  const currentLoader = profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('neoforge') ? 'neoforge' : profileLoader.includes('forge') ? 'forge' : profileLoader.includes('quilt') ? 'quilt' : '';
-  const rawMcVer = activeProfileVersion?.inheritsFrom || activeProfileVersion?.mcVer || activeVersion?.inheritsFrom || activeVersion?.mcVer || activeProfile?.version || activeVersion?.id || '';
+  const currentLoader = instanceLoader || (profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('neoforge') ? 'neoforge' : profileLoader.includes('forge') ? 'forge' : profileLoader.includes('quilt') ? 'quilt' : '');
+  const rawMcVer = activeInstance?.version || activeProfileVersion?.inheritsFrom || activeProfileVersion?.mcVer || activeVersion?.inheritsFrom || activeVersion?.mcVer || activeProfile?.version || activeVersion?.id || '';
   const currentMcVer = resolveMinecraftVersion(rawMcVer);
 
   const effectiveLoader = modrinthLoaderFilter === 'auto' ? currentLoader : (modrinthLoaderFilter === 'all' ? '' : modrinthLoaderFilter);
@@ -1615,7 +1674,7 @@ export default function App() {
       const loader = effectiveLoader || currentLoader || 'fabric';
       const gameVersion = effectiveMcVer || currentMcVer || '';
 
-      const res = await launcher.minecraftCheckModUpdates?.({ loader, gameVersion });
+      const res = await launcher.minecraftCheckModUpdates?.({ loader, gameVersion, instanceId: activeInstanceId });
       if (res?.updates) {
         setModUpdates(res.updates);
         const count = Object.keys(res.updates).filter(k => k.includes('.jar')).length;
@@ -1647,7 +1706,7 @@ export default function App() {
       checkingModUpdatesRef.current = false;
       setCheckingModUpdates(false);
     }
-  }, [isOnline, effectiveLoader, currentLoader, effectiveMcVer, currentMcVer, pushToast, t]);
+  }, [isOnline, effectiveLoader, currentLoader, effectiveMcVer, currentMcVer, activeInstanceId, pushToast, t]);
 
   const handleUpdateMod = async (updateInfo) => {
     if (!updateInfo) return;
@@ -1663,6 +1722,7 @@ export default function App() {
         fileName: updateInfo.targetFileName || updateInfo.fileName,
         loader,
         gameVersion,
+        instanceId: activeInstanceId,
       });
 
       if (res?.error) {
@@ -1893,7 +1953,11 @@ export default function App() {
 
   const handleOpenMinecraftDirectory = async () => {
     try {
-      await launcher.minecraftOpenRootDirectory?.();
+      if (activeInstanceId) {
+        await launcher.minecraftOpenContentFolder?.('instance', activeInstanceId);
+      } else {
+        await launcher.minecraftOpenRootDirectory?.();
+      }
     } catch (e) {
       addLog('error', `Failed to open directory: ${e?.message || e}`);
     }
@@ -2066,6 +2130,14 @@ export default function App() {
 
             <div className="sidebar-nav">
               <div
+                className={`nav-item ${activeTab === 'instances' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+                onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('instances'); }}
+              >
+                <span className="nav-icon"><Icon d={ICONS.layers} size={14} /></span>
+                <span>{t('sidebar.instances') || 'Instances'}</span>
+                <span className="nav-counter">{instances.length}</span>
+              </div>
+              <div
                 className={`nav-item ${activeTab === 'mods' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('mods'); }}
               >
@@ -2125,7 +2197,12 @@ export default function App() {
 
           {/* ── ACCOUNT AREA ── */}
           <div className="sidebar-account">
-            <div className="account-card">
+            <div
+              className="account-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setAccountModalOpen(true)}
+              title={t('accountModal.manageTitle')}
+            >
               <div className="account-avatar">
                 <img
                   key={`account-avatar-${profileAvatarName}`}
@@ -2223,6 +2300,13 @@ export default function App() {
                   {/* Library Group */}
                   <div className="tab-group">
                     <button
+                      className={`tab-btn ${activeTab === 'instances' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('instances')}
+                    >
+                      <Icon d={ICONS.layers} size={13} />
+                      <span>{t('sidebar.instances') || 'Instances'}</span>
+                    </button>
+                    <button
                       className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
                       onClick={() => setActiveTab('mods')}
                     >
@@ -2267,6 +2351,32 @@ export default function App() {
                 </div>
 
                 <div className="action-bar-actions">
+                  <div
+                    className={`environment-badge ${activeInstance ? 'is-instance' : 'is-global'}`}
+                    onClick={() => setActiveTab('instances')}
+                    title={activeInstance ? t('instances.managingInstance', { name: activeInstance.name }) : t('instances.managingGlobal')}
+                  >
+                    {activeInstance ? (
+                      <>
+                        <img
+                          src={getInstanceIconSrc(activeInstance.icon)}
+                          alt={activeInstance.name}
+                          className="env-icon"
+                        />
+                        <span className="env-name">
+                          {activeInstance.name}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon d={ICONS.folder} size={13} className="env-icon-svg" />
+                        <span className="env-name">
+                          {t('instances.globalInstallation')}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
                   {!isOnline && (
                     <div className="offline-pill" title={t('offline.newsDesc')}>
                       <Icon d={ICONS.wifiOff} size={12} />
@@ -2314,6 +2424,58 @@ export default function App() {
                   </div>
                 </div>
               ) : null}
+
+              <InstancesTab
+                active={activeTab === 'instances'}
+                instances={instances}
+                activeInstanceId={activeInstanceId}
+                onSelectInstance={(id) => {
+                  setActiveInstanceId(id);
+                  persistState({ activeInstanceId: id });
+                }}
+                onPlayInstance={(inst) => {
+                  setActiveInstanceId(inst.id);
+                  persistState({ activeInstanceId: inst.id });
+                  handlePlay();
+                }}
+                onCreateInstanceClick={() => {
+                  setInstanceEditor({ mode: 'create', instance: null });
+                }}
+                onMigrateClick={() => {
+                  setMigrateModalOpen(true);
+                }}
+                onEditInstanceClick={(inst) => {
+                  setInstanceEditor({ mode: 'edit', instance: inst });
+                }}
+                onDeleteInstanceClick={(inst) => {
+                  setConfirmDialog({
+                    title: t('instances.delete'),
+                    message: t('instances.deleteConfirm', { name: inst.name }),
+                    confirmText: t('common.delete') || 'Delete',
+                    danger: true,
+                    onConfirm: async () => {
+                      setConfirmDialog(null);
+                      await launcher.deleteInstance(inst.id);
+                      const updated = await launcher.getInstances();
+                      setInstances(updated);
+                      if (activeInstanceId === inst.id) {
+                        const fallbackId = updated[0]?.id || null;
+                        setActiveInstanceId(fallbackId);
+                        persistState({ activeInstanceId: fallbackId });
+                      }
+                      pushToast({
+                        tone: 'info',
+                        title: t('instances.deletedTitle'),
+                        message: t('instances.deletedMessage', { name: inst.name }),
+                      });
+                    },
+                  });
+                }}
+                onOpenFolderClick={(id) => {
+                  launcher.minecraftOpenContentFolder('instance', id);
+                }}
+                runningInstanceId={gameState === 'running' ? activeInstanceId : null}
+              />
 
               <NewsTab
                 active={activeTab === 'news'}
@@ -2482,19 +2644,6 @@ export default function App() {
                   {loaderBadgeLabel}
                 </span>
               </div>
-
-              {/* RAM meter */}
-              <div className="ram-pill">
-                <span>{activeProfile?.ram || 4} GB</span>
-                <div className="ram-gauge">
-                  <div
-                    className="ram-gauge-fill"
-                    style={{
-                      width: `${Math.min(100, ((activeProfile?.ram || 4) / (systemTotalRam || Math.max(activeProfile?.ram || 4, 4))) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
             </div>
 
             {/* Play Button Action */}
@@ -2543,6 +2692,102 @@ export default function App() {
       </div>
 
       {/* ── MODALS ── */}
+      {instanceEditor && (
+        <InstanceModal
+          mode={instanceEditor.mode}
+          instance={instanceEditor.instance}
+          availableVersions={installedVersions}
+          systemTotalRam={systemTotalRam}
+          onClose={() => setInstanceEditor(null)}
+          onSave={async (instanceData) => {
+            if (instanceEditor.mode === 'create') {
+              const res = await launcher.createInstance(instanceData);
+              if (res?.ok && res?.instance) {
+                const updated = await launcher.getInstances();
+                setInstances(updated);
+                setActiveInstanceId(res.instance.id);
+                pushToast({
+                  tone: 'success',
+                  title: t('instances.createdTitle'),
+                  message: t('instances.createdMessage', { name: instanceData.name }),
+                });
+              }
+            } else {
+              const res = await launcher.updateInstance(instanceData.id, instanceData);
+              if (res?.ok) {
+                const updated = await launcher.getInstances();
+                setInstances(updated);
+                pushToast({
+                  tone: 'success',
+                  title: t('instances.savedTitle'),
+                  message: t('instances.savedMessage'),
+                });
+              }
+            }
+          }}
+        />
+      )}
+      {migrateModalOpen && (
+        <MigrateInstanceModal
+          availableVersions={installedVersions}
+          systemTotalRam={systemTotalRam}
+          onClose={() => setMigrateModalOpen(false)}
+          onMigrate={async (migrateData) => {
+            const res = await launcher.migrateBaseToInstance(migrateData);
+            if (res?.ok && res?.instance) {
+              const updated = await launcher.getInstances();
+              setInstances(updated);
+              setActiveInstanceId(res.instance.id);
+              pushToast({
+                tone: 'success',
+                title: t('migration.successTitle'),
+                message: t(res.mode === 'converted' ? 'migration.convertedMessage' : 'migration.copiedMessage', { name: res.instance.name }),
+              });
+            } else {
+              pushToast({
+                tone: 'critical',
+                title: t('common.error') || 'Error',
+                message: res?.message || 'Migration failed',
+              });
+            }
+          }}
+        />
+      )}
+      {accountModalOpen && (
+        <AccountModal
+          currentAccount={account}
+          loginLoading={loginLoading}
+          onClose={() => setAccountModalOpen(false)}
+          onSaveOfflineName={(newName) => {
+            if (!activeProfile) return;
+            setProfiles(prev => {
+              const next = prev.map(p => p.id === activeProfile.id ? { ...p, localName: newName, name: newName } : p);
+              persistState({ profiles: next, activeProfileId: activeProfile.id });
+              return next;
+            });
+            setAccount(prev => ({
+              ...prev,
+              name: newName,
+              loggedIn: true,
+              kind: 'local',
+              session: createOfflineSession(newName),
+            }));
+            pushToast({
+              tone: 'success',
+              title: t('accountModal.accountUpdatedTitle'),
+              message: t('accountModal.accountUpdatedMessage', { name: newName }),
+            });
+          }}
+          onLoginMicrosoft={() => {
+            setAccountModalOpen(false);
+            handleLogin();
+          }}
+          onLogout={() => {
+            setAccountModalOpen(false);
+            handleLogout();
+          }}
+        />
+      )}
       {profileEditor && (
         <ProfileModal
           mode={profileEditor.mode}
@@ -2619,6 +2864,17 @@ export default function App() {
           updateInfo={updateModalInfo}
           onClose={() => setUpdateModalInfo(null)}
           onInstall={handleApplyUpdate}
+        />
+      )}
+      {confirmDialog && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmText={confirmDialog.confirmText}
+          cancelText={confirmDialog.cancelText}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onClose={() => setConfirmDialog(null)}
         />
       )}
     </>

@@ -643,14 +643,21 @@ select option {
   transform: translateZ(0);
   gap: 12px;
   z-index: 5;
+  min-width: 0;
 }
 
 .action-bar-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
-  min-width: max-content;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.action-bar-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-group {
@@ -661,6 +668,7 @@ select option {
   padding: 3px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 .tab-group-divider {
@@ -668,6 +676,7 @@ select option {
   height: 18px;
   background: var(--border-medium);
   opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .tab-btn {
@@ -703,9 +712,100 @@ select option {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
   justify-content: flex-end;
-  min-width: 0;
+  margin-left: auto;
+}
+
+/* Environment Badge (Active Instance vs Global) */
+.environment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  max-width: 220px;
+  flex-shrink: 0;
+}
+
+.environment-badge.is-instance {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(88, 166, 255, 0.45);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.environment-badge.is-instance:hover {
+  background: rgba(51, 65, 85, 0.95);
+  border-color: #58a6ff;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+}
+
+.environment-badge.is-global {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.environment-badge.is-global:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
+  transform: translateY(-1px);
+}
+
+.environment-badge .env-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.environment-badge.is-instance .env-tag {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.environment-badge.is-global .env-tag {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+}
+
+.environment-badge .env-icon {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.environment-badge .env-icon-svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.environment-badge .env-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environment-badge.is-instance .env-name {
+  color: #e2e8f0;
+}
+
+.environment-badge.is-global .env-name {
+  color: var(--text-muted);
 }
 
 .btn-secondary {
@@ -739,38 +839,51 @@ select option {
   cursor: not-allowed;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1550px) {
+
   .action-bar {
-    align-items: stretch;
-    flex-wrap: wrap;
-    gap: 8px;
     padding: 8px 12px;
+    gap: 10px;
   }
 
-  .action-bar-tabs,
-  .action-bar-actions {
-    flex: 0 1 auto;
-    width: max-content;
-    max-width: 100%;
+  .tab-btn {
+    padding: 5px 8px;
+    gap: 5px;
   }
 
-  .action-bar-tabs {
-    overflow-x: auto;
-    justify-content: flex-start;
+  .environment-badge {
+    max-width: 140px;
+    padding: 4px 8px;
+    gap: 5px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .tab-btn span {
+    display: none;
   }
 
-  .action-bar-actions {
-    align-self: flex-start;
-    justify-content: flex-start;
-    gap: 6px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 2px;
+  .tab-btn {
+    padding: 6px 8px;
   }
 
-  .action-bar-actions>.btn-secondary,
-  .action-bar-actions>.offline-pill {
-    flex: 0 0 auto;
+  .action-bar-actions .btn-primary span {
+    display: none;
+  }
+
+  .action-bar-actions .btn-primary {
+    padding: 6px 10px !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .environment-badge .env-name {
+    display: none;
+  }
+
+  .environment-badge {
+    padding: 3px 6px;
+    gap: 4px;
   }
 }
 
@@ -1334,6 +1447,250 @@ select option {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 160px;
+}
+
+/* ── INSTANCES GRID & CARDS ── */
+.instances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 360px));
+  gap: 16px;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+.instance-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.instance-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: var(--shadow-card);
+}
+
+.instance-card.is-active {
+  background: rgba(74, 158, 255, 0.08);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.12);
+}
+
+.instance-card.is-active:hover {
+  background: rgba(74, 158, 255, 0.11);
+  border-color: var(--accent-bright);
+}
+
+.instance-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.instance-card-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  padding: 6px;
+  transition: border-color 0.15s ease;
+}
+
+.instance-card.is-active .instance-card-icon-wrapper {
+  border-color: var(--accent);
+}
+
+.instance-card-icon-img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.instance-card-title-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instance-card-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.instance-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.instance-card-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.instance-tag-version {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.instance-tag-loader {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.instance-tag-loader.fabric {
+  background: rgba(74, 158, 255, 0.15);
+  color: #58a6ff;
+}
+
+.instance-tag-loader.forge {
+  background: rgba(255, 140, 0, 0.15);
+  color: #ffa657;
+}
+
+.instance-tag-loader.neoforge {
+  background: rgba(255, 80, 0, 0.15);
+  color: #ff7b72;
+}
+
+.instance-tag-loader.quilt {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.instance-tag-loader.vanilla {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.instance-active-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.instance-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 10px;
+  gap: 8px;
+}
+
+.instance-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+  min-width: 0;
+}
+
+.instance-card-actions .btn-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.instance-card-actions .btn-select span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instance-card-actions .btn-play {
+  padding: 7px 11px;
+  color: #58a6ff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.instance-card-actions .btn-icon-only {
+  padding: 7px 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instance-card-actions .btn-icon-only:hover {
+  color: var(--text-primary);
+}
+
+.instance-card-actions .btn-delete:hover {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-subtle);
+}
+
+@media (max-width: 768px) {
+  .instances-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .mod-card-actions {
@@ -4799,4 +5156,4 @@ select option {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
+}

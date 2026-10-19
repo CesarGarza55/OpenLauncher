@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { spawn } from 'child_process';
-import { getMinecraftRoot } from './paths.js';
+import { getMinecraftRoot, getInstanceDir } from './paths.js';
 import {
   findJavaCommand,
   resolveJavaCommand,
@@ -247,7 +247,7 @@ export function parseFabricModConflict(logText) {
 }
 
 export async function launchMinecraft(opts, { onLog = null, onAssetProgress = null, onExit = null, onConflict = null } = {}) {
-  const { profile, version: rawVersion } = opts || {};
+  const { profile, version: rawVersion, instanceId } = opts || {};
   let version = rawVersion || profile?.version || null;
   if (typeof version === 'string') {
     version = { id: version, label: version, mcVer: version, type: 'vanilla' };
@@ -255,6 +255,7 @@ export async function launchMinecraft(opts, { onLog = null, onAssetProgress = nu
   const rawId = String(version?.id || profile?.version || (typeof rawVersion === 'string' ? rawVersion : rawVersion?.id) || '').trim();
   const mcVer = resolveMinecraftVersion(version) || resolveMinecraftVersion(rawId) || rawId;
   const baseDir = getMinecraftRoot();
+  const gameDir = instanceId ? getInstanceDir(instanceId) : baseDir;
   const versionDir = version?.path && String(version.path).trim()
     ? String(version.path).trim()
     : path.join(baseDir, 'versions', rawId || mcVer);
@@ -522,7 +523,7 @@ export async function launchMinecraft(opts, { onLog = null, onAssetProgress = nu
     '${auth_access_token}': normalizedSession.accessToken,
     '${auth_session}': normalizedSession.accessToken,
     '${version_name}': versionJson?.id || mcVer,
-    '${game_directory}': baseDir,
+    '${game_directory}': gameDir,
     '${assets_root}': path.join(baseDir, 'assets'),
     '${assets_index_name}': versionJson?.assets || '',
     '${user_type}': normalizedSession.userType,
@@ -588,7 +589,7 @@ export async function launchMinecraft(opts, { onLog = null, onAssetProgress = nu
   } else {
     gameArgs.push('--username', normalizedSession.name);
     gameArgs.push('--version', versionJson?.id || mcVer);
-    gameArgs.push('--gameDir', baseDir);
+    gameArgs.push('--gameDir', gameDir);
     gameArgs.push('--assetsDir', path.join(baseDir, 'assets'));
     gameArgs.push('--assetIndex', versionJson?.assets || 'legacy');
     gameArgs.push('--uuid', normalizedSession.uuid);
@@ -599,7 +600,7 @@ export async function launchMinecraft(opts, { onLog = null, onAssetProgress = nu
 
   if (!gameArgs.includes('--username')) gameArgs.push('--username', normalizedSession.name);
   if (!gameArgs.includes('--version')) gameArgs.push('--version', versionJson?.id || mcVer);
-  if (!gameArgs.includes('--gameDir')) gameArgs.push('--gameDir', baseDir);
+  if (!gameArgs.includes('--gameDir')) gameArgs.push('--gameDir', gameDir);
   if (!gameArgs.includes('--assetsDir')) gameArgs.push('--assetsDir', path.join(baseDir, 'assets'));
   if (!gameArgs.includes('--assetIndex')) gameArgs.push('--assetIndex', String(versionJson?.assets || versionJson?.assetIndex?.id || 'legacy'));
   if (!gameArgs.includes('--uuid')) gameArgs.push('--uuid', normalizedSession.uuid);
