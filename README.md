@@ -47,11 +47,12 @@ The current Electron-based version represents a complete rewrite with improved p
 ## Features
 
 - **Microsoft & Offline Profiles**: Secure authentication via official Microsoft OAuth, plus offline local profile support.
+- **Full Instance Isolation**: Create, edit, and launch independent game instances with isolated mods, resource packs, shaders, datapacks, saves, and screenshots. Includes custom icons, custom JVM arguments, and 1-click migration from `.minecraft`.
 - **Modrinth Hub (Mods, Shaders & Texture Packs)**: Direct online browsing and 1-click installation of mods, shaders, and resource packs with auto-dependency resolution and update checks.
-- **My Library Management**: Dedicated tabs for local Mods, Shaders, and Texture Packs with live item counts and folder access.
+- **My Library Management**: Dedicated tabs for local Mods, Shaders, Resource Packs, and Data Packs scoped dynamically to the active instance or global `.minecraft`.
 - **Fabric Conflict & Incompatibility Auto-Fixer**: Diagnoses Fabric crash logs and harmonizes mod versions in 1 click.
 - **Unified Version Installer**: Fast installation of **Vanilla**, **Fabric**, **Forge**, **NeoForge**, and **Quilt** versions with live Minecraft Snapshot support.
-- **Fine-Tuned Performance**: Per-profile RAM allocation, custom Java paths, and smart version-aware JVM garbage collection presets (Generational ZGC for Java 21+, Aikar's G1GC for Java 8–17).
+- **Fine-Tuned Performance**: Per-profile and per-instance RAM allocation, custom Java paths, and smart version-aware JVM garbage collection presets (Generational ZGC for Java 21+, Aikar's G1GC for Java 8–17).
 - **News Feed & Customization**: Integrated official Minecraft news, multi-language support (EN, ES, FR), and auto-updater.
 
 ---
@@ -61,7 +62,7 @@ The current Electron-based version represents a complete rewrite with improved p
 ### Main Dashboard
 Quick access to profiles, version selectors, installed mods, real-time console output, official news, and launcher settings.
 
-<img width="1552" height="897" alt="main" src="https://github.com/user-attachments/assets/a4af4e79-3d3a-4cc8-a204-c68590a3a285" />
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/19971ff9-a8e4-4153-9f7f-a3efc6af4d50" />
 
 <details>
 <summary><b>View Interface Details & Screenshots (Versions, Settings, Microsoft Login, Mod Manager, Auto-Fixer)</b></summary>
@@ -69,12 +70,12 @@ Quick access to profiles, version selectors, installed mods, real-time console o
 #### Version Installation
 Install Vanilla, Fabric, Forge, NeoForge, or Quilt versions with automatic catalog loading and snapshot filters:
 
-<img width="1552" height="897" alt="install" src="https://github.com/user-attachments/assets/944507af-bbcd-440a-be27-e3dfc2e82222" />
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/5f83e287-7039-456c-854a-eed8e1900a3a" />
 
 #### Settings & Customization
 Configure game directories, custom Java JREs, auto-updates, JVM arguments, and language options:
 
-<img width="1552" height="897" alt="settings" src="https://github.com/user-attachments/assets/7a38ccaa-a320-4269-969e-052dcd4115a3" />
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/896a5e22-9184-4d43-b7b3-758b78b5e91c" />
 
 #### Optimized Dynamic JVM Arguments
 OpenLauncher dynamically applies the best Garbage Collector flags based on the detected Java runtime:
@@ -98,14 +99,29 @@ Authenticate securely with your official Minecraft-entitled Microsoft account:
 <img width="279" height="94" alt="Microsoft Authentication" src="https://github.com/user-attachments/assets/5f036741-7007-45f2-819e-034146bd4ba5" />
 
 #### Mod, Shaders & Texture Packs Manager & Modrinth Browser (Beta)
-Browse thousands of mods, shaders and texture packs, check installed mod updates against Modrinth hashes, and drag-and-drop files:
+Browse thousands of mods, shaders, texture packs and data packs check installed mod updates against Modrinth hashes, and drag-and-drop files:
 
-<img width="1552" height="897" alt="Modrinth" src="https://github.com/user-attachments/assets/1cfbc784-adf3-4e34-a22a-0aa5fa1c2ee4" />
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/749d04a5-89c8-4a4d-8d81-429ef046b3e3" />
 
 #### Mod Incompatibility Auto-Fixer
 When Fabric detects conflicting mods, OpenLauncher parses the diagnostic tree and applies harmonized versions in one action:
 
 <img width="1552" height="897" alt="Mod Auto-Fixer" src="https://github.com/user-attachments/assets/3a76a061-743c-4cb0-b00c-aec1b5e64aed" />
+
+#### Instance Creation & Profile Management
+Create separate Minecraft instances to run distinct modpacks, loaders, versions, and configurations without interference:
+- **Dedicated Game Directories**: Keeps `.minecraft/instances/<id>` fully isolated (mods, config, saves, resource packs, shaders, data packs).
+- **Scope-Aware Content Management**: Selecting an active instance automatically shifts your Mods, Shaders, Resource Packs, and Data Packs tabs to that instance.
+- **Custom Visuals & Performance**: Pick standard pixel-perfect Minecraft block icons or upload your own custom image (`.png`, `.jpg`, `.webp`, `.svg`), with individual RAM and JVM argument overrides.
+
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/287319dd-d921-4c37-9767-890c8e06794b" />
+
+#### Instance Migration Wizard
+Easily transition from a traditional shared `.minecraft` directory to an isolated setup without losing your progress:
+- **Non-Destructive Cloning**: Safely copies existing mods, configs, shaders, resource packs, and world saves into a dedicated new instance.
+- **Automatic Loader & Version Detection**: Identifies the currently installed Fabric, Forge, NeoForge, Quilt, or Vanilla environment to preserve modpack compatibility.
+
+<img width="1478" height="851" alt="image" src="https://github.com/user-attachments/assets/9380ecef-212f-45fb-bee6-dda1651c3caf" />
 
 </details>
 
@@ -167,11 +183,11 @@ Generates `OpenLauncher.deb` (Debian/Ubuntu) and `OpenLauncher-Portable-Linux.ta
 
 ## Testing & Benchmarks
 
-- **Hardware**: Apple M1 (8-core CPU / 8-core GPU), 8GB Unified Memory, macOS Tahoe 26.x
-- **Setup**: OpenLauncher 1.1.2, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.19.5
+- **Hardware**: AMD Ryzen 5 5600G (6-core / 12-thread), AMD Radeon RX 580 (8GB VRAM), 32GB DDR4 RAM, Windows 11 Pro x64
+- **Setup**: OpenLauncher 1.1.4, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.1845, Custom Mods (Distant Horizons, Iris, Sodium, etc.)
 - **Shaders**: [MakeUp-UltraFast-9.5e](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
-<img width="1440" height="752" alt="Test" src="https://github.com/user-attachments/assets/3021a02e-da62-4d22-89d9-966568702607" />
+<img width="1425" height="901" alt="image" src="https://github.com/user-attachments/assets/2a24a96d-055e-4a53-85bb-8ea3fbfed841" />
 
 ---
 
@@ -181,7 +197,7 @@ OpenLauncher utilizes **Electron + React 19** to deliver a unified, cross-platfo
 
 Rather than letting Chromium consume unnecessary memory while you play, OpenLauncher is engineered specifically for maximum performance and resource efficiency:
 
-### 1. Zero-Overhead Mode (0 MB RAM / 0% CPU)
+### 1. Zero-Overhead Mode
 When set to **"Close launcher completely"**, OpenLauncher terminates Electron entirely upon starting Minecraft, freeing **100% of its RAM** for your game. A native OS background supervisor (`/bin/sh` on macOS/Linux, PowerShell on Windows) monitors the game's PID with near-zero overhead (< 2 MB) and automatically relaunches OpenLauncher the moment Minecraft closes.
 
 ### 2. Background Throttling & Memory Cleansing
