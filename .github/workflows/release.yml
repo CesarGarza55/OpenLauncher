@@ -116,10 +116,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y npm nodejs
-          npm install
+        run: npm install
 
       - name: Build renderer
         run: npm run build
