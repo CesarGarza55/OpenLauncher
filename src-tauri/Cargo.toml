@@ -23,7 +23,7 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 futures-util = "0.3"
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0", default-features = false, features = ["deflate"] }
 sha1 = "0.10"
 sha2 = "0.10"
 base64 = "0.22"
