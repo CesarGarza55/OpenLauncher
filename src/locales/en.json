@@ -471,6 +471,7 @@
     "chooseCustomIcon": "Choose custom image...",
     "removeCustomIcon": "Remove custom icon",
     "versionLabel": "Minecraft version",
+    "versionManagedByInstance": "Version is managed in the selected instance settings.",
     "loaderLabel": "Modloader",
     "autoDetected": "Auto-detected from version",
     "allocatedRam": "Allocated RAM: {ram} GB",

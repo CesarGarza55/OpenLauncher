@@ -2,8 +2,8 @@
 set -e
 
 # ==============================================================================
-# OpenLauncher - Interactive Linux 
-# Build packages for Debian (.deb), AppImage, tar.gz, and Arch Linux
+# OpenLauncher - Interactive Linux
+# Build packages for Debian (.deb), AppImage, tar.gz, and standalone binary
 # ==============================================================================
 
 # ANSI Color Palette
@@ -26,7 +26,7 @@ NC='\033[0m'
 print_banner() {
     clear
     echo ""
-    echo -e "  ${BRIGHT_CYAN}◆${NC} ${BOLD}OpenLauncher${NC} ${DIM}•${NC} ${BRIGHT_BLUE}Linux${NC}"
+    echo -e "  ${BRIGHT_CYAN}◆${NC} ${BOLD}OpenLauncher${NC} ${DIM}•${NC} ${BRIGHT_BLUE}Linux (Tauri + Rust)${NC}"
     echo -e "  ${DIM}───────────────────────────────────────────────────────${NC}"
     echo ""
 }
@@ -79,8 +79,15 @@ check_prerequisites() {
         exit 1
     fi
     
+    if ! command -v cargo >/dev/null 2>&1; then
+        print_error "Rust / Cargo is not installed! Please install Rust (https://rustup.rs)"
+        exit 1
+    fi
+    
     NODE_VER=$(node -v)
+    RUST_VER=$(cargo --version)
     print_info "Node.js:     ${GREEN}${NODE_VER}${NC}"
+    print_info "Rust/Cargo:  ${GREEN}${RUST_VER}${NC}"
     print_info "Package Mgr: ${GREEN}${PKG_MGR}${NC}"
     
     if [ "$PKG_MGR" = "none" ]; then
@@ -100,6 +107,7 @@ check_prerequisites() {
 clean_build_cache() {
     print_step 2 4 "Cleaning Workspace & Release Cache"
     rm -rf release dist
+    mkdir -p release
     print_success "Build directory cleaned"
 }
 
@@ -109,10 +117,28 @@ compile_renderer() {
     print_success "Vite bundle compiled into dist/"
 }
 
-package_linux() {
-    local target="$1"
-    print_step 4 4 "Packaging Linux Target (${target})"
-    $PKG_EXEC electron-builder --linux "$target"
+package_linux_tauri() {
+    local bundles="$1"
+    print_step 4 4 "Packaging Linux Target (${bundles})"
+    
+    if [ "$bundles" = "tar.gz" ]; then
+        $PKG_EXEC tauri build --no-bundle
+        mkdir -p release
+        tar -czvf release/OpenLauncher.tar.gz -C src-tauri/target/release openlauncher
+    elif [ "$bundles" = "dir" ]; then
+        $PKG_EXEC tauri build --no-bundle
+        mkdir -p release/linux-unpacked
+        cp src-tauri/target/release/openlauncher release/linux-unpacked/OpenLauncher
+    else
+        $PKG_EXEC tauri build --bundles "$bundles"
+        mkdir -p release
+        if [ -d "src-tauri/target/release/bundle/deb" ]; then
+            cp -f src-tauri/target/release/bundle/deb/*.deb release/ 2>/dev/null || true
+        fi
+        if [ -d "src-tauri/target/release/bundle/appimage" ]; then
+            cp -f src-tauri/target/release/bundle/appimage/*.AppImage release/ 2>/dev/null || true
+        fi
+    fi
     print_success "Linux package created"
 }
 
@@ -127,7 +153,7 @@ show_summary() {
     
     if [ -d "release" ]; then
         echo -e "  ${DIM}Generated packages:${NC}"
-        find release -maxdepth 1 -type f \( -name "*.deb" -o -name "*.tar.gz" -o -name "*.AppImage" \) -exec ls -lh {} + 2>/dev/null | awk '{print "    " $9 " (" $5 ")"}'
+        find release -maxdepth 2 -type f \( -name "*.deb" -o -name "*.tar.gz" -o -name "*.AppImage" -o -name "OpenLauncher" \) -exec ls -lh {} + 2>/dev/null | awk '{print "    " $9 " (" $5 ")"}'
     fi
     
     echo ""
@@ -143,11 +169,12 @@ echo -e "   • Package Mgr:  ${MAGENTA}${PKG_MGR}${NC}\n"
 
 echo -e " ${BOLD}Select Target Linux Format:${NC}"
 echo -e "   ${BRIGHT_CYAN}[1]${NC} 📦 Debian / Ubuntu Package (.deb) ${DIM}[Recommended for Debian/Ubuntu]${NC}"
-echo -e "   ${BRIGHT_CYAN}[2]${NC} 🗜️  Portable Archive (.tar.gz)     ${DIM}[Arch, Fedora, generic Linux]${NC}"
-echo -e "   ${BRIGHT_CYAN}[3]${NC} 🚀 Full Bundle (.deb + .tar.gz)"
-echo -e "   ${BRIGHT_CYAN}[4]${NC} 📂 Unpacked Directory (linux-unpacked)"
-echo -e "   ${BRIGHT_CYAN}[5]${NC} ⚡ Frontend Build Only"
-read -p " Select [1-5] (default: 1): " target_choice
+echo -e "   ${BRIGHT_CYAN}[2]${NC} 🚀 Universal AppImage (.AppImage) ${DIM}[All Linux distributions]${NC}"
+echo -e "   ${BRIGHT_CYAN}[3]${NC} 🗜️  Portable Archive (.tar.gz)     ${DIM}[Arch, Fedora, generic Linux]${NC}"
+echo -e "   ${BRIGHT_CYAN}[4]${NC} 🌟 Full Bundle (.deb + .AppImage + .tar.gz)"
+echo -e "   ${BRIGHT_CYAN}[5]${NC} 📂 Unpacked Directory (linux-unpacked)"
+echo -e "   ${BRIGHT_CYAN}[6]${NC} ⚡ Frontend Build Only"
+read -p " Select [1-6] (default: 1): " target_choice
 target_choice=${target_choice:-1}
 
 clear
@@ -157,36 +184,44 @@ case $target_choice in
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_linux deb
+        package_linux_tauri "deb"
         show_summary
         ;;
     2)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_linux "tar.gz"
+        package_linux_tauri "appimage"
         show_summary
         ;;
     3)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_linux deb
-        package_linux "tar.gz"
+        package_linux_tauri "tar.gz"
         show_summary
         ;;
     4)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_linux dir
+        package_linux_tauri "deb,appimage"
+        # Also build tar.gz
+        tar -czvf release/OpenLauncher.tar.gz -C src-tauri/target/release openlauncher
         show_summary
         ;;
     5)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        print_success "Frontend compilation complete!"
+        package_linux_tauri "dir"
+        show_summary
+        ;;
+    6)
+        check_prerequisites
+        clean_build_cache
+        compile_renderer
+        print_success "Frontend compilation complete! (dist/ is ready)"
         ;;
     *)
         print_error "Invalid choice. Exiting."

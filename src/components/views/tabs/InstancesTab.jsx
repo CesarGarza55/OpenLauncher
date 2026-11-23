@@ -76,6 +76,7 @@ export function InstancesTab({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={t('instances.searchPlaceholder')}
+            aria-label={t('instances.searchPlaceholder')}
             style={{ paddingLeft: 32, height: 36 }}
           />
           <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>
@@ -83,6 +84,8 @@ export function InstancesTab({
           </div>
           {search && (
             <button
+              type="button"
+              aria-label={t('common.clear') || 'Clear search'}
               onClick={() => setSearch('')}
               style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
             >
@@ -148,7 +151,6 @@ export function InstancesTab({
           {/* Card: Global Installation (.minecraft) */}
           {!search && (
             <div
-              onClick={() => onSelectInstance(null)}
               className={`instance-card ${!activeInstanceId ? 'is-active' : ''}`}
             >
               <div className="instance-card-header">
@@ -174,19 +176,21 @@ export function InstancesTab({
 
               <div className="instance-card-actions">
                 <button
+                  type="button"
                   className="btn btn-secondary btn-icon-only"
                   onClick={(e) => {
-                    e.stopPropagation();
                     onOpenFolderClick(null);
                   }}
                   title={t('instances.openFolder')}
+                  aria-label={t('instances.openFolder')}
                 >
                   <Icon d={ICONS.folder} size={13} />
                 </button>
                 <button
+                  type="button"
                   className={`btn btn-select ${!activeInstanceId ? 'btn-primary' : 'btn-secondary'}`}
+                  aria-pressed={!activeInstanceId}
                   onClick={(e) => {
-                    e.stopPropagation();
                     onSelectInstance(null);
                   }}
                 >
@@ -204,7 +208,6 @@ export function InstancesTab({
             return (
               <div
                 key={inst.id}
-                onClick={() => onSelectInstance(inst.id)}
                 className={`instance-card ${isActive ? 'is-active' : ''}`}
               >
                 {/* Header: Icon, Name & Status */}
@@ -212,7 +215,7 @@ export function InstancesTab({
                   <div className="instance-card-icon-wrapper">
                     <img
                       src={getInstanceIconSrc(inst.icon)}
-                      alt={inst.name}
+                      alt=""
                       className="instance-card-icon-img"
                     />
                   </div>
@@ -254,58 +257,53 @@ export function InstancesTab({
                 {/* Action buttons */}
                 <div className="instance-card-actions">
                   <button
+                    type="button"
                     className={`btn btn-select ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectInstance(inst.id);
-                    }}
+                    aria-pressed={isActive}
+                    onClick={() => onSelectInstance(inst.id)}
                   >
                     <Icon d={isActive ? ICONS.check : ICONS.layers} size={13} />
                     <span>{isActive ? t('instances.selectedInstance') : t('instances.selectInstance')}</span>
                   </button>
 
                   <button
+                    type="button"
                     className="btn btn-secondary btn-play"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlayInstance(inst);
-                    }}
+                    onClick={() => onPlayInstance(inst)}
                     disabled={isRunning}
                     title={t('instances.play')}
+                    aria-label={isRunning ? t('instances.playing') : `${t('instances.play')} ${inst.name}`}
                   >
                     <Icon d={isRunning ? ICONS.stop : ICONS.play} size={13} />
                     <span>{isRunning ? t('instances.playing') : t('instances.play')}</span>
                   </button>
 
                   <button
+                    type="button"
                     className="btn btn-secondary btn-icon-only"
                     title={t('instances.openFolder')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenFolderClick(inst.id);
-                    }}
+                    aria-label={`${t('instances.openFolder')} ${inst.name}`}
+                    onClick={() => onOpenFolderClick(inst.id)}
                   >
                     <Icon d={ICONS.folder} size={13} />
                   </button>
 
                   <button
+                    type="button"
                     className="btn btn-secondary btn-icon-only"
                     title={t('instances.settings')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditInstanceClick(inst);
-                    }}
+                    aria-label={`${t('instances.settings')} ${inst.name}`}
+                    onClick={() => onEditInstanceClick(inst)}
                   >
                     <Icon d={ICONS.settings} size={14} />
                   </button>
 
                   <button
+                    type="button"
                     className="btn btn-secondary btn-icon-only btn-delete"
                     title={t('instances.delete')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteInstanceClick(inst);
-                    }}
+                    aria-label={`${t('instances.delete')} ${inst.name}`}
+                    onClick={() => onDeleteInstanceClick(inst)}
                   >
                     <Icon d={ICONS.trash} size={14} />
                   </button>

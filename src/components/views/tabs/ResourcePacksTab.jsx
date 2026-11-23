@@ -123,7 +123,12 @@ export function ResourcePacksTab({
                   </div>
                   <div className="installed-pack-meta">
                     <span className="installed-pack-title" title={pack.name}>{pack.name}</span>
-                    <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
+                    <div className="installed-pack-sub">
+                      {pack.authors ? (
+                        <span className="installed-pack-author" title={pack.authors}>by {pack.authors}</span>
+                      ) : null}
+                      <span className="installed-pack-file" title={pack.fileName}>{pack.fileName}</span>
+                    </div>
                   </div>
                 </div>
                 {pack.description && (

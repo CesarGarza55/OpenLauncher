@@ -471,6 +471,7 @@
     "chooseCustomIcon": "Choisir une image personnalisée...",
     "removeCustomIcon": "Supprimer l'icône personnalisée",
     "versionLabel": "Version de Minecraft",
+    "versionManagedByInstance": "La version est définie dans les paramètres de l’instance sélectionnée.",
     "loaderLabel": "Modloader",
     "autoDetected": "Détecté automatiquement",
     "allocatedRam": "RAM allouée : {ram} Go",

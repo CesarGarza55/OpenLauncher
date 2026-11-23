@@ -2,14 +2,14 @@
   <img width="96px" src="public/icon.webp" alt="OpenLauncher" />
   <h1 align="center">OpenLauncher</h1>
   <p align="center">
-    A fast, modern, and open-source Minecraft launcher built with <b>React</b> and <b>Electron</b> for <b>Windows</b>, <b>macOS</b>, and <b>Linux</b>.
+    A fast, modern, and open-source Minecraft launcher built with <b>React</b> and <b>Tauri 2</b> for <b>Windows</b>, <b>macOS</b>, and <b>Linux</b>.
   </p>
 </p>
 
 <p align="center">
   <a href="https://github.com/CesarGarza55/OpenLauncher/releases"><img alt="Latest Release" src="https://img.shields.io/github/v/release/CesarGarza55/OpenLauncher?style=flat&color=3b82f6" /></a>
   <img alt="License" src="https://img.shields.io/badge/License-GPL--2.0-blue.svg?style=flat" />
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-33+-47848F?style=flat&logo=electron&logoColor=white" />
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-FFC131?style=flat&logo=tauri&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-19+-61DAFB?style=flat&logo=react&logoColor=black" />
   <img alt="Vite" src="https://img.shields.io/badge/Vite-6+-646CFF?style=flat&logo=vite&logoColor=white" />
   <img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-22c55e?style=flat" />
@@ -24,9 +24,9 @@ Pre-built binaries are available in the **[Releases](https://github.com/CesarGar
 
 | Operating System | Installer | Portable | Architecture |
 | :--- | :--- | :--- | :--- |
-| **macOS** | `OpenLauncher-mac-arm64.dmg` | `OpenLauncher-mac-arm64.zip` | ARM64 (Apple Silicon: M1–M5) |
+| **macOS** | `OpenLauncher-mac-arm64.dmg`<br>`OpenLauncher-mac-x64.dmg` | `OpenLauncher-mac-arm64.zip`<br>`OpenLauncher-mac-x64.zip` | Apple Silicon (M1–M5)<br>Intel (x64) |
 | **Windows** | `OpenLauncher.exe` | `OpenLauncher-Portable-Windows.exe` | x64 |
-| **Linux** | `OpenLauncher.deb` | `OpenLauncher-Portable-Linux.tar.gz` | x64 |
+| **Linux** | `OpenLauncher.deb`<br>`OpenLauncher.AppImage` | `OpenLauncher.tar.gz` | x64 |
 
 > [!TIP]
 > **macOS Installation Note:**
@@ -35,11 +35,21 @@ Pre-built binaries are available in the **[Releases](https://github.com/CesarGar
 > sudo xattr -rd com.apple.quarantine /Applications/OpenLauncher.app
 > ```
 
+> [!NOTE]
+> **Linux Installation & Permissions:**
+> - **Debian / Ubuntu (.deb):** `sudo apt install ./OpenLauncher.deb`
+> - **Universal AppImage:** Give execution permission and run:
+>   ```bash
+>   chmod +x OpenLauncher.AppImage
+>   ./OpenLauncher.AppImage
+>   ```
+> - **Tarball (.tar.gz):** Extract and execute `./openlauncher`. Ensure your distribution has `webkit2gtk-4.1` installed (`sudo apt install libwebkit2gtk-4.1-0` on Ubuntu/Debian, `sudo dnf install webkit2gtk4.1` on Fedora, `sudo pacman -S webkit2gtk-4.1` on Arch).
+
 <details>
 <summary><b>Legacy Python Version (Beta-1.7.4)</b></summary>
 
 The previous Python-based version of OpenLauncher (legacy) is still available for download in the [Releases](https://github.com/CesarGarza55/OpenLauncher/releases) section. The last version of the legacy system was **Beta-1.7.4**.
-The current Electron-based version represents a complete rewrite with improved performance, cross-platform stability, and a modern reactive UI.
+Version 1.2.0 completes the migration from the Electron desktop shell to Tauri 2 while keeping the React/Vite interface and launcher workflows.
 </details>
 
 ---
@@ -53,7 +63,7 @@ The current Electron-based version represents a complete rewrite with improved p
 - **Fabric Conflict & Incompatibility Auto-Fixer**: Diagnoses Fabric crash logs and harmonizes mod versions in 1 click.
 - **Unified Version Installer**: Fast installation of **Vanilla**, **Fabric**, **Forge**, **NeoForge**, and **Quilt** versions with live Minecraft Snapshot support.
 - **Fine-Tuned Performance**: Per-profile and per-instance RAM allocation, custom Java paths, and smart version-aware JVM garbage collection presets (Generational ZGC for Java 21+, Aikar's G1GC for Java 8–17).
-- **News Feed & Customization**: Integrated official Minecraft news, multi-language support (EN, ES, FR), and auto-updater.
+- **News Feed & Customization**: Integrated official Minecraft news, multi-language support (EN, ES, FR), and launcher settings.
 
 ---
 
@@ -129,13 +139,24 @@ Easily transition from a traditional shared `.minecraft` directory to an isolate
 
 ## Build from Source
 
-**Requirements:** Node.js 18+, npm/pnpm, Java JDK 17+.
+**Prerequisites:**
+- **Node.js**: 20+ (recommended 22+)
+- **Package Manager**: `pnpm` (or `npm`)
+- **Rust**: Stable toolchain (`rustup default stable`)
+- **Java**: Java JDK 17+ (only needed to play Minecraft, not to build the launcher)
 
 ```bash
 git clone https://github.com/CesarGarza55/OpenLauncher.git
 cd OpenLauncher
-npm install
+pnpm install
 ```
+
+To run in development mode with hot-reload:
+```bash
+pnpm tauri:dev
+```
+
+### Interactive Platform Builders
 
 <details>
 <summary><b>macOS Build Instructions</b></summary>
@@ -145,28 +166,50 @@ Execute the macOS compilation script:
 chmod +x compile-mac.sh
 ./compile-mac.sh
 ```
-Choose Apple Silicon (ARM64), Intel (x64), or Universal to generate `.dmg` and `.zip` packages in `release/`.
+Interactive options:
+- **Architecture**: Current Mac, Apple Silicon (ARM64: M1–M5), Intel (x64), or Universal Binary.
+- **Format**: DMG installer (`.dmg`), portable zip (`.zip`), full bundle (DMG + ZIP), or unpacked `.app`.
 </details>
 
 <details>
 <summary><b>Windows Build Instructions</b></summary>
 
-Execute the Windows batch script:
+Execute the Windows interactive batch script:
 ```cmd
 compile-windows.bat
 ```
-Generates `OpenLauncher.exe` (NSIS installer) and `OpenLauncher-Portable-Windows.exe`. Requires [NSIS](https://nsis.sourceforge.io/Download).
+Generates `OpenLauncher.exe` (custom NSIS installer via `script/installer.nsi`) and `OpenLauncher-Portable-Windows.exe`. Requires [NSIS](https://nsis.sourceforge.io/Download) (or will fallback to Tauri's bundler).
 </details>
 
 <details>
 <summary><b>Linux Build Instructions</b></summary>
+
+Install system dependencies:
+- **Ubuntu / Debian:**
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y build-essential curl wget file libssl-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf libwebkit2gtk-4.1-dev
+  ```
+- **Fedora / RHEL:**
+  ```bash
+  sudo dnf install -y gcc gcc-c++ webkit2gtk4.1-devel openssl-devel curl wget librsvg2-devel libappindicator-gtk3-devel patchelf
+  ```
+- **Arch Linux:**
+  ```bash
+  sudo pacman -S --needed base-devel webkit2gtk-4.1 openssl curl wget librsvg libappindicator-gtk3
+  ```
 
 Execute the Linux compilation script:
 ```bash
 chmod +x compile-linux.sh
 ./compile-linux.sh
 ```
-Generates `OpenLauncher.deb` (Debian/Ubuntu) and `OpenLauncher-Portable-Linux.tar.gz`.
+Interactive options:
+- **Debian / Ubuntu package** (`.deb`)
+- **Universal AppImage** (`.AppImage` for any Linux distribution)
+- **Portable Tarball** (`.tar.gz`)
+- **Full bundle** (`.deb` + `.AppImage` + `.tar.gz`)
+- **Unpacked directory** (`linux-unpacked`)
 </details>
 
 ### Custom Microsoft Entra Client ID (For Forks & Developers)
@@ -184,35 +227,23 @@ Generates `OpenLauncher.deb` (Debian/Ubuntu) and `OpenLauncher-Portable-Linux.ta
 ## Testing & Benchmarks
 
 - **Hardware**: AMD Ryzen 5 5600G (6-core / 12-thread), AMD Radeon RX 580 (8GB VRAM), 32GB DDR4 RAM, Windows 11 Pro x64
-- **Setup**: OpenLauncher 1.1.4, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.1845, Custom Mods (Distant Horizons, Iris, Sodium, etc.)
+- **Setup**: OpenLauncher 1.2.0, 4GB RAM allocated, Minecraft 1.21.11, Fabric Loader 0.1845, Custom Mods (Distant Horizons, Iris, Sodium, etc.)
 - **Shaders**: [MakeUp-UltraFast-9.5e](https://modrinth.com/shader/makeup-ultra-fast-shaders)
 
 <img width="1425" height="901" alt="image" src="https://github.com/user-attachments/assets/2a24a96d-055e-4a53-85bb-8ea3fbfed841" />
 
 ---
 
-## Why Electron & Zero-Overhead Optimization
+## Tauri Architecture & Performance
 
-OpenLauncher utilizes **Electron + React 19** to deliver a unified, cross-platform experience across macOS, Windows, and Linux—featuring fluid animations, instant Modrinth hub discovery, and secure Microsoft OAuth flows.
+OpenLauncher 1.2.0 migrates the desktop runtime from Electron to **Tauri 2 + Rust**. React 19 and Vite continue to render the user interface, while high-performance Rust services in `src-tauri` handle game management, networking, and system operations.
 
-Rather than letting Chromium consume unnecessary memory while you play, OpenLauncher is engineered specifically for maximum performance and resource efficiency:
-
-### 1. Zero-Overhead Mode
-When set to **"Close launcher completely"**, OpenLauncher terminates Electron entirely upon starting Minecraft, freeing **100% of its RAM** for your game. A native OS background supervisor (`/bin/sh` on macOS/Linux, PowerShell on Windows) monitors the game's PID with near-zero overhead (< 2 MB) and automatically relaunches OpenLauncher the moment Minecraft closes.
-
-### 2. Background Throttling & Memory Cleansing
-In **"Hide launcher"** mode, the application window is hidden, audio is muted, Chromium background throttling is enforced, and session memory caches are cleared to minimize background footprint.
-
-### 3. Modular Decoupled Architecture
-- **Vite & React 19**: Ultra-fast hot-module reloading and optimized production bundles.
-- **Context-Isolated Preload Bridge**: Secure, minimal CommonJS IPC layer (`electron/preload.cjs`).
-- **Dedicated Background Services**: Separated modules for game launching, Java detection, content downloads, and mod conflict diagnostics.
-
-### 4. Built-in Benchmark Suite
-Measure and verify resource usage on your machine in real time with our automated testing suite:
-```bash
-pnpm run test:perf
-```
+### Key Performance Advantages:
+- **Ultra-Lightweight Footprint:** By leveraging native system webviews (WebKit on macOS, WebKitGTK on Linux, and WebView2 on Windows) instead of bundling a full Chromium browser, the installer size drops from **~150 MB to ~15 MB**, and baseline idle RAM drops from **~220 MB down to ~35 MB**.
+- **High-Performance Native Command Layer:** Filesystem operations, multi-threaded Minecraft asset downloads, Java detection, Microsoft OAuth callback handling, and Modrinth API enrichment run with compiled Rust performance.
+- **Native Game Supervisor:** Minecraft game processes are launched and supervised via asynchronous Rust threads with zero CPU impact and instant game log streaming.
+- **Zero-Overhead Launcher Modes:** Choose between keeping the launcher open, minimizing to background, hiding the window, or terminating the launcher upon game launch to free 100% of resources for Minecraft.
+- **Automated Cross-Platform CI:** GitHub Actions compiles native distributions for Windows (NSIS & Portable), Linux (Debian, AppImage, tar.gz), and macOS (Apple Silicon ARM64 & Intel x64).
 
 ---
 
@@ -225,7 +256,7 @@ This project is licensed under the **[GPL-2.0 License](https://github.com/CesarG
 
 ## Credits & Acknowledgements
 
-OpenLauncher is developed and maintained by **[Cesar Garza](https://github.com/CesarGarza55)** with modern AI-assisted engineering workflows for rapid feature iteration and code quality. Built upon [Electron](https://www.electronjs.org/), [React](https://react.dev/), [Vite](https://vitejs.dev/), [Node.js](https://nodejs.org/), [electron-builder](https://www.electron.build/), and [Modrinth API](https://docs.modrinth.com/).
+OpenLauncher is developed and maintained by **[Cesar Garza](https://github.com/CesarGarza55)** with modern AI-assisted engineering workflows for rapid feature iteration and code quality. Built upon [Tauri](https://tauri.app/), [Rust](https://www.rust-lang.org/), [React](https://react.dev/), [Vite](https://vitejs.dev/), [pnpm](https://pnpm.io/), and [Modrinth API](https://docs.modrinth.com/).
 
 ---
 

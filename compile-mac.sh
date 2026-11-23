@@ -2,7 +2,7 @@
 set -e
 
 # ==============================================================================
-# OpenLauncher - Interactive macOS 
+# OpenLauncher - Interactive macOS
 # High-performance builder for macOS distributions (DMG, ZIP, Universal)
 # ==============================================================================
 
@@ -27,7 +27,7 @@ NC='\033[0m'
 print_banner() {
     clear
     echo ""
-    echo -e "  ${BRIGHT_CYAN}◆${NC} ${BOLD}OpenLauncher${NC} ${DIM}•${NC} ${BRIGHT_BLUE}macOS${NC}"
+    echo -e "  ${BRIGHT_CYAN}◆${NC} ${BOLD}OpenLauncher${NC} ${DIM}•${NC} ${BRIGHT_BLUE}macOS (Tauri + Rust)${NC}"
     echo -e "  ${DIM}───────────────────────────────────────────────────────${NC}"
     echo ""
 }
@@ -65,9 +65,11 @@ detect_system() {
     
     if [ "$HOST_ARCH" = "arm64" ]; then
         DEFAULT_ARCH="arm64"
+        DEFAULT_TARGET="aarch64-apple-darwin"
         ARCH_LABEL="Apple Silicon (ARM64)"
     else
         DEFAULT_ARCH="x64"
+        DEFAULT_TARGET="x86_64-apple-darwin"
         ARCH_LABEL="Intel (x64)"
     fi
 
@@ -94,8 +96,15 @@ check_prerequisites() {
         exit 1
     fi
     
+    if ! command -v cargo >/dev/null 2>&1; then
+        print_error "Rust / Cargo is not installed! Please install Rust (https://rustup.rs)"
+        exit 1
+    fi
+    
     NODE_VER=$(node -v)
+    RUST_VER=$(cargo --version)
     print_info "Node.js:        ${GREEN}${NODE_VER}${NC}"
+    print_info "Rust/Cargo:     ${GREEN}${RUST_VER}${NC}"
     print_info "Host System:    ${GREEN}${MACOS_VER} (${ARCH_LABEL})${NC}"
     
     if [ "$PKG_MGR" = "none" ]; then
@@ -118,6 +127,7 @@ check_prerequisites() {
 clean_build_cache() {
     print_step 2 4 "Cleaning Workspace & Release Cache"
     rm -rf release dist
+    mkdir -p release
     print_success "Artifacts directory cleaned"
 }
 
@@ -128,17 +138,46 @@ compile_renderer() {
     print_success "Vite bundle compiled into dist/"
 }
 
-# Package macOS target with electron-builder
-package_electron() {
-    local target="$1"
+# Package macOS target with Tauri
+package_mac_tauri() {
+    local format="$1"
     local arch="$2"
+    local target="$3"
     
-    print_step 4 4 "Packaging macOS Binary (${target} - ${arch})"
+    print_step 4 4 "Packaging macOS Binary (${format} - ${arch})"
     
-    if [ "$arch" = "universal" ]; then
-        $PKG_EXEC electron-builder --mac "$target" --universal
-    else
-        $PKG_EXEC electron-builder --mac "$target" --"$arch"
+    local target_flag=""
+    if [ -n "$target" ] && [ "$target" != "universal" ]; then
+        target_flag="--target $target"
+    fi
+    
+    mkdir -p release
+    
+    if [ "$format" = "dmg" ]; then
+        $PKG_EXEC tauri build $target_flag --bundles dmg
+        find src-tauri/target -name "*.dmg" -exec cp -f {} release/ \; 2>/dev/null || true
+    elif [ "$format" = "zip" ]; then
+        $PKG_EXEC tauri build $target_flag
+        # Find OpenLauncher.app and zip it
+        APP_PATH=$(find src-tauri/target -type d -name "OpenLauncher.app" 2>/dev/null | head -n 1)
+        if [ -n "$APP_PATH" ]; then
+            APP_DIR=$(dirname "$APP_PATH")
+            (cd "$APP_DIR" && zip -r "../../../../release/OpenLauncher-mac-${arch}.zip" OpenLauncher.app)
+        fi
+    elif [ "$format" = "all" ]; then
+        $PKG_EXEC tauri build $target_flag --bundles dmg
+        find src-tauri/target -name "*.dmg" -exec cp -f {} release/ \; 2>/dev/null || true
+        APP_PATH=$(find src-tauri/target -type d -name "OpenLauncher.app" 2>/dev/null | head -n 1)
+        if [ -n "$APP_PATH" ]; then
+            APP_DIR=$(dirname "$APP_PATH")
+            (cd "$APP_DIR" && zip -r "../../../../release/OpenLauncher-mac-${arch}.zip" OpenLauncher.app)
+        fi
+    elif [ "$format" = "dir" ]; then
+        $PKG_EXEC tauri build $target_flag
+        APP_PATH=$(find src-tauri/target -type d -name "OpenLauncher.app" 2>/dev/null | head -n 1)
+        if [ -n "$APP_PATH" ]; then
+            cp -R "$APP_PATH" release/
+        fi
     fi
     
     print_success "macOS build packaging finished"
@@ -157,6 +196,7 @@ show_summary() {
     if [ -d "release" ]; then
         echo -e "  ${DIM}Generated packages:${NC}"
         find release -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.zip" \) -exec ls -lh {} + 2>/dev/null | awk '{print "    " $9 " (" $5 ")"}'
+        find release -maxdepth 1 -type d -name "*.app" -exec ls -ldh {} + 2>/dev/null | awk '{print "    " $9 " (" $5 ")"}'
     fi
     
     echo ""
@@ -180,12 +220,13 @@ read -p " Select [1-4] (default: 1): " arch_choice
 arch_choice=${arch_choice:-1}
 
 TARGET_ARCH="$DEFAULT_ARCH"
+TARGET_TRIPLE="$DEFAULT_TARGET"
 case $arch_choice in
-    1) TARGET_ARCH="$DEFAULT_ARCH" ;;
-    2) TARGET_ARCH="arm64" ;;
-    3) TARGET_ARCH="x64" ;;
-    4) TARGET_ARCH="universal" ;;
-    *) TARGET_ARCH="$DEFAULT_ARCH" ;;
+    1) TARGET_ARCH="$DEFAULT_ARCH"; TARGET_TRIPLE="$DEFAULT_TARGET" ;;
+    2) TARGET_ARCH="arm64"; TARGET_TRIPLE="aarch64-apple-darwin" ;;
+    3) TARGET_ARCH="x64"; TARGET_TRIPLE="x86_64-apple-darwin" ;;
+    4) TARGET_ARCH="universal"; TARGET_TRIPLE="universal-apple-darwin" ;;
+    *) TARGET_ARCH="$DEFAULT_ARCH"; TARGET_TRIPLE="$DEFAULT_TARGET" ;;
 esac
 
 # Clear screen and update banner with chosen target
@@ -193,8 +234,9 @@ clear
 print_banner
 
 echo -e " ${BOLD}System Configuration:${NC}"
-echo -e "   • Target Arch:  ${GREEN}${TARGET_ARCH}${NC}"
-echo -e "   • Package Mgr:  ${MAGENTA}${PKG_MGR}${NC}\n"
+echo -e "   • Target Arch:   ${GREEN}${TARGET_ARCH}${NC}"
+echo -e "   • Target Triple: ${GREEN}${TARGET_TRIPLE}${NC}"
+echo -e "   • Package Mgr:   ${MAGENTA}${PKG_MGR}${NC}\n"
 
 echo -e " ${BOLD}Step 2/2: Select Distribution Format:${NC}"
 echo -e "   ${BRIGHT_GREEN}[1]${NC} 📦 DMG Installer (.dmg) ${DIM}[Standard installer]${NC}"
@@ -213,29 +255,28 @@ case $build_choice in
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_electron dmg "$TARGET_ARCH"
+        package_mac_tauri "dmg" "$TARGET_ARCH" "$TARGET_TRIPLE"
         show_summary
         ;;
     2)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_electron zip "$TARGET_ARCH"
+        package_mac_tauri "zip" "$TARGET_ARCH" "$TARGET_TRIPLE"
         show_summary
         ;;
     3)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_electron dmg "$TARGET_ARCH"
-        package_electron zip "$TARGET_ARCH"
+        package_mac_tauri "all" "$TARGET_ARCH" "$TARGET_TRIPLE"
         show_summary
         ;;
     4)
         check_prerequisites
         clean_build_cache
         compile_renderer
-        package_electron dir "$TARGET_ARCH"
+        package_mac_tauri "dir" "$TARGET_ARCH" "$TARGET_TRIPLE"
         show_summary
         ;;
     5)

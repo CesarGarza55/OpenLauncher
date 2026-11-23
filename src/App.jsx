@@ -142,7 +142,17 @@ export default function App() {
     setAutoScroll,
   } = useLauncherLogs();
   const { toasts, pushToast, dismissToast } = useToasts();
-  const [newsItems, setNewsItems] = useState([]);
+  const [newsItems, setNewsItems] = useState(() => {
+    try {
+      const cached = localStorage.getItem('openlauncher_news_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed.items) && parsed.items.length > 0) return parsed.items;
+      }
+    } catch { }
+    return [];
+  });
   const [newsSourceUrl, setNewsSourceUrl] = useState('https://www.minecraft.net/en-us/articles');
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState('');
@@ -200,6 +210,10 @@ export default function App() {
   }, [showBetaInfo]);
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0] || null;
+  const activeInstance = instances.find(i => i.id === activeInstanceId) || null;
+  const activeInstanceVersion = activeInstance?.version
+    ? installedVersions.find(v => v.id === activeInstance.version) || activeInstance.version
+    : null;
   const activeProfileVersion = activeProfile?.version
     ? installedVersions.find(v => v.id === activeProfile.version) || getVersionById(activeProfile.version, versionCatalog)
     : null;
@@ -242,7 +256,8 @@ export default function App() {
   }, []);
 
   const loadNews = useCallback(async () => {
-    setNewsLoading(true);
+    // Only show loading spinner if no news are loaded yet
+    setNewsLoading((prev) => (newsItems && newsItems.length > 0 ? false : true));
     setNewsError('');
     try {
       let payload = null;
@@ -254,19 +269,24 @@ export default function App() {
       }
 
       if (!payload) {
-        setNewsError(t('news.errorNoNewsFound'));
+        if (!newsItems || newsItems.length === 0) {
+          setNewsError(t('news.errorNoNewsFound'));
+        }
         return;
       }
       if (payload.error && (!payload.items || payload.items.length === 0)) {
-        setNewsError(payload.error);
+        if (!newsItems || newsItems.length === 0) {
+          setNewsError(payload.error);
+        }
         return;
       }
-      if (Array.isArray(payload)) {
-        setNewsItems(payload);
-        return;
+      const items = Array.isArray(payload) ? payload : (Array.isArray(payload.items) ? payload.items : []);
+      if (items.length > 0) {
+        setNewsItems(items);
+        try {
+          localStorage.setItem('openlauncher_news_cache', JSON.stringify(items));
+        } catch { }
       }
-      const items = Array.isArray(payload.items) ? payload.items : [];
-      setNewsItems(items);
       if (payload.sourceUrl) {
         setNewsSourceUrl(payload.sourceUrl);
       }
@@ -275,14 +295,19 @@ export default function App() {
         const fallbackPayload = await loadMinecraftNews({ limit: 60 });
         if (fallbackPayload?.items?.length > 0) {
           setNewsItems(fallbackPayload.items);
+          try {
+            localStorage.setItem('openlauncher_news_cache', JSON.stringify(fallbackPayload.items));
+          } catch { }
           return;
         }
       } catch { }
-      setNewsError(error?.message || t('news.errorNoNewsFound'));
+      if (!newsItems || newsItems.length === 0) {
+        setNewsError(error?.message || t('news.errorNoNewsFound'));
+      }
     } finally {
       setNewsLoading(false);
     }
-  }, [t]);
+  }, [t, newsItems]);
 
   useEffect(() => {
     if (autoScroll && consoleRef.current) {
@@ -1080,7 +1105,7 @@ export default function App() {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
           const res = await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: filePath, fileName: file.name }, activeInstanceId);
-          if (res?.ok) imported++;
+          if (res?.ok || res?.fileName || res?.path) imported++;
         }
         if (imported > 0) {
           loadShaders();
@@ -1092,7 +1117,7 @@ export default function App() {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
           const res = await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: filePath, fileName: file.name }, activeInstanceId);
-          if (res?.ok) imported++;
+          if (res?.ok || res?.fileName || res?.path) imported++;
         }
         if (imported > 0) {
           loadResourcePacks();
@@ -1104,7 +1129,7 @@ export default function App() {
           if (!file.name.toLowerCase().endsWith('.zip')) continue;
           const filePath = file.path || file.name;
           const res = await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: filePath, fileName: file.name }, activeInstanceId);
-          if (res?.ok) imported++;
+          if (res?.ok || res?.fileName || res?.path) imported++;
         }
         if (imported > 0) {
           loadDatapacks();
@@ -1124,15 +1149,31 @@ export default function App() {
   };
 
   // ── Load installed content ──
+  const enrichInstalledList = useCallback(async (items, projectType) => {
+    if (!isOnline || !items.length || !launcher.minecraftModrinthEnrichInstalledContent) return items;
+    try {
+      const enriched = await launcher.minecraftModrinthEnrichInstalledContent(items, projectType);
+      return Array.isArray(enriched) ? enriched : items;
+    } catch (error) {
+      console.warn(`Could not load Modrinth metadata for ${projectType}:`, error);
+      return items;
+    }
+  }, [isOnline]);
+
   const loadMods = useCallback(async () => {
     try {
       const list = await launcher.minecraftGetInstalledMods?.(activeInstanceId);
       if (Array.isArray(list)) {
         setMods(list);
         persistState({ mods: list });
+        const enriched = await enrichInstalledList(list, 'mod');
+        if (enriched !== list) {
+          setMods(enriched);
+          persistState({ mods: enriched });
+        }
       }
     } catch { }
-  }, [activeInstanceId, persistState]);
+  }, [activeInstanceId, isOnline, persistState, enrichInstalledList]);
 
   const loadShaders = useCallback(async () => {
     try {
@@ -1140,9 +1181,14 @@ export default function App() {
       if (Array.isArray(list)) {
         setShaders(list);
         persistState({ shaders: list });
+        const enriched = await enrichInstalledList(list, 'shader');
+        if (enriched !== list) {
+          setShaders(enriched);
+          persistState({ shaders: enriched });
+        }
       }
     } catch { }
-  }, [activeInstanceId, persistState]);
+  }, [activeInstanceId, isOnline, persistState, enrichInstalledList]);
 
   const loadResourcePacks = useCallback(async () => {
     try {
@@ -1150,9 +1196,14 @@ export default function App() {
       if (Array.isArray(list)) {
         setResourcePacks(list);
         persistState({ resourcePacks: list });
+        const enriched = await enrichInstalledList(list, 'resourcepack');
+        if (enriched !== list) {
+          setResourcePacks(enriched);
+          persistState({ resourcePacks: enriched });
+        }
       }
     } catch { }
-  }, [activeInstanceId, persistState]);
+  }, [activeInstanceId, isOnline, persistState, enrichInstalledList]);
 
   const loadDatapacks = useCallback(async () => {
     try {
@@ -1160,9 +1211,14 @@ export default function App() {
       if (Array.isArray(list)) {
         setDatapacks(list);
         persistState({ datapacks: list });
+        const enriched = await enrichInstalledList(list, 'datapack');
+        if (enriched !== list) {
+          setDatapacks(enriched);
+          persistState({ datapacks: enriched });
+        }
       }
     } catch { }
-  }, [activeInstanceId, persistState]);
+  }, [activeInstanceId, isOnline, persistState, enrichInstalledList]);
 
   // Synchronize content whenever activeInstanceId changes
   useEffect(() => {
@@ -1221,7 +1277,7 @@ export default function App() {
       const res = await launcher.minecraftPickContentFiles?.('shader');
       if (res?.filePaths?.length > 0) {
         for (const fp of res.filePaths) {
-          await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: fp });
+          await launcher.minecraftImportContentFile?.({ type: 'shader', sourcePath: fp }, activeInstanceId);
         }
         loadShaders();
         pushToast({ tone: 'success', title: t('mods.contentTypeShaders'), message: t('mods.shadersImportedSuccess', { count: res.filePaths.length }) });
@@ -1230,7 +1286,7 @@ export default function App() {
       const res = await launcher.minecraftPickContentFiles?.('resourcepack');
       if (res?.filePaths?.length > 0) {
         for (const fp of res.filePaths) {
-          await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: fp });
+          await launcher.minecraftImportContentFile?.({ type: 'resourcepack', sourcePath: fp }, activeInstanceId);
         }
         loadResourcePacks();
         pushToast({ tone: 'success', title: t('mods.contentTypeResourcePacks'), message: t('mods.resourcePacksImportedSuccess', { count: res.filePaths.length }) });
@@ -1239,7 +1295,7 @@ export default function App() {
       const res = await launcher.minecraftPickContentFiles?.('datapack');
       if (res?.filePaths?.length > 0) {
         for (const fp of res.filePaths) {
-          await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: fp });
+          await launcher.minecraftImportContentFile?.({ type: 'datapack', sourcePath: fp }, activeInstanceId);
         }
         loadDatapacks();
         pushToast({ tone: 'success', title: t('mods.contentTypeDatapacks'), message: t('mods.datapacksImportedSuccess', { count: res.filePaths.length }) });
@@ -1250,14 +1306,14 @@ export default function App() {
   };
 
   // ── Modrinth Search & Install logic ──
-  const activeInstance = instances.find(i => i.id === activeInstanceId) || null;
   const instanceLoader = String(activeInstance?.loader || '').toLowerCase();
+  const effectiveInstanceLoader = instanceLoader === 'vanilla' ? '' : instanceLoader;
   const profileLoader = String(activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
-  const currentLoader = instanceLoader || (profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('neoforge') ? 'neoforge' : profileLoader.includes('forge') ? 'forge' : profileLoader.includes('quilt') ? 'quilt' : '');
+  const currentLoader = effectiveInstanceLoader || (profileLoader.includes('fabric') ? 'fabric' : profileLoader.includes('neoforge') ? 'neoforge' : profileLoader.includes('forge') ? 'forge' : profileLoader.includes('quilt') ? 'quilt' : '');
   const rawMcVer = activeInstance?.version || activeProfileVersion?.inheritsFrom || activeProfileVersion?.mcVer || activeVersion?.inheritsFrom || activeVersion?.mcVer || activeProfile?.version || activeVersion?.id || '';
   const currentMcVer = resolveMinecraftVersion(rawMcVer);
 
-  const effectiveLoader = modrinthLoaderFilter === 'auto' ? currentLoader : (modrinthLoaderFilter === 'all' ? '' : modrinthLoaderFilter);
+  const effectiveLoader = modrinthLoaderFilter === 'auto' ? currentLoader : (modrinthLoaderFilter === 'all' || modrinthLoaderFilter === 'vanilla' ? '' : modrinthLoaderFilter);
   const effectiveMcVer = modrinthVersionFilter === 'auto' ? currentMcVer : '';
 
   const executeModrinthSearch = useCallback(async (isLoadMore = false) => {
@@ -1377,41 +1433,53 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug;
-    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod');
+    const targetProjectType = exploreType === 'shaders'
+      ? 'shader'
+      : exploreType === 'resourcepacks'
+        ? 'resourcepack'
+        : exploreType === 'datapacks'
+          ? 'datapack'
+          : (project.project_type || 'mod');
     setModrinthInstalling(prev => ({ ...prev, [projectId]: true }));
     setLogs([]);
     persistState({ logs: [] });
     setActiveTab('console');
-    addLog('info', `Installing ${projectType} '${project.title || projectId}' from Modrinth...`);
+    const contentLabel = targetProjectType === 'datapack' ? 'data pack' : targetProjectType === 'resourcepack' ? 'texture pack' : targetProjectType === 'shader' ? 'shader' : 'mod';
+    addLog('info', `Installing ${contentLabel} '${project.title || projectId}' from Modrinth...`);
 
     try {
       let res;
       if (typeof window !== 'undefined' && window.launcher?.minecraftModrinthInstall) {
         res = await window.launcher.minecraftModrinthInstall({
           projectId,
-          projectType,
+          projectType: targetProjectType,
           gameVersion: effectiveMcVer || currentMcVer,
-          loader: projectType === 'mod' ? (effectiveLoader || currentLoader) : undefined,
+          loader: targetProjectType === 'datapack'
+            ? 'datapack'
+            : targetProjectType === 'mod'
+              ? (effectiveLoader || currentLoader)
+              : undefined,
+          instanceId: activeInstanceId,
         });
       } else {
         res = { ok: true, fileName: `${projectId}.zip` };
       }
 
       if (res?.ok) {
-        if (projectType === 'shader') {
+        if (targetProjectType === 'shader') {
           if (Array.isArray(res.items)) setShaders(res.items);
           else loadShaders();
-        } else if (projectType === 'resourcepack') {
+        } else if (targetProjectType === 'resourcepack') {
           if (Array.isArray(res.items)) setResourcePacks(res.items);
           else loadResourcePacks();
-        } else if (projectType === 'datapack') {
+        } else if (targetProjectType === 'datapack') {
           if (Array.isArray(res.items)) setDatapacks(res.items);
           else loadDatapacks();
         } else {
           if (Array.isArray(res.mods || res.items)) setMods(res.mods || res.items);
           else loadMods();
         }
-        addLog('success', `${projectType === 'shader' ? 'Shader' : projectType === 'resourcepack' ? 'Texture pack' : projectType === 'datapack' ? 'Data pack' : 'Mod'} '${project.title || projectId}' installed.`);
+        addLog('success', `${targetProjectType === 'shader' ? 'Shader' : targetProjectType === 'resourcepack' ? 'Texture pack' : targetProjectType === 'datapack' ? 'Data pack' : 'Mod'} '${project.title || projectId}' installed.`);
         pushToast({
           tone: 'success',
           title: t('mods.install'),
@@ -1439,7 +1507,8 @@ export default function App() {
   const handleOpenLocalModDetails = (mod) => {
     const fileKey = mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').toLowerCase() : '';
     const updateInfo = modUpdates[mod.fileName] || modUpdates[fileKey] || modUpdates[mod.name] || modUpdates[mod.id] || null;
-    const knownProjectId = updateInfo?.projectId || mod.projectId || mod.modrinthId;
+    const is3dSkinLayers = /3d[-_ ]?skin[-_ ]?layers/i.test(`${mod.fileName || ''} ${mod.name || ''} ${mod.modId || ''}`);
+    const knownProjectId = is3dSkinLayers ? '3dskinlayers' : updateInfo?.projectId || mod.projectId || mod.modrinthId;
     const slugCandidate = knownProjectId || mod.modId || (mod.fileName ? mod.fileName.replace(/\.jar(\.disabled)?$/i, '').replace(/[-_]v?\d+.*$/i, '') : '') || mod.id;
     setSelectedModDetail({
       project: {
@@ -1526,39 +1595,51 @@ export default function App() {
       return;
     }
     const projectId = project.project_id || project.slug || project.id;
-    const projectType = project.project_type || (exploreType === 'shaders' ? 'shader' : exploreType === 'resourcepacks' ? 'resourcepack' : exploreType === 'datapacks' ? 'datapack' : 'mod');
+    const targetProjectType = exploreType === 'shaders'
+      ? 'shader'
+      : exploreType === 'resourcepacks'
+        ? 'resourcepack'
+        : exploreType === 'datapacks'
+          ? 'datapack'
+          : (project.project_type || 'mod');
     setInstallingVersionId(version.id);
     const primaryFile = version.files?.find(f => f.primary) || version.files?.[0];
     const verNumber = version.version_number || version.name || '';
     setLogs([]);
     persistState({ logs: [] });
     setActiveTab('console');
-    addLog('info', `[Modrinth] Installing ${project.title || projectId} (v${verNumber})...`);
+    const contentLabel = targetProjectType === 'datapack' ? 'data pack' : targetProjectType === 'resourcepack' ? 'texture pack' : targetProjectType === 'shader' ? 'shader' : 'mod';
+    addLog('info', `[Modrinth] Installing ${contentLabel} '${project.title || projectId}' (v${verNumber})...`);
 
     try {
       let res;
       if (typeof window !== 'undefined' && window.launcher?.minecraftModrinthInstall) {
         res = await window.launcher.minecraftModrinthInstall({
           projectId,
-          projectType,
+          projectType: targetProjectType,
           versionId: version.id,
           fileUrl: primaryFile?.url,
           fileName: primaryFile?.filename,
           gameVersion: version.game_versions?.[0] || effectiveMcVer || currentMcVer,
-          loader: projectType === 'mod' ? (version.loaders?.[0] || effectiveLoader || currentLoader) : undefined,
+          loader: targetProjectType === 'datapack'
+            ? 'datapack'
+            : targetProjectType === 'mod'
+              ? (version.loaders?.[0] || effectiveLoader || currentLoader)
+              : undefined,
+          instanceId: activeInstanceId,
         });
       } else {
         res = { ok: true, fileName: primaryFile?.filename || `${projectId}.zip` };
       }
 
       if (res?.ok) {
-        if (projectType === 'shader') {
+        if (targetProjectType === 'shader') {
           if (Array.isArray(res.items)) setShaders(res.items);
           else loadShaders();
-        } else if (projectType === 'resourcepack') {
+        } else if (targetProjectType === 'resourcepack') {
           if (Array.isArray(res.items)) setResourcePacks(res.items);
           else loadResourcePacks();
-        } else if (projectType === 'datapack') {
+        } else if (targetProjectType === 'datapack') {
           if (Array.isArray(res.items)) setDatapacks(res.items);
           else loadDatapacks();
         } else {
@@ -1720,6 +1801,7 @@ export default function App() {
         versionId: updateInfo.versionId,
         fileUrl: updateInfo.fileUrl,
         fileName: updateInfo.targetFileName || updateInfo.fileName,
+        replaceFileName: updateInfo.fileName,
         loader,
         gameVersion,
         instanceId: activeInstanceId,
@@ -1737,7 +1819,7 @@ export default function App() {
       if (res?.mods && Array.isArray(res.mods)) {
         setMods(res.mods);
       } else {
-        const loadedMods = await launcher.minecraftGetInstalledMods?.();
+        const loadedMods = await launcher.minecraftGetInstalledMods?.(activeInstanceId);
         if (Array.isArray(loadedMods)) setMods(loadedMods);
       }
 
@@ -1981,7 +2063,7 @@ export default function App() {
   const profileAvatarUrl = getMcHeadsAvatarUrl(profileAvatarName, 64);
 
   // Version Loader Type badge helper
-  const loaderType = String(activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
+  const loaderType = String(activeInstance?.loader || activeProfileVersion?.type || activeVersion?.type || activeProfile?.version || '').toLowerCase();
   const loaderBadgeClass = loaderType.includes('fabric') ? 'fabric' : loaderType.includes('neoforge') ? 'neoforge' : loaderType.includes('forge') ? 'forge' : loaderType.includes('quilt') ? 'quilt' : 'vanilla';
   const loaderBadgeLabel = loaderType.includes('fabric') ? 'Fabric' : loaderType.includes('neoforge') ? 'NeoForge' : loaderType.includes('forge') ? 'Forge' : loaderType.includes('quilt') ? 'Quilt' : 'Vanilla';
 
@@ -2106,135 +2188,156 @@ export default function App() {
               <span className="sidebar-title">{t('sidebar.discover')}</span>
             </div>
 
-            <div className="sidebar-nav">
-              <div
-                className={`nav-item ${activeTab === 'news' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+            <nav className="sidebar-nav" aria-label={t('sidebar.discover')}>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'news' ? 'active' : ''}`}
+                aria-current={activeTab === 'news' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('news'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.news} size={14} /></span>
                 <span>{t('sidebar.news')}</span>
-              </div>
-              <div
-                className={`nav-item ${activeTab === 'explore' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'explore' ? 'active' : ''}`}
+                aria-current={activeTab === 'explore' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('explore'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.compass} size={14} /></span>
                 <span>{t('sidebar.explore')}</span>
-              </div>
-            </div>
+              </button>
+            </nav>
 
             {/* ── MY LIBRARY ── */}
             <div className="sidebar-heading" style={{ marginTop: 12 }}>
               <span className="sidebar-title">{t('sidebar.library')}</span>
             </div>
 
-            <div className="sidebar-nav">
-              <div
-                className={`nav-item ${activeTab === 'instances' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+            <nav className="sidebar-nav" aria-label={t('sidebar.library')}>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'instances' ? 'active' : ''}`}
+                aria-current={activeTab === 'instances' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('instances'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.layers} size={14} /></span>
                 <span>{t('sidebar.instances') || 'Instances'}</span>
                 <span className="nav-counter">{instances.length}</span>
-              </div>
-              <div
-                className={`nav-item ${activeTab === 'mods' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'mods' ? 'active' : ''}`}
+                aria-current={activeTab === 'mods' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('mods'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.cube} size={14} /></span>
                 <span>{t('sidebar.mods')}</span>
                 <span className="nav-counter">{mods.filter(m => m.enabled).length}</span>
-              </div>
-              <div
-                className={`nav-item ${activeTab === 'shaders' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'shaders' ? 'active' : ''}`}
+                aria-current={activeTab === 'shaders' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('shaders'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.sun} size={14} /></span>
                 <span>{t('sidebar.shaders')}</span>
                 <span className="nav-counter">{shaders.length}</span>
-              </div>
-              <div
-                className={`nav-item ${activeTab === 'resourcepacks' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'resourcepacks' ? 'active' : ''}`}
+                aria-current={activeTab === 'resourcepacks' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('resourcepacks'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.layers} size={14} /></span>
                 <span>{t('sidebar.resourcePacks')}</span>
                 <span className="nav-counter">{resourcePacks.length}</span>
-              </div>
-              <div
-                className={`nav-item ${activeTab === 'datapacks' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'datapacks' ? 'active' : ''}`}
+                aria-current={activeTab === 'datapacks' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('datapacks'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.datapack} size={14} /></span>
                 <span>{t('sidebar.datapacks')}</span>
                 <span className="nav-counter">{datapacks.length}</span>
-              </div>
-            </div>
+              </button>
+            </nav>
 
             {/* ── SYSTEM ── */}
             <div className="sidebar-heading" style={{ marginTop: 12 }}>
               <span className="sidebar-title">{t('sidebar.system')}</span>
             </div>
 
-            <div className="sidebar-nav">
-              <div
-                className={`nav-item ${activeTab === 'console' && !selectedModDetail && !selectedArticle ? 'active' : ''}`}
+            <nav className="sidebar-nav" aria-label={t('sidebar.system')}>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === 'console' ? 'active' : ''}`}
+                aria-current={activeTab === 'console' ? 'page' : undefined}
                 onClick={() => { setSelectedModDetail(null); setSelectedArticle(null); setActiveTab('console'); }}
               >
                 <span className="nav-icon"><Icon d={ICONS.console} size={14} /></span>
                 <span>{t('sidebar.console')}</span>
                 {gameState === 'running' && <span className="status-dot in-game" style={{ marginLeft: 'auto' }} />}
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 className={`nav-item ${modal === 'settings' ? 'active' : ''}`}
+                aria-current={modal === 'settings' ? 'page' : undefined}
                 onClick={() => setModal('settings')}
               >
                 <span className="nav-icon"><Icon d={ICONS.settings} size={14} /></span>
                 <span>{t('sidebar.settings')}</span>
-              </div>
-            </div>
+              </button>
+            </nav>
           </div>
 
           {/* ── ACCOUNT AREA ── */}
           <div className="sidebar-account">
-            <div
-              className="account-card"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setAccountModalOpen(true)}
-              title={t('accountModal.manageTitle')}
-            >
-              <div className="account-avatar">
-                <img
-                  key={`account-avatar-${profileAvatarName}`}
-                  src={profileAvatarUrl}
-                  alt={profileAvatarName}
-                  onLoad={(e) => { e.currentTarget.style.display = 'block'; }}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              </div>
-              <div className="account-info">
-                <span className="account-name">{account.name || t('account.loggedOut')}</span>
-                <span className="account-status-label">
-                  <span className={`status-dot ${gameState === 'running' ? 'in-game' : account.loggedIn ? 'online' : ''}`} />
-                  {authRefreshing ? (
-                    <span>{t('account.refreshingAuth')}</span>
-                  ) : gameState === 'running' ? (
-                    <span>{t('account.inGame')}</span>
-                  ) : account.kind === 'microsoft' ? (
-                    <span>{t('account.microsoftBadge')}</span>
-                  ) : account.loggedIn ? (
-                    <span>{t('account.offline')}</span>
-                  ) : (
-                    <span>{t('account.guest')}</span>
-                  )}
+            <div className="account-card">
+              <button
+                type="button"
+                className="account-manage-trigger"
+                onClick={() => setAccountModalOpen(true)}
+                aria-label={t('accountModal.manageTitle')}
+                title={t('accountModal.manageTitle')}
+              >
+                <span className="account-avatar">
+                  <img
+                    key={`account-avatar-${profileAvatarName}`}
+                    src={profileAvatarUrl}
+                    alt={profileAvatarName}
+                    onLoad={(e) => { e.currentTarget.style.display = 'block'; }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
                 </span>
-              </div>
+                <span className="account-info">
+                  <span className="account-name">{account.name || t('account.loggedOut')}</span>
+                  <span className="account-status-label">
+                    <span className={`status-dot ${gameState === 'running' ? 'in-game' : account.loggedIn ? 'online' : ''}`} />
+                    {authRefreshing ? (
+                      <span>{t('account.refreshingAuth')}</span>
+                    ) : gameState === 'running' ? (
+                      <span>{t('account.inGame')}</span>
+                    ) : account.kind === 'microsoft' ? (
+                      <span>{t('account.microsoftBadge')}</span>
+                    ) : account.loggedIn ? (
+                      <span>{t('account.offline')}</span>
+                    ) : (
+                      <span>{t('account.guest')}</span>
+                    )}
+                  </span>
+                </span>
+              </button>
               {account.kind === 'microsoft' ? (
-                <button className="account-auth-btn logout" onClick={handleLogout} title={t('account.logout')}>
+                <button type="button" className="account-auth-btn logout" onClick={handleLogout} title={t('account.logout')} aria-label={t('account.logout')}>
                   <Icon d={ICONS.logout} size={12} />
                 </button>
               ) : (
-                <button className="account-auth-btn" onClick={handleLogin} title={t('account.loginWithMicrosoft')}>
+                <button type="button" className="account-auth-btn" onClick={handleLogin} title={t('account.loginWithMicrosoft')} aria-label={t('account.loginWithMicrosoft')}>
                   <MicrosoftLogo />
                 </button>
               )}
@@ -2276,91 +2379,29 @@ export default function App() {
             <>
               {/* Top Action Toolbar */}
               <div className="action-bar">
-                <div className="action-bar-tabs">
-                  {/* Discover Group */}
-                  <div className="tab-group">
-                    <button
-                      className={`tab-btn ${activeTab === 'news' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('news')}
-                    >
-                      <Icon d={ICONS.news} size={13} />
-                      <span>{t('sidebar.news')}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'explore' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('explore')}
-                    >
-                      <Icon d={ICONS.compass} size={13} />
-                      <span>{t('sidebar.explore')}</span>
-                    </button>
-                  </div>
-
-                  <div className="tab-group-divider" />
-
-                  {/* Library Group */}
-                  <div className="tab-group">
-                    <button
-                      className={`tab-btn ${activeTab === 'instances' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('instances')}
-                    >
-                      <Icon d={ICONS.layers} size={13} />
-                      <span>{t('sidebar.instances') || 'Instances'}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'mods' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('mods')}
-                    >
-                      <Icon d={ICONS.cube} size={13} />
-                      <span>{t('sidebar.mods')}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'shaders' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('shaders')}
-                    >
-                      <Icon d={ICONS.sun} size={13} />
-                      <span>{t('sidebar.shaders')}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'resourcepacks' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('resourcepacks')}
-                    >
-                      <Icon d={ICONS.layers} size={13} />
-                      <span>{t('sidebar.resourcePacks')}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'datapacks' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('datapacks')}
-                    >
-                      <Icon d={ICONS.datapack} size={13} />
-                      <span>{t('sidebar.datapacks')}</span>
-                    </button>
-                  </div>
-
-                  <div className="tab-group-divider" />
-
-                  {/* System Group */}
-                  <div className="tab-group">
-                    <button
-                      className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('console')}
-                    >
-                      <Icon d={ICONS.console} size={13} />
-                      <span>{t('sidebar.console')}</span>
-                    </button>
-                  </div>
+                <div className="action-bar-context" aria-live="polite">
+                  <span className="action-bar-section-label">
+                    {activeTab === 'news' ? t('sidebar.news') :
+                      activeTab === 'explore' ? t('sidebar.explore') :
+                        activeTab === 'instances' ? (t('sidebar.instances') || 'Instances') :
+                          activeTab === 'mods' ? t('sidebar.mods') :
+                            activeTab === 'shaders' ? t('sidebar.shaders') :
+                              activeTab === 'resourcepacks' ? t('sidebar.resourcePacks') :
+                                activeTab === 'datapacks' ? t('sidebar.datapacks') : t('sidebar.console')}
+                  </span>
                 </div>
 
                 <div className="action-bar-actions">
                   <div
                     className={`environment-badge ${activeInstance ? 'is-instance' : 'is-global'}`}
-                    onClick={() => setActiveTab('instances')}
                     title={activeInstance ? t('instances.managingInstance', { name: activeInstance.name }) : t('instances.managingGlobal')}
+                    role="status"
                   >
                     {activeInstance ? (
                       <>
                         <img
                           src={getInstanceIconSrc(activeInstance.icon)}
-                          alt={activeInstance.name}
+                          alt=""
                           className="env-icon"
                         />
                         <span className="env-name">
@@ -2384,28 +2425,25 @@ export default function App() {
                     </div>
                   )}
                   <button
+                    type="button"
                     className="btn-primary"
                     onClick={() => setModal('install')}
                     disabled={gameState === 'running'}
                     title={t('install.installVersion')}
+                    aria-label={t('install.installVersion')}
                     style={{ gap: 6, padding: '7px 14px' }}
                   >
                     <Icon d={ICONS.download} size={13} />
                     <span>{t('install.installVersion')}</span>
                   </button>
                   <button
+                    type="button"
                     className="btn-secondary"
                     onClick={handleOpenMinecraftDirectory}
                     title={t('settings.openMinecraftDirectory')}
+                    aria-label={t('settings.openMinecraftDirectory')}
                   >
                     <Icon d={ICONS.folder} size={12} />
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setModal('settings')}
-                    title={t('settings.title')}
-                  >
-                    <Icon d={ICONS.settings} size={12} />
                   </button>
                 </div>
               </div>
@@ -2614,35 +2652,57 @@ export default function App() {
           <div className="play-deck">
             <div className="play-deck-controls">
               {/* Version capsule */}
-              <div className="version-capsule">
-                <select
-                  className="version-select"
-                  value={selectedInstalledVersionId}
-                  onChange={e => {
-                    if (gameState === 'running') return;
-                    const newVer = e.target.value;
-                    if (!activeProfileId) return;
-                    setProfiles(prev => {
-                      const nextProfiles = prev.map(p =>
-                        p.id === activeProfileId ? { ...p, version: newVer } : p
-                      );
-                      persistState({ profiles: nextProfiles });
-                      return nextProfiles;
-                    });
-                  }}
-                  disabled={gameState === 'running'}
-                >
-                  {installedVersions.length > 0 ? (
-                    installedVersions.map(v => (
-                      <option key={v.id} value={v.id}>{formatVersionLabel(v)}</option>
-                    ))
-                  ) : (
-                    <option value="">{t('profile.noVersionsInstalled')}</option>
-                  )}
-                </select>
+              <div className={`version-capsule${activeInstance ? ' is-readonly' : ''}`}>
+                {activeInstance ? (
+                  <span
+                    className="version-static"
+                    title={t('instances.versionManagedByInstance')}
+                    aria-label={`${t('instances.versionLabel')}: ${formatVersionLabel(activeInstanceVersion)}`}
+                  >
+                    {formatVersionLabel(activeInstanceVersion)}
+                  </span>
+                ) : (
+                  <select
+                    className="version-select"
+                    value={selectedInstalledVersionId}
+                    onChange={e => {
+                      if (gameState === 'running') return;
+                      const newVer = e.target.value;
+                      if (!activeProfileId) return;
+                      setProfiles(prev => {
+                        const nextProfiles = prev.map(p =>
+                          p.id === activeProfileId ? { ...p, version: newVer } : p
+                        );
+                        persistState({ profiles: nextProfiles });
+                        return nextProfiles;
+                      });
+                    }}
+                    disabled={gameState === 'running'}
+                  >
+                    {installedVersions.length > 0 ? (
+                      installedVersions.map(v => (
+                        <option key={v.id} value={v.id}>{formatVersionLabel(v)}</option>
+                      ))
+                    ) : (
+                      <option value="">{t('profile.noVersionsInstalled')}</option>
+                    )}
+                  </select>
+                )}
                 <span className={`loader-badge ${loaderBadgeClass}`}>
                   {loaderBadgeLabel}
                 </span>
+                {activeInstance && (
+                  <button
+                    type="button"
+                    className="btn-secondary version-edit-button"
+                    title={t('instances.settings')}
+                    aria-label={t('instances.settings')}
+                    onClick={() => setInstanceEditor({ mode: 'edit', instance: activeInstance })}
+                  >
+                    <Icon d={ICONS.settings} size={13} />
+                    <span>{t('instances.settings')}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2733,22 +2793,28 @@ export default function App() {
           systemTotalRam={systemTotalRam}
           onClose={() => setMigrateModalOpen(false)}
           onMigrate={async (migrateData) => {
-            const res = await launcher.migrateBaseToInstance(migrateData);
-            if (res?.ok && res?.instance) {
-              const updated = await launcher.getInstances();
-              setInstances(updated);
-              setActiveInstanceId(res.instance.id);
-              pushToast({
-                tone: 'success',
-                title: t('migration.successTitle'),
-                message: t(res.mode === 'converted' ? 'migration.convertedMessage' : 'migration.copiedMessage', { name: res.instance.name }),
-              });
-            } else {
+            try {
+              const res = await launcher.migrateBaseToInstance(migrateData);
+              const instance = res?.instance || res;
+              if (instance?.id) {
+                const updated = await launcher.getInstances();
+                setInstances(updated);
+                setActiveInstanceId(instance.id);
+                pushToast({
+                  tone: 'success',
+                  title: t('migration.successTitle'),
+                  message: t(migrateData.move ? 'migration.convertedMessage' : 'migration.copiedMessage', { name: instance.name }),
+                });
+                return;
+              }
+              throw new Error(res?.message || 'Migration failed');
+            } catch (err) {
               pushToast({
                 tone: 'critical',
                 title: t('common.error') || 'Error',
-                message: res?.message || 'Migration failed',
+                message: err?.message || 'Migration failed',
               });
+              throw err;
             }
           }}
         />
@@ -2880,5 +2946,3 @@ export default function App() {
     </>
   );
 }
-
-// Microsoft official 4-color square logo SVG

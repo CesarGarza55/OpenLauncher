@@ -9,9 +9,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -25,32 +22,28 @@ jobs:
 
       - name: Check version
         id: check
-        run: |
-          # Read version.json
-          VERSION=$(jq -r '.version' version.json)
-          CHANGELOG=$(jq -r '.changelog' version.json)
-
-          # Get latest release from GitHub
-          LATEST_RELEASE=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || echo "none")
-
-          echo "Current version: $VERSION"
-          echo "Latest release: $LATEST_RELEASE"
-
-          # Check if version changed
-          if [ "release-$VERSION" != "$LATEST_RELEASE" ]; then
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "changelog<<EOF" >> $GITHUB_OUTPUT
-            echo "$CHANGELOG" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "New version detected: release-$VERSION"
-          else
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "No new version detected"
-          fi
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(jq -r '.version' version.json)
+          CHANGELOG=$(jq -r '.changelog' version.json)
+          LATEST=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || echo "none")
+
+          echo "Current version: $VERSION"
+          echo "Latest release: $LATEST"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "release-$VERSION" != "$LATEST" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "changelog<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+            echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
+            echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+            echo "New version detected: release-$VERSION"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No new version detected"
+          fi
 
   build-windows:
     needs: check-version
@@ -63,16 +56,24 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build renderer
+      - name: Build frontend
         run: npm run build
 
-      - name: Build Electron app folder
-        run: npx electron-builder --win --dir
+      - name: Build Tauri binary
+        run: npx tauri build --no-bundle
+
+      - name: Prepare unpacked folder
+        run: |
+          mkdir release\win-unpacked
+          copy src-tauri\target\release\openlauncher.exe release\win-unpacked\OpenLauncher.exe
 
       - name: Install NSIS
         run: choco install nsis -y
@@ -80,11 +81,12 @@ jobs:
       - name: Build NSIS installer with custom script
         run: |
           cd script
-          & "C:\Program Files (x86)\NSIS\makensis.exe" compile-electron.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
           cd ..
 
       - name: Build portable version
-        run: npx electron-builder --win portable
+        run: |
+          copy src-tauri\target\release\openlauncher.exe release\OpenLauncher-Portable-Windows.exe
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -96,16 +98,7 @@ jobs:
   build-linux:
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - target: deb
-            name: debian
-          - target: tar.gz
-            name: portable
-          - target: AppImage
-            name: appimage
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,21 +106,39 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libssl-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf libwebkit2gtk-4.1-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build renderer
+      - name: Build frontend
         run: npm run build
 
-      - name: Build Linux (${{ matrix.name }})
-        run: npx electron-builder --linux ${{ matrix.target }} --publish never
+      - name: Build Tauri bundles (deb & appimage)
+        run: npx tauri build --bundles deb,appimage
+
+      - name: Package artifacts
+        run: |
+          mkdir -p release
+          # Copy .deb
+          cp src-tauri/target/release/bundle/deb/*.deb release/OpenLauncher.deb || true
+          # Copy .AppImage
+          cp src-tauri/target/release/bundle/appimage/*.AppImage release/OpenLauncher.AppImage || true
+          # Create portable tar.gz
+          tar -czvf release/OpenLauncher.tar.gz -C src-tauri/target/release openlauncher
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.name }}-build
+          name: linux-build
           path: |
             release/*.deb
             release/*.tar.gz
@@ -137,6 +148,13 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: x64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -144,21 +162,38 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build renderer
+      - name: Build frontend
         run: npm run build
 
-      - name: Build macOS packages (Apple Silicon)
-        run: npx electron-builder --mac dmg zip --arm64 --publish never
+      - name: Build Tauri bundle (dmg)
+        run: npx tauri build --target ${{ matrix.target }} --bundles dmg
 
-      - name: Upload macOS artifacts (Apple Silicon)
+      - name: Package macOS artifacts
+        run: |
+          mkdir -p release
+          # Copy dmg
+          cp src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg release/OpenLauncher-mac-${{ matrix.arch }}.dmg || true
+          # Create zip of .app
+          if [ -d "src-tauri/target/${{ matrix.target }}/release/bundle/macos/OpenLauncher.app" ]; then
+            cd "src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+            zip -r "../../../../../release/OpenLauncher-mac-${{ matrix.arch }}.zip" OpenLauncher.app
+            cd -
+          fi
+
+      - name: Upload macOS artifacts (${{ matrix.arch }})
         uses: actions/upload-artifact@v4
         with:
-          name: macos-apple-silicon-build
+          name: macos-${{ matrix.arch }}-build
           path: |
             release/*.dmg
             release/*.zip
@@ -180,18 +215,18 @@ jobs:
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: linux-*-build
+          name: linux-build
           path: ./release/linux
-          merge-multiple: true
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-apple-silicon-build
+          pattern: macos-*-build
           path: ./release/macos
+          merge-multiple: true
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: release-${{ needs.check-version.outputs.version }}
           name: release-${{ needs.check-version.outputs.version }}

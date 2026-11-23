@@ -430,6 +430,7 @@ select option {
 }
 
 .nav-item {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -441,6 +442,9 @@ select option {
   cursor: pointer;
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  border: 0;
+  background: transparent;
+  text-align: left;
 }
 
 .nav-item:hover {
@@ -452,6 +456,13 @@ select option {
   background: rgba(16, 185, 129, 0.12);
   color: var(--accent-bright);
   font-weight: 600;
+}
+
+.nav-item:focus-visible,
+.tab-btn:focus-visible,
+.environment-badge:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
 }
 
 .nav-icon {
@@ -496,6 +507,18 @@ select option {
 
 .account-card:hover {
   border-color: var(--border-medium);
+}
+
+.account-manage-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
 }
 
 .account-avatar {
@@ -656,6 +679,20 @@ select option {
   scrollbar-width: none;
 }
 
+.action-bar-context {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.action-bar-section-label {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
 .action-bar-tabs::-webkit-scrollbar {
   display: none;
 }
@@ -726,7 +763,7 @@ select option {
   border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 600;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
@@ -740,24 +777,10 @@ select option {
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.environment-badge.is-instance:hover {
-  background: rgba(51, 65, 85, 0.95);
-  border-color: #58a6ff;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
-  transform: translateY(-1px);
-}
-
 .environment-badge.is-global {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-}
-
-.environment-badge.is-global:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border-medium);
-  color: var(--text-secondary);
-  transform: translateY(-1px);
 }
 
 .environment-badge .env-tag {
@@ -1466,7 +1489,7 @@ select option {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  cursor: pointer;
+  cursor: default;
   transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
   position: relative;
   min-width: 0;
@@ -1878,6 +1901,22 @@ select option {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-mono, monospace);
+}
+
+.installed-pack-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.installed-pack-author {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 
 .installed-pack-desc {
@@ -2569,6 +2608,14 @@ select option {
   border-color: var(--border-medium);
 }
 
+.version-capsule.is-readonly {
+  cursor: default;
+}
+
+.version-capsule.is-readonly:hover {
+  border-color: var(--border-subtle);
+}
+
 .version-select {
   background: transparent;
   border: none;
@@ -2581,6 +2628,27 @@ select option {
   max-width: 260px;
   padding: 4px 6px;
   text-overflow: ellipsis;
+}
+
+.version-static {
+  display: inline-flex;
+  align-items: center;
+  min-width: 140px;
+  max-width: 260px;
+  padding: 4px 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.version-edit-button {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  font-size: 11px;
 }
 
 .version-select option {

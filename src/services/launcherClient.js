@@ -1,3 +1,155 @@
+import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { listen as tauriListen } from '@tauri-apps/api/event';
+import { open as tauriOpenDialog } from '@tauri-apps/plugin-dialog';
+
+const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+
+function channelToTauriCommand(channel) {
+  if (channel === 'instances:get-all') return 'instances_get_all';
+  if (channel === 'shell:open-external') return 'shell_open_external';
+  return channel.replace(/[:\-]/g, '_');
+}
+
+const tauriLauncher = {
+  platform: typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? 'darwin' : (navigator.platform.includes('Win') ? 'win32' : 'linux'),
+  isMac: typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform),
+  systemTotalRamGb: 8,
+
+  // Window Controls
+  windowMinimize: () => tauriInvoke('window_minimize'),
+  windowMaximize: () => tauriInvoke('window_maximize'),
+  windowClose: () => tauriInvoke('window_close'),
+  openExternal: (url) => tauriInvoke('shell_open_external', { url }),
+
+  // System & Directories
+  minecraftGetRoot: () => tauriInvoke('minecraft_get_root'),
+  minecraftOpenRootDirectory: () => tauriInvoke('minecraft_open_root_directory'),
+  getAppVersion: () => tauriInvoke('app_get_version'),
+  getSystemInfo: () => tauriInvoke('system_get_info'),
+
+  // State & Settings
+  minecraftGetState: () => tauriInvoke('minecraft_get_state'),
+  minecraftSaveState: (state) => tauriInvoke('minecraft_save_state', { state }),
+  minecraftGetSettings: () => tauriInvoke('minecraft_get_settings'),
+  getAppLanguage: () => tauriInvoke('app_get_language'),
+  setAppLanguage: (language) => tauriInvoke('app_set_language', { language }),
+
+  // Catalog & News
+  minecraftGetCatalog: (options) => tauriInvoke('minecraft_get_catalog', { options }),
+  minecraftGetNews: (options) => tauriInvoke('minecraft_get_news', { options }),
+  minecraftGetArticle: (url) => tauriInvoke('minecraft_get_article', { url }),
+
+  // Auth
+  minecraftGetAuthState: (profileKey, _options) => tauriInvoke('minecraft_get_auth_state', { profileKey }),
+  minecraftLogin: (profileKey) => tauriInvoke('minecraft_login', { profileKey }),
+  minecraftLogout: (profileKey) => tauriInvoke('minecraft_logout', { profileKey }),
+
+  // Instances
+  getInstances: () => tauriInvoke('instances_get_all'),
+  createInstance: (payload) => tauriInvoke('instances_create', { payload }),
+  updateInstance: (id, updates) => tauriInvoke('instances_update', { id, updates }),
+  deleteInstance: (id) => tauriInvoke('instances_delete', { id }),
+  scanBaseDirectory: () => tauriInvoke('instances_scan_base'),
+  migrateBaseToInstance: (payload) => tauriInvoke('instances_migrate_base', { payload }),
+  pickInstanceImage: async () => {
+    try {
+      const selected = await tauriOpenDialog({
+        title: 'Select instance icon image',
+        multiple: false,
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'] }],
+      });
+      if (!selected) return { canceled: true };
+      const path = typeof selected === 'string' ? selected : selected.path;
+      const dataUri = await tauriInvoke('instances_read_image_data_uri', { path });
+      return { canceled: false, dataUri };
+    } catch (err) {
+      return { canceled: true, error: String(err) };
+    }
+  },
+
+  // Content
+  minecraftGetInstalledVersions: () => tauriInvoke('minecraft_get_installed_versions'),
+  minecraftGetInstalledMods: (instanceId) => tauriInvoke('minecraft_get_installed_mods', { instanceId: instanceId || null }),
+  minecraftGetInstalledShaders: (instanceId) => tauriInvoke('minecraft_get_installed_shaders', { instanceId: instanceId || null }),
+  minecraftGetInstalledResourcePacks: (instanceId) => tauriInvoke('minecraft_get_installed_resourcepacks', { instanceId: instanceId || null }),
+  minecraftGetInstalledDatapacks: (instanceId) => tauriInvoke('minecraft_get_installed_datapacks', { instanceId: instanceId || null }),
+  minecraftModrinthEnrichInstalledContent: (items, projectType) => tauriInvoke('minecraft_modrinth_enrich_installed_content', { items, projectType }),
+  minecraftToggleMod: (modId, enable, instanceId) => tauriInvoke('minecraft_toggle_mod', { modId, enable, instanceId: instanceId || null }),
+  minecraftSetAllModsEnabled: (enable, instanceId) => tauriInvoke('minecraft_set_all_mods_enabled', { enable, instanceId: instanceId || null }),
+  minecraftDeleteMod: (modId, instanceId) => tauriInvoke('minecraft_delete_mod', { modId, instanceId: instanceId || null }),
+  minecraftDeleteShader: (fileName, instanceId) => tauriInvoke('minecraft_delete_shader', { fileName, instanceId: instanceId || null }),
+  minecraftDeleteResourcePack: (fileName, instanceId) => tauriInvoke('minecraft_delete_resourcepack', { fileName, instanceId: instanceId || null }),
+  minecraftDeleteDatapack: (fileName, instanceId) => tauriInvoke('minecraft_delete_datapack', { fileName, instanceId: instanceId || null }),
+  minecraftOpenContentFolder: (folderType, instanceId) => tauriInvoke('minecraft_open_content_folder', { folderType, instanceId: instanceId || null }),
+  minecraftInstallModFile: (sourcePath, instanceId) => tauriInvoke('minecraft_install_mod_file', { sourcePath, instanceId: instanceId || null }),
+  minecraftImportContentFile: (payload, instanceId) => tauriInvoke('minecraft_import_content_file', { payload, instanceId: instanceId || null }),
+  minecraftPickModFiles: async () => {
+    try {
+      const selected = await tauriOpenDialog({
+        title: 'Select mod files',
+        multiple: true,
+        filters: [{ name: 'Minecraft Mods', extensions: ['jar', 'olpkg'] }, { name: 'All Files', extensions: ['*'] }],
+      });
+      if (!selected) return { canceled: true, filePaths: [] };
+      const filePaths = Array.isArray(selected) ? selected : [selected];
+      return { canceled: false, filePaths: filePaths.map(p => typeof p === 'string' ? p : p.path) };
+    } catch {
+      return { canceled: true, filePaths: [] };
+    }
+  },
+  minecraftPickContentFiles: async (type) => {
+    try {
+      const selected = await tauriOpenDialog({
+        title: `Select ${type} files`,
+        multiple: true,
+        filters: [{ name: 'Packs / Archives', extensions: ['zip', 'jar'] }, { name: 'All Files', extensions: ['*'] }],
+      });
+      if (!selected) return { canceled: true, filePaths: [] };
+      const filePaths = Array.isArray(selected) ? selected : [selected];
+      return { canceled: false, filePaths: filePaths.map(p => typeof p === 'string' ? p : p.path) };
+    } catch {
+      return { canceled: true, filePaths: [] };
+    }
+  },
+
+  // Modrinth
+  minecraftModrinthSearch: (params) => tauriInvoke('minecraft_modrinth_search', { params }),
+  minecraftModrinthGetProject: (idOrSlug) => tauriInvoke('minecraft_modrinth_get_project', { idOrSlug }),
+  minecraftModrinthGetVersions: (params) => tauriInvoke('minecraft_modrinth_get_versions', { params }),
+  minecraftModrinthGetVersion: (versionId) => tauriInvoke('minecraft_modrinth_get_version', { versionId }),
+  minecraftModrinthInstall: (payload) => tauriInvoke('minecraft_modrinth_install', { payload }),
+  minecraftCheckModUpdates: (params) => tauriInvoke('minecraft_check_mod_updates', { params }),
+
+  // Install & Run
+  minecraftInstall: (opts) => tauriInvoke('minecraft_install', { opts }),
+  minecraftInstallCancel: (opts) => tauriInvoke('minecraft_install_cancel', { installId: opts?.installId || 'default' }),
+  minecraftRun: (opts) => tauriInvoke('minecraft_run', { opts }),
+  minecraftStop: (opts) => tauriInvoke('minecraft_stop', { pid: opts?.pid }),
+
+  // Updater
+  minecraftCheckUpdate: () => tauriInvoke('minecraft_check_update'),
+  minecraftApplyUpdate: (payload) => tauriInvoke('minecraft_apply_update', { payload }),
+
+  // Generic IPC Bridge
+  invoke: (channel, data) => {
+    const cmd = channelToTauriCommand(channel);
+    return tauriInvoke(cmd, typeof data === 'object' && data !== null ? data : { payload: data });
+  },
+
+  on: (channel, listener) => {
+    let unlisten = null;
+    tauriListen(channel, (event) => {
+      listener(event.payload);
+    }).then((fn) => {
+      unlisten = fn;
+    }).catch(console.error);
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  },
+};
+
 const launcherFallback = {
   platform: 'browser',
   isMac: typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform),
@@ -19,12 +171,7 @@ const launcherFallback = {
   migrateBaseToInstance: (payload) => Promise.resolve({ ok: true, instance: { id: 'migrated', ...payload } }),
   pickInstanceImage: () => Promise.resolve({ canceled: true }),
   minecraftGetNews: () => Promise.resolve({ items: [], sourceUrl: 'https://www.minecraft.net/en-us/articles' }),
-  minecraftGetArticle: (url) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:get-article', url);
-    }
-    return Promise.resolve(null);
-  },
+  minecraftGetArticle: () => Promise.resolve(null),
   minecraftToggleMod: () => Promise.resolve({ ok: true }),
   minecraftDeleteMod: () => Promise.resolve({ ok: true }),
   minecraftDeleteShader: () => Promise.resolve({ ok: true }),
@@ -34,62 +181,20 @@ const launcherFallback = {
   minecraftImportContentFile: () => Promise.resolve({ ok: true }),
   minecraftPickContentFiles: () => Promise.resolve({ canceled: true, filePaths: [] }),
   minecraftInstallModFile: () => Promise.resolve({ ok: true }),
-  minecraftPickModFiles: () => Promise.resolve([]),
+  minecraftPickModFiles: () => Promise.resolve({ canceled: true, filePaths: [] }),
   minecraftSaveState: () => Promise.resolve({ ok: true }),
   minecraftSetAllModsEnabled: () => Promise.resolve({ ok: true }),
-  minecraftGetAuthState: (profileKey, options) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:get-auth-state', profileKey, options);
-    }
-    return Promise.resolve(null);
-  },
-  minecraftLogin: (profileKey) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:login', profileKey);
-    }
-    return Promise.resolve({
-      error: 'El inicio de sesión interactivo con Microsoft requiere ejecutar la aplicación de escritorio Electron.',
-    });
-  },
-  minecraftLogout: (profileKey) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:logout', profileKey);
-    }
-    return Promise.resolve(null);
-  },
+  minecraftGetAuthState: () => Promise.resolve(null),
+  minecraftLogin: () => Promise.resolve({ error: 'Desktop application required.' }),
+  minecraftLogout: () => Promise.resolve(null),
   minecraftCheckUpdate: () => Promise.resolve({ skipped: true }),
-  minecraftApplyUpdate: (payload) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:apply-update', payload);
-    }
-    return Promise.resolve({ skipped: true });
-  },
-  getAppVersion: () => Promise.resolve(''),
-  getSystemInfo: () => Promise.resolve({}),
-  minecraftInstall: (opts) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:install', opts);
-    }
-    return Promise.resolve({ installId: 'mock' });
-  },
-  minecraftRun: (opts) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:run', opts);
-    }
-    return Promise.resolve({ pid: 1234 });
-  },
-  minecraftStop: (opts) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:stop', opts);
-    }
-    return Promise.resolve({ stopped: true });
-  },
-  minecraftInstallCancel: (opts) => {
-    if (typeof window !== 'undefined' && window.launcher?.invoke) {
-      return window.launcher.invoke('minecraft:install-cancel', opts);
-    }
-    return Promise.resolve({ cancelled: true });
-  },
+  minecraftApplyUpdate: () => Promise.resolve({ skipped: true }),
+  getAppVersion: () => Promise.resolve('1.2.0'),
+  getSystemInfo: () => Promise.resolve({ totalRamGb: 8, platform: 'browser', arch: 'x64' }),
+  minecraftInstall: () => Promise.resolve({ installId: 'mock' }),
+  minecraftRun: () => Promise.resolve({ pid: 1234 }),
+  minecraftStop: () => Promise.resolve({ stopped: true }),
+  minecraftInstallCancel: () => Promise.resolve({ cancelled: true }),
   windowMinimize: () => { },
   windowMaximize: () => { },
   windowClose: () => { },
@@ -98,38 +203,12 @@ const launcherFallback = {
   on: () => () => { },
 };
 
-export const launcher = new Proxy({}, {
-  get(_target, prop) {
-    if (typeof window !== 'undefined' && window.launcher) {
-      const val = window.launcher[prop];
-      if (typeof val === 'function') {
-        return val.bind(window.launcher);
-      }
-      if (val !== undefined) {
-        return val;
-      }
-      if (typeof window.launcher.invoke === 'function') {
-        if (prop === 'minecraftInstall') return (opts) => window.launcher.invoke('minecraft:install', opts);
-        if (prop === 'minecraftRun') return (opts) => window.launcher.invoke('minecraft:run', opts);
-        if (prop === 'minecraftStop') return (opts) => window.launcher.invoke('minecraft:stop', opts);
-        if (prop === 'minecraftInstallCancel') return (opts) => window.launcher.invoke('minecraft:install-cancel', opts);
-        if (prop === 'minecraftLogin') return (key) => window.launcher.invoke('minecraft:login', key);
-        if (prop === 'minecraftLogout') return (key) => window.launcher.invoke('minecraft:logout', key);
-        if (prop === 'minecraftGetAuthState') return (key, opts) => window.launcher.invoke('minecraft:get-auth-state', key, opts);
-        if (prop === 'minecraftCheckUpdate') return () => window.launcher.invoke('minecraft:check-update');
-        if (prop === 'minecraftApplyUpdate') return (payload) => window.launcher.invoke('minecraft:apply-update', payload);
-      }
-    }
-    if (prop in launcherFallback) {
-      return launcherFallback[prop];
-    }
-    return () => Promise.resolve();
-  }
-});
+export const launcher = isTauri ? tauriLauncher : launcherFallback;
 
-export const minecraftLoginWithAbort = async (profileKey, abortSignal) => {
-  if (typeof window !== 'undefined' && window.launcher?.minecraftLogin) {
-    return await window.launcher.minecraftLogin(profileKey, abortSignal);
-  }
+if (typeof window !== 'undefined') {
+  window.launcher = launcher;
+}
+
+export const minecraftLoginWithAbort = async (profileKey, _abortSignal) => {
   return await launcher.minecraftLogin(profileKey);
 };

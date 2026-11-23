@@ -21,6 +21,10 @@ export function ShadersTab({
   handleDeleteShader,
 }) {
   const { t } = useI18n();
+  const visibleShaders = shaders.filter(shader => {
+    const fileName = String(shader.fileName || '').toLowerCase();
+    return shader.isDirectory || fileName.endsWith('.zip') || fileName.endsWith('.zip.disabled');
+  });
 
   return (
     <div
@@ -57,9 +61,9 @@ export function ShadersTab({
           )}
         </div>
 
-        {shaders.length > 0 && (
+        {visibleShaders.length > 0 && (
           <span className="mods-count-badge">
-            {shaders.length} {t('sidebar.shaders')}
+            {visibleShaders.length} {t('sidebar.shaders')}
           </span>
         )}
 
@@ -75,7 +79,7 @@ export function ShadersTab({
         </div>
       </div>
 
-      {shaders.length === 0 ? (
+      {visibleShaders.length === 0 ? (
         <EmptyState
           icon={ICONS.sun}
           title={t('mods.emptyShadersTitle')}
@@ -90,7 +94,7 @@ export function ShadersTab({
           onSecondary={() => handleOpenContentFolder('shaders')}
         />
       ) : (() => {
-        const filtered = shaders.filter(s =>
+        const filtered = visibleShaders.filter(s =>
           String(s.name || '').toLowerCase().includes(shaderSearch.toLowerCase()) ||
           String(s.fileName || '').toLowerCase().includes(shaderSearch.toLowerCase())
         );
@@ -131,7 +135,12 @@ export function ShadersTab({
                   </div>
                   <div className="installed-pack-meta">
                     <span className="installed-pack-title" title={shader.name}>{shader.name}</span>
-                    <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
+                    <div className="installed-pack-sub">
+                      {shader.authors ? (
+                        <span className="installed-pack-author" title={shader.authors}>by {shader.authors}</span>
+                      ) : null}
+                      <span className="installed-pack-file" title={shader.fileName}>{shader.fileName}</span>
+                    </div>
                   </div>
                 </div>
                 {shader.description && (

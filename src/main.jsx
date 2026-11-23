@@ -4,6 +4,10 @@ import './index.css'
 import App from './App.jsx'
 import { I18nProvider } from './context/I18nContext.jsx'
 
+if (!import.meta.env.DEV) {
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <I18nProvider>

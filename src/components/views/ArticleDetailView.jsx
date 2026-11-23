@@ -3,7 +3,7 @@ import { useI18n } from '../../context/I18nContext';
 import { ICONS } from '../../constants/icons';
 import { Icon } from '../common/CommonComponents';
 import { launcher } from '../../services/launcherClient';
-import { loadMinecraftArticle } from '../../lib/minecraftNews';
+import { loadMinecraftArticle, parseMinecraftArticleHtml } from '../../lib/minecraftNews';
 
 export function ArticleDetailView({ item, onBack }) {
   const { t } = useI18n();
@@ -31,10 +31,13 @@ export function ArticleDetailView({ item, onBack }) {
 
     try {
       let data = null;
-      if (typeof window !== 'undefined' && window.launcher?.minecraftGetArticle) {
+      if (typeof launcher?.minecraftGetArticle === 'function') {
         try {
-          data = await window.launcher.minecraftGetArticle(targetUrl);
+          data = await launcher.minecraftGetArticle(targetUrl);
         } catch {}
+      }
+      if (typeof data?.html === 'string') {
+        data = parseMinecraftArticleHtml(data.html, data.url || targetUrl);
       }
       if (!data || data.error) {
         data = await loadMinecraftArticle(targetUrl);

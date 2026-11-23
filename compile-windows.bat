@@ -78,41 +78,31 @@ if "%build_choice%"=="5" (
     exit /b 0
 )
 
-if "%build_choice%"=="4" (
-    cls
-    echo.
-    echo   OpenLauncher - Windows
-    echo  -------------------------------------------------------------
-    echo   [3/4] Packaging unpacked directory...
-    echo.
-    call %PKG_EXEC% electron-builder --win --dir
-    if errorlevel 1 exit /b 1
-    goto summary
-)
-
-if "%build_choice%"=="2" (
-    cls
-    echo.
-    echo   OpenLauncher - Windows
-    echo  -------------------------------------------------------------
-    echo   [3/4] Packaging portable Windows executable...
-    echo.
-    call %PKG_EXEC% electron-builder --win portable
-    if errorlevel 1 exit /b 1
-    goto summary
-)
-
-REM Handle NSIS custom build or Full build
 cls
 echo.
 echo   OpenLauncher - Windows
 echo  -------------------------------------------------------------
-echo   [3/4] Packaging Windows binaries...
+echo   [3/4] Compiling Tauri Application (Release mode)...
 echo.
-call %PKG_EXEC% electron-builder --win --dir
-if errorlevel 1 exit /b 1
+call %PKG_EXEC% tauri build --no-bundle
+if errorlevel 1 (
+    echo [ERROR] Tauri build failed!
+    exit /b 1
+)
 
-REM Try to find makensis for custom NSIS script
+if not exist "release\win-unpacked" mkdir "release\win-unpacked"
+copy /y "src-tauri\target\release\openlauncher.exe" "release\win-unpacked\OpenLauncher.exe" >nul
+
+if "%build_choice%"=="4" (
+    goto summary
+)
+
+if "%build_choice%"=="2" (
+    copy /y "src-tauri\target\release\openlauncher.exe" "release\OpenLauncher-Portable-Windows.exe" >nul
+    goto summary
+)
+
+REM Handle NSIS custom build or Full build
 set "MAKENSIS_PATH="
 if exist "C:\Program Files (x86)\NSIS\makensis.exe" set "MAKENSIS_PATH=C:\Program Files (x86)\NSIS\makensis.exe"
 if exist "C:\Program Files\NSIS\makensis.exe" set "MAKENSIS_PATH=C:\Program Files\NSIS\makensis.exe"
@@ -124,13 +114,13 @@ if not errorlevel 1 (
 )
 
 if not "%MAKENSIS_PATH%"=="" (
-    echo   [i] Compiling custom NSIS installer...
+    echo   [i] Compiling custom NSIS installer using script/installer.nsi...
     pushd script
-    "%MAKENSIS_PATH%" compile-electron.nsi
+    "%MAKENSIS_PATH%" installer.nsi
     popd
 ) else (
-    echo   [!] NSIS not found in PATH, using electron-builder NSIS fallback...
-    call %PKG_EXEC% electron-builder --win nsis
+    echo   [!] NSIS not found in PATH, using tauri build --bundles nsis fallback...
+    call %PKG_RUN% tauri build -- --bundles nsis
 )
 
 if "%build_choice%"=="1" (
@@ -140,8 +130,7 @@ if "%build_choice%"=="1" (
     echo  -------------------------------------------------------------
     echo   [4/4] Building portable executable...
     echo.
-    call %PKG_EXEC% electron-builder --win portable
-    if errorlevel 1 exit /b 1
+    copy /y "src-tauri\target\release\openlauncher.exe" "release\OpenLauncher-Portable-Windows.exe" >nul
 )
 
 :summary
@@ -151,7 +140,8 @@ echo   OpenLauncher - Windows
 echo  -------------------------------------------------------------
 echo   [OK] Build completed successfully!
 echo.
-echo   Artifacts generated in release\ folder.
+echo   Artifacts generated in release\ folder:
+dir /b release\*.exe 2>nul
 echo.
 
 endlocal

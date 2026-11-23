@@ -4,6 +4,7 @@ import babel from '@rolldown/plugin-babel';
 
 export default defineConfig({
   base: './',
+  clearScreen: false,
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
@@ -19,4 +20,5 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  envPrefix: ['VITE_', 'TAURI_'],
 });

@@ -1,173 +1,45 @@
 {
   "name": "OpenLauncher",
   "private": true,
-  "version": "1.1.4",
-  "description": "OpenLauncher is an open source Minecraft launcher developed by CesarGarza55",
+  "version": "1.2.0",
+  "description": "OpenLauncher is a fast, modern, and open-source Minecraft launcher built with React and Tauri with Rust",
   "author": "CesarGarza55",
   "type": "module",
-  "main": "electron/main.js",
   "scripts": {
-    "vite": "vite",
-    "electron": "wait-on http://localhost:5173 && electron .",
-    "electron:dev": "wait-on http://localhost:5173 && nodemon --watch electron --watch src/lib --ext js,cjs,mjs,json --exec \"electron . --dev\"",
-    "dev": "concurrently \"npm run vite\" \"npm run electron:dev\"",
+    "dev": "tauri dev",
     "build": "vite build",
-    "start": "electron .",
-    "build:win:dir": "npm run build && electron-builder --win --dir",
-    "build:win:installer": "npm run build && electron-builder --win nsis",
-    "build:mac:dir": "npm run build && electron-builder --mac --dir",
-    "build:mac:dmg": "npm run build && electron-builder --mac dmg",
-    "build:mac:zip": "npm run build && electron-builder --mac zip",
-    "build:mac:universal": "npm run build && electron-builder --mac --universal",
-    "build:mac:all": "npm run build && electron-builder --mac dmg zip",
-    "test:perf": "node script/test-performance.js"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "build:win": "compile-windows.bat",
+    "build:linux": "bash compile-linux.sh",
+    "build:mac": "bash compile-mac.sh",
+    "build:win:installer": "npx tauri build --no-bundle && node -e \"const fs=require('fs'); fs.mkdirSync('release/win-unpacked', {recursive:true}); fs.copyFileSync('src-tauri/target/release/openlauncher.exe', 'release/win-unpacked/OpenLauncher.exe');\" && cd script && \"C:\\Program Files (x86)\\NSIS\\makensis.exe\" installer.nsi && cd ..",
+    "build:win:portable": "npx tauri build --no-bundle && node -e \"const fs=require('fs'); fs.mkdirSync('release', {recursive:true}); fs.copyFileSync('src-tauri/target/release/openlauncher.exe', 'release/OpenLauncher-Portable-Windows.exe');\""
   },
   "dependencies": {
-    "adm-zip": "^0.6.1",
+    "@tauri-apps/api": "^2.12.5",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "marked": "^18.0.14"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@eslint/js": "^10.0.1",
     "@rolldown/plugin-babel": "^0.2.4",
+    "@tauri-apps/cli": "^2.12.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
-    "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
-    "electron": "^43.7.7",
-    "electron-builder": "^26.15.3",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
-    "nodemon": "^3.1.14",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "vite": "^8.3.2",
-    "wait-on": "^9.5.1"
-  },
-  "build": {
-    "appId": "com.codevbox.openlauncher",
-    "productName": "OpenLauncher",
-    "directories": {
-      "output": "release"
-    },
-    "asar": true,
-    "compression": "maximum",
-    "afterPack": "script/afterPack.cjs",
-    "removePackageScripts": true,
-    "removePackageKeywords": true,
-    "npmRebuild": false,
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "src/lib/**/*",
-      "src/locales/**/*",
-      "package.json"
-    ],
-    "extraMetadata": {
-      "main": "electron/main.js"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "dir",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "script/icon.ico"
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "tar.gz",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "category": "Game",
-      "maintainer": "CesarGarza55",
-      "artifactName": "${productName}.${ext}",
-      "icon": "script/icon.png"
-    },
-    "deb": {
-      "artifactName": "${productName}.${ext}",
-      "depends": [
-        "libgtk-3-0",
-        "libnotify4",
-        "libnss3",
-        "libxss1",
-        "libxtst6",
-        "xdg-utils",
-        "libatspi2.0-0",
-        "libuuid1",
-        "libappindicator3-1",
-        "libsecret-1-0"
-      ]
-    },
-    "portable": {
-      "artifactName": "${productName}-Portable-Windows.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "category": "public.app-category.games",
-      "icon": "script/icon.icns",
-      "artifactName": "${productName}-mac-${arch}.${ext}",
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
-    },
-    "dmg": {
-      "artifactName": "${productName}-mac-${arch}.${ext}",
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "electronLanguages": [
-      "en-US",
-      "es"
-    ],
-    "icon": "script/icon.ico"
+    "vite": "^8.3.2"
   }
 }
