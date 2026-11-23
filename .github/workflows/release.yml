@@ -147,7 +147,7 @@ jobs:
   build-macos:
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
-    runs-on: macos-14
+    runs-on: macos-latest
     strategy:
       matrix:
         include:
